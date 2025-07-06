@@ -1,0 +1,86 @@
+\documentclass[11pt]{article}  % Sets the font size to 12 pt and document type to article
+
+% =============================
+% Essential Packages
+% =============================
+\usepackage[utf8]{inputenc}     % Ensures proper encoding of special characters
+\usepackage[T1]{fontenc}        % Improved font encoding
+\usepackage{amsmath, amsfonts, amssymb} % Common math packages
+\usepackage{geometry}           % More intuitive control over margins
+\usepackage{fancyhdr}           % Custom headers and footers
+\usepackage{lmodern}            % Improved Latin Modern font
+%\usepackage{setspace}          % Uncomment for line spacing adjustments (e.g., \doublespacing)
+\usepackage[most]{tcolorbox}
+
+% =============================
+% Color Box
+% =============================
+
+\newtcolorbox{notebox}[2][]{%
+  colback=yellow!10!white,
+  colframe=yellow!50!black,
+  coltitle=black,
+  fonttitle=\normalfont,
+  enhanced,
+  attach boxed title to top left={yshift=-2mm,xshift=5mm},
+  boxed title style={colback=yellow!50!white},
+  title={#2},
+  sharp corners=south,
+  rounded corners=northwest,
+  #1
+}
+
+% =============================
+% Page Layout
+% =============================
+\geometry{
+  left=1in,
+  right=1in,
+  top=1in,
+  bottom=1in
+}
+
+% =============================
+% Header Setup
+% =============================
+\pagestyle{fancy}
+\fancyhf{}  % Clear default header/footer
+\fancyhead[R]{\today}
+\fancyhead[C]{Norm Selection}
+\fancyhead[L]{}
+\renewcommand{\headrulewidth}{0.4pt}  % Header line thickness
+
+
+% =============================
+% Macros
+% =============================
+\input{macros.tex}  % No .tex extension needed
+
+
+% =============================
+% Begin Document
+% =============================
+\begin{document}
+
+\section{Linear Algebra}
+
+
+\paragraph{Column wise decomposition}
+Any matrix $\mA \in \R^{m \times n}$ can be decomposed into the sum of its columns: 
+\begin{align}
+	\mA = \sum_{i=1}^{n} \mA_{:j} e_j^{\top},
+\end{align}
+where $e_j$ are standard basis vectors of $\R^n$.
+Notice that this is a rank $1$ decomposition.
+
+\paragraph{Row wise decomposition}
+Any matrix $\mA \in \R^{m \times n}$ can be decomposed into the sum of its rows: 
+\begin{align}
+	\mA = \sum_{i=1}^{m} e_i \mA_{i:}^{\top},
+\end{align}
+where $e_i$ are standard basis vectors of $\R^m$.
+Notice that this is a rank $1$ decomposition.
+
+
+
+\end{document}

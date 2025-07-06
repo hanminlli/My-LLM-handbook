@@ -1,0 +1,322 @@
+\usepackage{url}            % simple URL typesetting
+\usepackage{booktabs}       % professional-quality tables
+\usepackage{amsfonts}       % blackboard math symbols
+\usepackage{nicefrac}       % compact symbols for 1/2, etc.
+\usepackage{microtype}      % microtypography
+%\usepackage[table]{xcolor}         % colors
+\usepackage{bbm}
+%\usepackage{dsfont}
+\usepackage{tcolorbox}
+\usepackage{euscript}    %  
+\usepackage{makecell}
+\usepackage{times}
+\RequirePackage{fix-cm}
+\usepackage{cmap}                   %   PDF
+\usepackage{comment}
+\usepackage{xr}
+\usepackage{tikz}
+%\usepackage{extsizes} %   14- 
+\usepackage{csquotes} %   
+\usepackage{siunitx}
+\usepackage{float}
+\restylefloat{table}
+\usepackage{array}
+%\usepackage{undertilde}
+\usepackage{setspace} % 
+%\onehalfspacing %  1.5
+%\doublespacing %  2
+%\singlespacing %  1f
+\usepackage[export]{adjustbox}
+\usepackage{lastpage} % ,     .
+\usepackage{soulutf8} %  
+\usepackage{icomma} % "" : $0,2$ --- , $0, 2$ --- 
+%\newenvironment{solution}
+%{\renewcommand\qedsymbol{$\blacksquare$}\begin{proof}[Solution]}{\end{proof}}
+\usepackage{diagbox, eqparbox, hhline}
+\usepackage{etoolbox}
+\usepackage{mathtools}
+\usepackage{etextools}
+\usepackage{ifthen}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{amsmath,amssymb, amsthm}
+%\usepackage{charter}
+%\usepackage{calc}
+\usepackage[flushleft]{threeparttable} % http://ctan.org/pkg/threeparttable
+\usepackage{calligra}
+\usepackage{layout}
+\usepackage{lipsum}
+%\mathtoolsset{showonlyrefs=true}
+\usepackage{mathrsfs}
+\usepackage{color}
+\usepackage{setspace}
+\usepackage{multicol} %  
+\usepackage{filecontents}
+%nwork with tables
+\usepackage{array,tabularx,tabulary,booktabs} %    
+%\usepackage{longtable}  %  
+\usepackage{multirow} %    
+\usepackage{graphicx}
+%\usepackage{subfig}
+\usepackage{fancyhdr}
+\usepackage{theoremref}
+\usepackage{pifont}%for defining \xmark
+%\usepackage[noend]{algpseudocode}
+%\usepackage{verbatim}
+%\usepackage[ruled,vlined]{algorithm2e}
+
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+
+\usepackage[colorinlistoftodos,bordercolor=orange,backgroundcolor=orange!20,linecolor=orange,textsize=scriptsize]{todonotes}
+\usepackage{xspace}
+
+\usepackage{hyperref}       % hyperlinks
+\usepackage{cleveref}
+
+\usepackage{enumitem}
+
+
+\usepackage{wrapfig}
+\usepackage{listings}
+\usepackage{xcolor}
+\lstdefinestyle{mystyle}{
+    language=Python,
+    basicstyle=\ttfamily\small,
+    keywordstyle=\color{blue},
+    stringstyle=\color{red},
+    commentstyle=\color{gray},
+    numbers=left,
+    numberstyle=\tiny,
+    stepnumber=1,
+    breaklines=true,
+    tabsize=4
+}
+
+
+
+\lstset{style=mystyle}
+
+
+%%%%%%%%%%%%%%
+%NEW COMMANDS   %%%
+%%%%%%%%%%%%%%
+\DeclareMathOperator*{\prox}{prox}
+\DeclareMathOperator*{\brox}{brox}
+\DeclareMathOperator*{\argmax}{arg\,max}
+\DeclareMathOperator*{\argmin}{arg\,min}
+\DeclareMathOperator*{\sign}{sign}
+\DeclareMathOperator*{\sgn}{sgn}
+\DeclarePairedDelimiter\abs{\lvert}{\rvert}
+
+\newcommand{\inner}[2]{\left\langle #1, #2 \right\rangle}
+
+% macros.tex
+
+\newcommand{\mA}{\mathbf{A}}
+\newcommand{\mB}{\mathbf{B}}
+\newcommand{\mC}{\mathbf{C}}
+\newcommand{\mD}{\mathbf{D}}
+\newcommand{\mE}{\mathbf{E}}
+\newcommand{\mF}{\mathbf{F}}
+\newcommand{\mG}{\mathbf{G}}
+\newcommand{\mH}{\mathbf{H}}
+\newcommand{\mI}{\mathbf{I}}
+\newcommand{\mJ}{\mathbf{J}}
+\newcommand{\mK}{\mathbf{K}}
+\newcommand{\mL}{\mathbf{L}}
+\newcommand{\mM}{\mathbf{M}}
+\newcommand{\mN}{\mathbf{N}}
+\newcommand{\mO}{\mathbf{O}}
+\newcommand{\mP}{\mathbf{P}}
+\newcommand{\mQ}{\mathbf{Q}}
+\newcommand{\mR}{\mathbf{R}}
+\newcommand{\mS}{\mathbf{S}}
+\newcommand{\mT}{\mathbf{T}}
+\newcommand{\mU}{\mathbf{U}}
+\newcommand{\mV}{\mathbf{V}}
+\newcommand{\mW}{\mathbf{W}}
+\newcommand{\mX}{\mathbf{X}}
+\newcommand{\mY}{\mathbf{Y}}
+\newcommand{\mZ}{\mathbf{Z}}
+
+% Calligraphic letters
+\newcommand{\cA}{\mathcal{A}}
+\newcommand{\cB}{\mathcal{B}}
+\newcommand{\cC}{\mathcal{C}}
+\newcommand{\cD}{\mathcal{D}}
+\newcommand{\cE}{\mathcal{E}}
+\newcommand{\cF}{\mathcal{F}}
+\newcommand{\cG}{\mathcal{G}}
+\newcommand{\cH}{\mathcal{H}}
+\newcommand{\cI}{\mathcal{I}}
+\newcommand{\cJ}{\mathcal{J}}
+\newcommand{\cK}{\mathcal{K}}
+\newcommand{\cL}{\mathcal{L}}
+\newcommand{\cM}{\mathcal{M}}
+\newcommand{\cN}{\mathcal{N}}
+\newcommand{\cO}{\mathcal{O}}
+\newcommand{\cP}{\mathcal{P}}
+\newcommand{\cQ}{\mathcal{Q}}
+\newcommand{\cR}{\mathcal{R}}
+\newcommand{\cS}{\mathcal{S}}
+\newcommand{\cT}{\mathcal{T}}
+\newcommand{\cU}{\mathcal{U}}
+\newcommand{\cV}{\mathcal{V}}
+\newcommand{\cW}{\mathcal{W}}
+\newcommand{\cX}{\mathcal{X}}
+\newcommand{\cY}{\mathcal{Y}}
+\newcommand{\cZ}{\mathcal{Z}}
+
+% Bracket macros
+\newcommand{\cbrac}[1]{\left\{ #1 \right\}}   % Curly braces
+\newcommand{\sbrac}[1]{\left[ #1 \right]}     % Square brackets
+\newcommand{\rbrac}[1]{\left( #1 \right)}     % Round parentheses
+% Norm macro
+\newcommand{\norm}[1]{\left\lVert #1 \right\rVert}
+\newcommand{\normsub}[2]{\left\lVert #1 \right\rVert_{#2}}
+\newcommand{\normarrow}[3]{\left\lVert #1 \right\rVert_{#2 \rightarrow #3}}
+\newcommand{\normabs}[1]{\left\lvert #1 \right\rvert}
+
+
+\let\la=\langle
+\let\ra=\rangle
+
+\def\<{\left\langle}
+\def\>{\right\rangle}
+% \def\[{\left[}
+%\def\]{\right]}
+\def\({\left(}
+\def\){\right)}
+
+%\newcommand{\st}{\;:\;}
+\newcommand{\ve}[2]{\langle #1 ,  #2 \rangle}
+
+%\newcommand{\eqdef}{\stackrel{\text{def}}{=}}
+\newcommand{\eqdef}{:=}
+\newcommand{\ii}{{}^{(i)}}
+
+
+\newcommand{\Prob}{\mathbf{Prob}}
+\newcommand{\E}{\mathbf{E}}
+\newcommand{\R}{\mathbb{R}}
+
+
+% sets
+\DeclareMathOperator{\card}{card}       % cardinality of a set
+\DeclareMathOperator{\diam}{diam}       % diameter of a set
+\DeclareMathOperator{\MVEE}{MVEE}       % minim volume enclosing ellipsoid of a set
+\DeclareMathOperator{\vol}{vol}         % volume of a set
+
+% statistical
+% \DeclareMathOperator{\Exp}{{\rm E}}           % expectation
+%\newcommand{\Exp}[1]{{\rm E}\left[#1\right]}
+\newcommand{\Exp}[1]{\mathbb{E}\left[#1\right]}
+\newcommand{\Expu}[2]{\mathbb{E}_{#1}\left[#2\right]}
+\newcommand{\ExpSub}[2]{\mathbb{E}_{#1}\left[#2\right]}
+% Trace macro
+\newcommand{\tr}[1]{\mathrm{tr}\left(#1\right)}
+
+
+\DeclareMathOperator{\Cov}{Cov}         % covariance
+\DeclareMathOperator{\Var}{Var}         % variance
+\DeclareMathOperator{\Corr}{Corr}       % correlation
+\DeclareMathOperator{\LMO}{LMO} 
+
+% functions and operators
+\DeclareMathOperator{\signum}{sign}     % signum/sign of a scalar
+\DeclareMathOperator{\dom}{dom}         % domain
+\DeclareMathOperator{\epi}{epi}         % epigraph
+\DeclareMathOperator{\Ker}{null}        % nullspace/kernel
+\DeclareMathOperator{\nullspace}{null}  % nullpsace
+\DeclareMathOperator{\range}{range}     % range
+\DeclareMathOperator{\Image}{Im}        % image
+
+% topology
+\DeclareMathOperator{\interior}{int}    % interior
+\DeclareMathOperator{\ri}{rint}         % relative interior
+\DeclareMathOperator{\rint}{rint}       % relative interior
+\DeclareMathOperator{\bdry}{bdry}       % boundary
+\DeclareMathOperator{\cl}{cl}           % closure
+
+% vectors, matrices
+\DeclareMathOperator{\linspan}{span}
+\DeclareMathOperator{\linspace}{linspace}
+\DeclareMathOperator{\cone}{cone}
+
+%\DeclareMathOperator{\tr}{tr}           % trace
+\DeclareMathOperator{\rank}{rank}       % rank
+\DeclareMathOperator{\conv}{conv}       % convex hull
+\DeclareMathOperator{\Diag}{Diag}       % Diag(v) = diagonal matrix with v_i on the diagonal
+\DeclareMathOperator{\diag}{diag}       % diag(D) = the diagonal vector of matrix D
+
+\DeclareMathOperator{\Arg}{Arg}         % Argument
+
+
+
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{proposition}{Proposition}
+
+\theoremstyle{plain}
+
+\newtheorem{example}{Example}
+\newtheorem{assumption}{Assumption}
+\newtheorem{lemma}{Lemma}
+\newtheorem{fact}{Fact}
+
+\newtheorem{prop}[theorem]{Proposition}
+\newtheorem{corollary}{Corollary}
+\newtheorem{lem}[theorem]{Lemma}
+\newtheorem{claim}[theorem]{Claim}
+\newtheorem{remark}{Remark}
+
+
+\newtheorem{exercise}[theorem]{Exercise}
+
+\newtheorem{rem}[theorem]{Remark}
+\newtheorem{que}[theorem]{Question}
+\newtheorem{definition}{Definition}
+
+
+%zerosarah paper symbols
+
+\newcommand*{\qedb}{\hfill\ensuremath{\square}}   % or \blacksquare
+\newcommand{\topic}[1]{\vspace{2mm}\noindent{{\bf #1:}}}
+\newcommand{\head}[1]{\noindent{{\bf #1:}}}
+
+\definecolor{mydarkgreen}{RGB}{39,130,67}
+\definecolor{mydarkred}{RGB}{192,47,25}
+\definecolor{mydarkblue}{RGB}{39,47,180}
+\definecolor{mydarkpurple}{RGB}{48,25,52}
+\newcommand{\green}{\color{mydarkgreen}}
+\newcommand{\red}{\color{mydarkred}}
+\newcommand{\blue}{\color{mydarkblue}}
+\newcommand{\purple}{\color{mydarkpurple}}
+
+\newcommand{\zerosarah}{{\sf ZeroSARAH}\xspace}
+\newcommand{\clip}{\operatorname{clip}}
+
+
+
+\definecolor{lightblue}{RGB}{224, 240, 255} % Adjust RGB values as needed
+\definecolor{bgcolor}{rgb}{0.8,1,1}
+\definecolor{bgcolor2}{rgb}{0.8,1,0.8}
+\newenvironment{proofof}[1]{\smallskip\noindent{\bf \em Proof of #1.}}%
+
+
+
+
+
+\newcommand{\peter}[1]{\todo[inline]{\textbf{Peter: }#1}}
+\newcommand{\igor}[1]{\todo[inline]{\textbf{Igor: }#1}}
+\newcommand{\abdurakhmon}[1]{\todo[inline]{\textbf{Abdurakhmon: }#1}}
+\newcommand{\hanmin}[1]{\todo[inline]{\textbf{Hanmin: }#1}}
+
+\newcommand{\algname}[1]{{\sf \footnotesize \color{mydarkgreen} #1}\xspace}
+
+%\newcommand{\theHalgorithm}{\arabic{algorithm}}
+
+
+\newcommand{\rA}{{\red A}}
+\newcommand{\rB}{{\red B}}
