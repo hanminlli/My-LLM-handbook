@@ -11,6 +11,7 @@
 \usepackage{lmodern}            % Improved Latin Modern font
 %\usepackage{setspace}          % Uncomment for line spacing adjustments (e.g., \doublespacing)
 \usepackage[most]{tcolorbox}
+\usepackage{enumitem} 
 
 % =============================
 % Color Box
@@ -107,6 +108,123 @@ If we assume each weight entry $w_{j, t}$ are i.i.d. with variance $\sigma^2$ th
 \end{align*}
 So the standard deviation $\sim \sqrt{E}$.
 To ensure that logits do not scale with the model dimension, we scale it by $\sqrt{E}$.
+
+
+
+\section{Attention}
+
+\paragraph{Multihead Self Attention (MHA)}
+Consider an input tensor $\mX \in \R^{B \times L \times d_{\text{model}}}$ to an attention layer, where $B$ is the batch size, $L$ is the sequence length, and $d_{\text{model}}$ is the model dimension.
+
+\begin{enumerate}
+  \item The first step involves computing queries, keys, and values. 
+  We have three matrices, $\mW_q$, $\mW_k$, and $\mW_v \in \R^{d_{\text{model}} \times d_{\text{model}}}$, and simultaneously perform the following operations
+  \begin{align}
+    \mQ = \mX \mW_{q};\quad \mK = \mX \mW_{k};\quad \mV = \mX\mW_{v}.
+  \end{align}
+  These operations are vectorized, meaning that for each sequence $b$ in the batch of size B, we do 
+  \begin{align*}
+    \mQ_b = \mX_b\mW_{q} \quad \forall b \in [B].
+  \end{align*} 
+  $\mW_q$, $\mW_k$, and $\mW_v$ are trainable parameters shared across the entire batch. 
+  The resulting $\mQ$, $\mK$, and $\mV$ have the shape $\R^{B \times L \times d_{\text{model}}}$.
+
+  \item Next, for multihead attention, we reshape $\mQ$, $\mK$, and $\mV$ from shape $\R^{B \times L \times d_{\text{model}}}$ into $\R^{B \times H \times L \times d_{\text{head}}}$, where $H$ is the number of attention heads and $d_{\text{head}}$ is the dimension of each head.
+  To achieve this, we first divide $d_{\text{model}}$ into $H$ heads, resulting in shapes of $\R^{B \times L \times H \times d_{\text{head}}}$. 
+  Then we rearrange into $\R^{B \times H \times L \times d_{\text{head}}}$.
+  Conceptually, each head uses a subset of dimensions from $d_{\text{model}}$ to compute scores between queries and keys along the sequence dimension $L$.
+  We will use the following notations $\mQ_h, \mK_h, \mV_h$ to denote the per head tensor in $R^{B \times 1 \times L \times d_{\text{head}}}$ for each head $h \in [H]$.
+
+  \item In the next step, we perform the attention calculation:
+  \begin{align*}
+    \mS_h &\eqdef \text{Scores}_h(\mQ_h, \mK_h) = \frac{\mQ_h \mK_h^{\top}}{\sqrt{d_{\text{head}}}} + \mM\\
+    \mA_h &\eqdef \text{Attention}_h(\mQ, \mK, \mV) = \text{softmax}\rbrac{\mS_h}\mV_h, \quad \forall h \in [H].
+  \end{align*}
+  The scaled multiplication of $\mQ_h$ and $\mK^{\top}_h$ is vectorized, resulting in $\mS_h \in \R^{B\times 1\times L \times L}$ and $\mS \in \R^{B\times H\times L \times L}$.\footnote{Here $\mS$ is the stack of $\mS_h$ along dimension $H$.}
+  Optionally, we could use a mask matrix to mask out certain tokens, an example would be the causual self attention.
+  To stabilize the gradients, we element-wise divide raw scores by $\sqrt{d_{\text{head}}}$.
+  This scaling choice can be justified because each element of $\mQ_h\mK_h^{\top}$ represents a dot product between vectors of dimension $d_{\text{model}}$. 
+  The variance of this dot product scales as $\Var\rbrac{\inner{q_h}{k_h}}\sim d_{\text{model}}\sigma_q^2\sigma_k^2$. 
+  Since variance scales quadratically, we divide by $\sqrt{d_{\text{head}}}$.
+  The softmax operation turns the scores after masking into probabilities, along the last dimension.\footnote{This is to say that for each $L \times L$ matrix, we softmax every row.}
+  Imagine $z = [z_1, \hdots, z_L] \in \R^L$ is a row vector, then essentially, softmax defines the operation:
+  \begin{align}
+    \sigma(z)_i \eqdef \frac{e^{z_i}}{\sum_{j=1}^{L}e^{z_j}}.
+  \end{align}
+  Sometimes we use a numerically stable version to replace it 
+  \begin{align}
+    \tilde{\sigma}(z) \eqdef \frac{e^{z_i - \max(z)}}{\sum_{j=1}^{L}e^{z_j - \max(z)}}.
+  \end{align}
+
+  It is worth mentioning that in single head attention (scaled dot product), the complexity of computation is $\cO\rbrac{BL^2d_{\text{model}}}$, while for multihead attention, it is the same since we do $\cO\rbrac{H \times BL^2d_{\text{head}}} = \cO\rbrac{BL^2d_{\text{model}}}$. 
+
+  \item Finally, we concatenate and mix attention outputs from all heads. 
+  Concatenation involves first transposing $\mA_h$ to $\R^{B \times L \times H \times d_{\text{head}}}$ and then merging the last two dimensions into $\mA \in \R^{B \times L \times d_{\text{model}}}$. 
+  This concatenated result is projected using a matrix $\mW_O$, as follows:
+  \begin{align}
+    \text{MHA}(\mX) = \mA\mW_{O}. 
+  \end{align}
+  The final output retains the shape $\R^{B \times L \times d_{\text{model}}}$.
+\end{enumerate}
+There a bunch of reasons why we are using multi heads instead of scaled dot product attention. 
+\begin{itemize}
+  \item \textbf{Diversity of learned attention patterns}: Each head learns different attention patterns in parallel. 
+  A single attention head computes only one set of attention scores.
+
+  \item \textbf{Subspace specialization}: Instead of operating in $d_{\text{model}}$, each head projects to a lower dimension subspace $d_{\text{head}}$.
+  This suggests that each head operates in a distinct feature subspace.
+
+  \item \textbf{Improved gradient flow and representation mixing}: Independent paths improve gradient flow and richness of learned representations.
+\end{itemize}
+Notice that the compuatational cost are the \textbf{SAME}!
+
+\paragraph{Multi Query Attention (MQA)}
+In MQA, different heads have its own query, but share the same key and value.
+Specifically, for a head $h$, we have 
+\begin{align*}
+  \mS_h &\eqdef \text{Scores}(\mQ_h, \mK) = \frac{\mQ_h\mK^{\top}}{\sqrt{d_{\text{head}}}} + \mM \\
+  \mA_h &\eqdef \text{Attention}_h (\mQ_h, \mK, \mV) = \text{softmax}(\mS_h)\mV, \quad \forall h \in [H]. 
+\end{align*}
+This means that for each head $h$, we have a separate $\mQ_h \in \R^{B \times 1 \times L \times d_{\text{head}}}$ and shared $\mK, \mV \in \R^{B \times 1 \times L \times d_{\text{head}}}$.
+
+Compared to standrad MHA, MQA has the following features:
+\begin{itemize}
+  \item \textbf{Reduced parameter count}: Each head has its own query only, shared key and value.
+  \item \textbf{Smaller activation size (memory usage)}: Now $\mK, \mV \in \R^{B \times 1 \times L \times d_{\text{head}}}$, so the activation size is smaller.
+  \item \textbf{Reduced KV cache (fast inferencing)}: For transformer based models such as GPT, we generate text one token at a time. 
+  To avoid recomputing attention over all previous tokens on every step, we cache $k, v$ (key and value vectors) for all previously seen tokens.
+  Specifically, in standard MHA, for each layer and token generated, we neeed $2BHLd_{\text{head}}$ for cached $\mK, \mV$.
+  In MQA, we share $\mK$ and $\mV$ so that the cost becomes $2BLd_{\text{head}}$.
+  \item \textbf{Minimal accuracy loss.} Used in GPT-3.5, PaLM, LLaMA, etc.
+\end{itemize}
+
+\paragraph{KV cache}
+The motivation for KV caching is to enable efficient inference — both in terms of compute time and memory bandwidth.
+At inference time only, autoregressive models input a sequence of tokens $\cbrac{x_t, \hdots, x_{t + L - 1}}$ to generate the next token $x_{t + L}$. 
+To avoid recomputing key and value vectors for all previous tokens every time, we cache the $k, v$ pairs corresponding to the tokens $x_t \hdots, x_{t + L - 1}$ in the forward pass.
+Then, when generating $x_{t + L + 1}$, we can reuse the vectors for cached $x_{t + 1}, \hdots, x_{t + L - 1}$ and we only need to compute $k, v$ for $x_{t + L}$. 
+This mechanism is known as the \textbf{KV cache}.
+
+
+\paragraph{Grouped Query Attention (GQA)}
+GQA is like an interpolation between MQA and MHA, where we ask groups of heads to share $\mK, \mV$.
+Specifically, let $g(h)$ be a function that maps a head $h$ to its corrsponding group index, then we have 
+\begin{align*}
+  \mS_h &\eqdef \text{Scores}(\mQ_h, \mK_{g(h)}) = \frac{\mQ_h\mK^{\top}_{g(h)}}{\sqrt{d_{\text{head}}}} + \mM \\
+  \mA_h &\eqdef \text{Attention}_h (\mQ_h, \mK_{g(h)}, \mV_{g(h)}) = \text{softmax}(\mS_h)\mV_{g(h)}, \quad \forall h \in [H]. 
+\end{align*} 
+Benefits:
+\begin{enumerate}
+  \item Less memory than MHA.
+  \item Flexible compute/memory tradeoff by controlling the number of k, v heads.
+\end{enumerate}
+It is used in LLaMA 2 and Mistral.
+
+
+
+\paragraph{Multihead Local Attention (MLA)}
+
+
 
 
 
