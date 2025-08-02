@@ -342,7 +342,16 @@ basically, we are computing mean and variance per channel.
 
 \subsection{RMSNorm}
 Its name is Root Mean Square Layer Normalization, which has become popular in some recent LLMs, especially as a lighter and sometimes more numerically stable alternative to LayerNorm.
-
+It normalizes only by root mean square of the features\footnote{Features in this context refer to the elements in dimension $d_{\text{model}}$} instead of mean and variance.
+Given $X \in \R^{B \times L \times d_{\text{model}}}$ 
+\begin{align*}
+  \text{RMS}_{b, l} = \sqrt{\frac{1}{d_{\text{model}}}\sum_{i=1}^{d_{\text{model}}} \mX[b, l, i]^2 + \epsilon}
+\end{align*}
+Then, each element in $\mX$ is normalized by 
+\begin{align*}
+  \hat{X}[b, l, i] = \frac{\mX[b, l, i]}{\text{RMS}_{b, l}} \cdot \gamma_i, \qquad \forall i \in [d],
+\end{align*}
+where $\gamma_i$ is the $i$-th component of the learnable scaling factor $\gamma \in \R^{d_{\text{model}}}$.
 
 
 
