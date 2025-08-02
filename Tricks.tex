@@ -313,6 +313,19 @@ where all operations are elementwise.
 Notice that $\gamma, \beta \in \R^{d_{\text{model}}}$ are learnable parameters.
 
 
+\subsection{Dropout}
+\paragraph{During Training:}
+This refers to During training we randomly set a fraction of the sub-layer output activations to zero and scale the survivors.
+Specifically, for $\mX \in \R^{B \times L \times d_{\text{model}}}$ and the drop out rate $0 < p < 1$, we sample a binary traning mask $\mM \in \cbrac{0, 1}^{B \times L \times d_{\text{model}}}$, using the Bernoulli($q$) distribution where $q = 1 - p$, we then apply 
+\begin{align*}
+  \widehat{\mX} = \frac{1}{q}\mX \odot \mM.
+\end{align*}
+$q$ is referred to as the keep probability, and we are trying to make $\Exp{\widehat{\mX}} = \mX$.
+\paragraph{During Inferencing:}
+At inference time the mask is removed and $\mX$ passes through unchanged.
+
+
+\subsection{DCA}
 
 
 \section{Normalizations}
@@ -339,6 +352,9 @@ If we are given an input 2D/Convolutional data $\mX \in \R^{B \times C \times H 
   \mu_c = \frac{1}{BHW}\sum_{b,h,w}\mX[b, c, h, w], \quad \sigma_c^2 = \frac{1}{BHW}\sum_{b,h,w}(\mX[b, c, h, w] - \mu_c)^2,
 \end{align*}
 basically, we are computing mean and variance per channel.
+Notice that \textbf{LayerNorm is still the default in most Vision Transformer (ViT-style) backbones}. 
+In CNN, sometimes GroupNorm replaces BatchNorm because it's batch-size independent and mixes well with vision features.
+
 
 \subsection{RMSNorm}
 Its name is Root Mean Square Layer Normalization, which has become popular in some recent LLMs, especially as a lighter and sometimes more numerically stable alternative to LayerNorm.
@@ -352,6 +368,35 @@ Then, each element in $\mX$ is normalized by
   \hat{X}[b, l, i] = \frac{\mX[b, l, i]}{\text{RMS}_{b, l}} \cdot \gamma_i, \qquad \forall i \in [d],
 \end{align*}
 where $\gamma_i$ is the $i$-th component of the learnable scaling factor $\gamma \in \R^{d_{\text{model}}}$.
+
+LLaMA (and most of Meta-Llama 1/2/3 checkpoints) swap the original LayerNorm for pre-norm RMSNorm.
+
+Below is a complete list of RMSNorm's features.
+\begin{itemize}
+  \item {\bf (Rescales by RMS only \& scaling only)}.
+  \item {\bf (Compute \& Memory efficiency)}. ~ 30 \% cheaper per norm op; overall 2-6 \% faster end-to-end in large LLMs.
+  \item {\bf (Numerically stable)}. Works well with very deep pre-norm Transformers.
+\end{itemize}
+When does it shine: (1) Ultra-deep LLMs, (2) Inference-first or edge deployments, (3) Pre-norm architectures.
+
+RMSNorm really does skip the “subtract-the-mean” step, so a single normalization needs one less reduction-operation and a bit less memory traffic (removing the mean saves one vector reduction, one broadcast, and one add.). 
+This skip would not affect training stability, because pre-norm residuals absorb the offset: in modern transformers RMSNorm sits before each residual branch, any mean shift can be compensated by the next linear layer's bias.
+To see this: consider the following procedure, (assuming $x \in \R^d$)
+\begin{align*}
+  \boxed{x} \xrightarrow{\text{RMSNorm}} \boxed{y = \gamma \cdot \frac{x}{\norm{x}_{\text{RMS}}}} \xrightarrow{\mW, b} \boxed{u = \mW y + b} \xrightarrow{} \boxed{z = x + u}
+\end{align*}
+$y$ indeed does not have mean zero, denote it as $\mu_{y}$, since the next operation is affine, we can rewrite it as 
+\begin{align*}
+  u = \mW(y - \mu_{y}{\bf{1}}) + (b + \mW\mu_{y}{\bf{1}}),
+\end{align*}
+which means that it is equivalent to adjusting the bias. 
+During training, back-prop will simply nudge $b$ so the network learns whatever overall shift is optimal, it does not care where that shift originates.
+After that $u$ is added to the original $x$, but the drift in $\mu_{y}$ will not accumulate unchecked because: (1) The residual path still carries the original, unshifted activations, (2) The next block starts with another RMSNorm, which rescales its input (including any offset) back to a controlled RMS before new computations begin.
+
+
+
+
+\section{Precisions}
 
 
 
