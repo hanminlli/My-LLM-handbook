@@ -1,5 +1,5 @@
 # Fdb version 4
-["pdflatex"] 1754142656.01753 "c:/Users/19358/Desktop/Documents/Commonly-used-facts-tricks/Tricks.tex" "Tricks.pdf" "Tricks" 1754142657.37763 0
+["pdflatex"] 1754143611.96627 "c:/Users/19358/Desktop/Documents/Commonly-used-facts-tricks/Tricks.tex" "Tricks.pdf" "Tricks" 1754143613.4303 0
   "C:/Users/19358/AppData/Local/MiKTeX/fonts/map/pdftex/pdftex.map" 1753617015 82507 a9eef8696c92627b87e9975edea03b2a ""
   "C:/Users/19358/AppData/Local/MiKTeX/fonts/pk/ljfour/jknappen/ec/dpi657/tcrm1000.pk" 1754135237 12648 dc87e36e8ab46199ca56f74d1570a8c5 ""
   "C:/Users/19358/AppData/Local/MiKTeX/fonts/pk/ljfour/jknappen/ec/dpi657/tctt1000.pk" 1754132008 10480 12f8d0f1e6cc0312613777311ec7aba2 ""
@@ -19,6 +19,8 @@
   "C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/tfm/adobe/times/ptmr8c.tfm" 1136761454 1352 fa28a7e6d323c65ce7d13d5342ff6be2 ""
   "C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/tfm/adobe/times/ptmr8r.tfm" 1136761454 4408 25b74d011a4c66b7f212c0cc3c90061b ""
   "C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/tfm/adobe/times/ptmr8t.tfm" 1136761454 6672 e3ab9e37e925f3045c9005e6d1473d56 ""
+  "C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/tfm/adobe/times/ptmri8r.tfm" 1136761454 4640 532ca3305aad10cc01d769f3f91f1029 ""
+  "C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/tfm/adobe/times/ptmri8t.tfm" 1136761454 6944 94c55ad86e6ea2826f78ba2240d50df9 ""
   "C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/tfm/adobe/zapfding/pzdr.tfm" 1136761454 1528 7e12f4c0fcf5a072cebdcfbfc610f54c ""
   "C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/tfm/jknappen/ec/ecrm1000.tfm" 993062122 3148 7e594c8240c71e432203f65ab5f95a51 ""
   "C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/tfm/jknappen/ec/ecrm1095.tfm" 993062124 3172 eb6efaa83c6c52473a1c403f376eab0f ""
@@ -70,10 +72,12 @@
   "C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/urw/courier/ucrr8a.pfb" 1136846148 45758 19968a0990191524e34e1994d4a31cb6 ""
   "C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/urw/times/utmb8a.pfb" 1136842548 44729 fea0975e20ec51c992338362f05f1146 ""
   "C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/urw/times/utmr8a.pfb" 1136842548 46026 687528a208fbfc1f00832bb96cccebbb ""
+  "C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/urw/times/utmri8a.pfb" 1136842548 45458 504e2b06fa82109d168c7a0afb09e145 ""
   "C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/vf/adobe/courier/pcrr8t.vf" 1136765053 2184 8475af1b9cfa983db5f46f5ed4b8f9f7 ""
   "C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/vf/adobe/times/ptmb8t.vf" 1136761454 2340 df9c920cc5688ebbf16a93f45ce7bdd3 ""
   "C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/vf/adobe/times/ptmr8c.vf" 1136761454 3556 8a9a6dcbcd146ef985683f677f4758a6 ""
   "C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/vf/adobe/times/ptmr8t.vf" 1136761454 2348 91706c542228501c410c266421fbe30c ""
+  "C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/vf/adobe/times/ptmri8t.vf" 1136761454 2328 6cd7df782b09b29cfc4d93e55b6b9a59 ""
   "C:/Users/19358/AppData/Local/Programs/MiKTeX/tex/context/base/mkii/supp-pdf.mkii" 1580390158 71627 94eb9990bed73c364d7f53f960cc8c5b ""
   "C:/Users/19358/AppData/Local/Programs/MiKTeX/tex/generic/atbegshi/atbegshi.sty" 1575571100 24708 5584a51a7101caf7e6bbf1fc27d8f7b1 ""
   "C:/Users/19358/AppData/Local/Programs/MiKTeX/tex/generic/bigintcalc/bigintcalc.sty" 1576433602 40635 c40361e206be584d448876bba8a64a3b ""
@@ -327,10 +331,10 @@
   "C:/Users/19358/AppData/Local/Programs/MiKTeX/tex/latex/wrapfig/wrapfig.sty" 1044403200 26220 3701aebf80ccdef248c0c20dd062fea9 ""
   "C:/Users/19358/AppData/Local/Programs/MiKTeX/tex/latex/xcolor/xcolor.sty" 1700127522 55487 80a65caedd3722f4c20a14a69e785d8f ""
   "C:/Users/19358/AppData/Local/Programs/MiKTeX/tex/latex/xkeyval/xkeyval.sty" 1656236919 4937 4ce600ce9bd4ec84d0250eb6892fcf4f ""
-  "Tricks.aux" 1754142657 2827 f24c4ee11777370c90f939beec29f6e1 "pdflatex"
-  "Tricks.out" 1754142657 2859 f77a324116b1d3b4fa9c347be7c52dc8 "pdflatex"
-  "Tricks.tex" 1754142653 24744 8864b35ac4f7e4f92bf06b4c08c14b03 ""
-  "c:/Users/19358/Desktop/Documents/Commonly-used-facts-tricks/Tricks.tex" 1754142653 24744 8864b35ac4f7e4f92bf06b4c08c14b03 ""
+  "Tricks.aux" 1754143613 3827 6df083aead4b79819e43c3229f726649 "pdflatex"
+  "Tricks.out" 1754143613 3516 7b9a2cce3a25cccd2ac11e96114a1551 "pdflatex"
+  "Tricks.tex" 1754143611 26865 a186396cd0cd2c86de6288117a12eed4 ""
+  "c:/Users/19358/Desktop/Documents/Commonly-used-facts-tricks/Tricks.tex" 1754143611 26865 a186396cd0cd2c86de6288117a12eed4 ""
   "macros.tex" 1751963268 9549 1c23571b72760630f48e8ed95f441460 ""
   (generated)
   "Tricks.aux"

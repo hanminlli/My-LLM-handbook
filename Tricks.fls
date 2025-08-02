@@ -599,6 +599,9 @@ INPUT C:\Users\19358\AppData\Local\Programs\MiKTeX\fonts\tfm\jknappen\ec\tcrm100
 INPUT C:\Users\19358\AppData\Local\Programs\MiKTeX\fonts\vf\adobe\courier\pcrr8t.vf
 INPUT C:\Users\19358\AppData\Local\Programs\MiKTeX\fonts\tfm\adobe\courier\pcrr8r.tfm
 INPUT C:\Users\19358\AppData\Local\Programs\MiKTeX\fonts\tfm\adobe\times\ptmr8t.tfm
+INPUT C:\Users\19358\AppData\Local\Programs\MiKTeX\fonts\tfm\adobe\times\ptmri8t.tfm
+INPUT C:\Users\19358\AppData\Local\Programs\MiKTeX\fonts\vf\adobe\times\ptmri8t.vf
+INPUT C:\Users\19358\AppData\Local\Programs\MiKTeX\fonts\tfm\adobe\times\ptmri8r.tfm
 INPUT Tricks.aux
 INPUT .\Tricks.out
 INPUT .\Tricks.out
@@ -640,3 +643,5 @@ INPUT C:\Users\19358\AppData\Local\Programs\MiKTeX\fonts\type1\urw\times\utmb8a.
 INPUT C:\Users\19358\AppData\Local\Programs\MiKTeX\fonts\type1\urw\times\utmb8a.pfb
 INPUT C:\Users\19358\AppData\Local\Programs\MiKTeX\fonts\type1\urw\times\utmr8a.pfb
 INPUT C:\Users\19358\AppData\Local\Programs\MiKTeX\fonts\type1\urw\times\utmr8a.pfb
+INPUT C:\Users\19358\AppData\Local\Programs\MiKTeX\fonts\type1\urw\times\utmri8a.pfb
+INPUT C:\Users\19358\AppData\Local\Programs\MiKTeX\fonts\type1\urw\times\utmri8a.pfb

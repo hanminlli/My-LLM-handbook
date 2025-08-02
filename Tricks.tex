@@ -324,8 +324,17 @@ $q$ is referred to as the keep probability, and we are trying to make $\Exp{\wid
 \paragraph{During Inferencing:}
 At inference time the mask is removed and $\mX$ passes through unchanged.
 
+Code: 
+\begin{verbatim}
+  torch.nn.Dropout(p=p)
+\end{verbatim}
 
 \subsection{DCA}
+This one seems to be less well known, on medical image tasks.
+
+\subsection{Linear Attention}
+
+\subsection{Sparse Attention}
 
 
 \section{Normalizations}
@@ -395,9 +404,54 @@ After that $u$ is added to the original $x$, but the drift in $\mu_{y}$ will not
 
 
 
+\section{Positional Embedding}
+
+
+
 
 \section{Precisions}
+Here is a summary provided by Chat-GPT o3.
+% ---------------- Table 1: high / mid precision ----------------
+\begin{table}[ht]
+\centering
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{@{}lccccc@{}}
+\toprule
+\textbf{Format} & \textbf{Bits} & \textbf{Exp/Mant} &
+\textbf{Dynamic range$^\dagger$} & \textbf{ULP@1} &
+\textbf{Typical use} \\
+\midrule
+FP32        & 32 & 8/23 & $1.2\!\times\!10^{-38}$-$3.4\!\times\!10^{38}$ & $2^{-23}$ & Master weights, optimiser \\
+FP16 (IEEE) & 16 & 5/10 & $6.1\!\times\!10^{-5}$-$6.6\!\times\!10^{4}$   & $2^{-10}$ & Fwd/Bwd on Volta \& T4 \\
+\textbf{bfloat16} & 16 & 8/7  & $1.2\!\times\!10^{-38}$-$3.4\!\times\!10^{38}$ & $2^{-7}$  & Default on A100/H100, TPU \\
+TF32$^{*}$  & 19 & 8/10 & $\phantom{0}$same as FP32 & $2^{-10}$ & GEMMs on Ampere \\
+\bottomrule
+\end{tabular}
+\caption{Mid-/high-precision dtypes widely used during LLM training.%
+$^\dagger$Smallest positive \emph{normal} value to largest finite.%
+$^{*}$TF32 is a compute mode; tensors stored as FP32.}
+\end{table}
 
+% ---------------- Table 2: low precision & INT -----------------
+\begin{table}[ht]
+\centering
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{@{}lccccc@{}}
+\toprule
+\textbf{Format} & \textbf{Bits} & \textbf{Exp/Mant} &
+\textbf{Dynamic range$^\dagger$} & \textbf{ULP@1} &
+\textbf{Typical use} \\
+\midrule
+FP8-E4M3 & 8 & 4/3 & $9.2\!\times\!10^{-8}$-$4.5\!\times\!10^{2}$  & $2^{-3}$ & Research train / fast inf.\ (H100) \\
+FP8-E5M2 & 8 & 5/2 & $3.0\!\times\!10^{-10}$-$5.7\!\times\!10^{4}$ & $2^{-2}$ & Wider range variant (H100) \\
+INT8 / INT4 & 8/4 & — & $\pm127$ / $\pm7$ & 1 / $1/16$ & Post-training inference quant. \\
+\bottomrule
+\end{tabular}
+\caption{Very low-precision formats used for efficient training research (FP8) or deployment quantisation (INT).}
+\end{table}
+
+
+\section{Computing the Number of Parameters}
 
 
 \end{document}
