@@ -14,6 +14,9 @@ class MultiHeadSelfAttention(nn.Module):
         self.use_numerical_softmax = use_numrical_softmax
 
         self.W_q = nn.Linear(d_model, d_model, bias=False)
+        # Automatically registered as part of your model’s parameters (shows up in .parameters() and gets trained).
+        # F.linear is just a linear transformation, and we need to supply the weights and bias, does not register
+        # parameters or handle device management
         self.W_k = nn.Linear(d_model, d_model, bias=False)
         self.W_v = nn.Linear(d_model, d_model, bias=False)
 

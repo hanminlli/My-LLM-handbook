@@ -66,7 +66,7 @@
 \section{Linear Algebra}
 
 
-\paragraph{Column wise decomposition.}
+\subsection{Column wise decomposition.}
 Any matrix $\mA \in \R^{m \times n}$ can be decomposed into the sum of its columns: 
 \begin{align}
 	\mA = \sum_{i=1}^{n} \mA_{:j} e_j^{\top},
@@ -74,7 +74,7 @@ Any matrix $\mA \in \R^{m \times n}$ can be decomposed into the sum of its colum
 where $e_j$ are standard basis vectors of $\R^n$.
 Notice that this is a rank $1$ decomposition.
 
-\paragraph{Row wise decomposition.}
+\subsection{Row wise decomposition.}
 Any matrix $\mA \in \R^{m \times n}$ can be decomposed into the sum of its rows: 
 \begin{align}
 	\mA = \sum_{i=1}^{m} e_i \mA_{i:}^{\top},
@@ -84,7 +84,7 @@ Notice that this is a rank $1$ decomposition.
 
 
 \section{LLM Training}
-\paragraph{Scaling the logits after LLM head.}
+\subsection{Scaling the logits after LLM head.}
 We usually apply RMS norm to normalize (along the last dimension $E$, where it stands for model dimension, $B$ means batch size and $L$ means sequence length) the tensor $\mX \in \R^{B \times L \times E}$ we feed into LLM head, and obtain the corresponding logits $l$.
 After RMS normalization, each tensor corresponding to the token $x_i \in \R^E$ will then have ${\rm RMS}(x_t) = 1$.
 Now notice that for each coordinate $x_{i, t}, t\in[E]$, treating as a random variable, its variance is given by 
@@ -113,7 +113,7 @@ To ensure that logits do not scale with the model dimension, we scale it by $\sq
 
 \section{Attention}
 
-\paragraph{Multihead Self Attention (MHA)}
+\subsection{Multihead Self Attention (MHA)}
 Consider an input tensor $\mX \in \R^{B \times L \times d_{\text{model}}}$ to an attention layer, where $B$ is the batch size, $L$ is the sequence length, and $d_{\text{model}}$ is the model dimension.
 
 \begin{enumerate}
@@ -178,7 +178,7 @@ There a bunch of reasons why we are using multi heads instead of scaled dot prod
 \end{itemize}
 Notice that the compuatational cost are the \textbf{SAME}!
 
-\paragraph{Multi Query Attention (MQA)}
+\subsection{Multi Query Attention (MQA)}
 In MQA, different heads have its own query, but share the same key and value.
 Specifically, for a head $h$, we have 
 \begin{align*}
@@ -198,7 +198,7 @@ Compared to standrad MHA, MQA has the following features:
   \item \textbf{Minimal accuracy loss.} Used in GPT-3.5, PaLM, LLaMA, etc.
 \end{itemize}
 
-\paragraph{KV cache}
+\subsection{KV cache}
 The motivation for KV caching is to enable efficient inference — both in terms of compute time and memory bandwidth.
 At inference time only, autoregressive models input a sequence of tokens $\cbrac{x_t, \hdots, x_{t + L - 1}}$ to generate the next token $x_{t + L}$. 
 To avoid recomputing key and value vectors for all previous tokens every time, we cache the $k, v$ pairs corresponding to the tokens $x_t \hdots, x_{t + L - 1}$ in the forward pass.
@@ -206,7 +206,7 @@ Then, when generating $x_{t + L + 1}$, we can reuse the vectors for cached $x_{t
 This mechanism is known as the \textbf{KV cache}.
 
 
-\paragraph{Grouped Query Attention (GQA)}
+\subsection{Grouped Query Attention (GQA)}
 GQA is like an interpolation between MQA and MHA, where we ask groups of heads to share $\mK, \mV$.
 Specifically, let $g(h)$ be a function that maps a head $h$ to its corrsponding group index, then we have 
 \begin{align*}
@@ -222,8 +222,126 @@ It is used in LLaMA 2 and Mistral.
 
 
 
-\paragraph{Multihead Local Attention (MLA)}
+\subsection{Multihead Latent Attention (MLA)}
+Before we go into details, we need to first differentiate between self attention and cross attention. 
+\begin{itemize}
+  \item Self attention is the case when Q, K, V comes from the same input sequence. Its typically used in encoder blocks of BERT, GPT, LLaMA, etc, and decoder blocks in GPT, T5, etc.
+  \item Cross attention refers to the case when Q comes from one sequence but K, V comes from another sequence. It is typically used in the case that decoder attends to encoder outputs (T5, BART), and the case of vision language models where text attends to image, and perceiver-style latent attention.
+\end{itemize}
+We can formulate cross attention in the following way: Let $\mZ \in \R^{B \times M \times d_{\text{model}}}$ (expanded from $\R^{1 \times M \times d_{\text{model}}}$.) be a target sequence (queries) and $\mX \in \R^{B \times L \times d_{\text{model}}}$ be a source sequence (keys and values),
+\begin{align}
+  \mQ = \mZ\mW_q; \quad \mK = \mX\mW_k; \quad \mV = \mX\mW_v.
+\end{align}
+Notice that $M$ could be different than $L$.
+In the case of cross-attention with a latent array, we often have, $M << L$, which significantly reduces computational cost by avoiding full self-attention over the entire input sequence.
+We then compute the attention scores and softmax:
+\begin{align}
+  \mS_h &\eqdef \text{Scores}(\mQ_h, \mK_{h}) = \frac{\mQ_h\mK^{\top}_{h}}{\sqrt{d_{\text{head}}}} \\
+  \mA_h &\eqdef \text{Attention}_h (\mQ_h, \mK_{h}, \mV_{h}) = \text{softmax}(\mS_h)\mV_{h}, \quad \forall h \in [H].
+\end{align}
+Notice that in this case $\mS_h \in \R^{B \times 1 \times M \times L}$ and $\mA_h \in \R^{B \times 1 \times M \times d_{\text{head}}}$ for head $h \in [H]$. 
+After concatenation, we result in $\mA \in \R^{B, M \times d_{\text{model}}}$, which is like we are focusing on a smaller sequence.
+In MLA, latent vector it self is a learnable parameter and shared accross a batch. 
+These latents act like information bottleneck that extract useful features from the long input $\mX \in \R^{B \times L \times d_{\text{model}}}$.
 
+
+
+\subsection{Latent Transformer Block}
+This is a key design of Perceiver (2021, DeepMind), Set Transformer and efficient transformers for long inputs (e.g., audio, video, documents).
+Essentially it can be viewed as cross attention followed by latent self-attention.
+Mathematically speaking, we are giving a vector $\mX \in \R^{B \times L \times d_{\text{model}}}$. 
+First we are using the latent vector $\mZ \in \R^{1 \times M \times d_{\text{model}}}$ (expanded accross batch dimension.) and the input $\mX \in \R^{B \times L \times d_{\text{model}}}$, we have 
+\begin{align*}
+  \mA_1 = \text{Attention}(\mX_q = \mZ, \mX_k = \mX, \mX_v = \mX),
+\end{align*}
+which essentially asks "What should I learn from all of you tokens?".
+After this step: each latent now contains information extracted from the input.
+Notice that now $\mA_1 \in \R^{B \times M \times d_{\text{model}}}$ is a compressed representation of $\mX$, extracted by the latent array.
+Then we do normal self attention on the latent variable:
+\begin{align*}
+  \mA_2 = \text{Attention}(\mX_q = \mA_1, \mX_k = \mA_1, \mX_v = \mA_1)
+\end{align*}
+where each latent vector is allowed to look at other latents, share what they learned and refine itself.
+\begin{verbatim}
+  for each block:
+    z = z + CrossAttention(q ← z, k ← x, v ← x)
+    z = z + SelfAttention(q ← z, k ← z, v ← z)    
+\end{verbatim}
+Before we actually feed the $\mZ$ and $\mX$ into the attention block and the final feed forward layer, we first do normlization (LayerNorm in the case of my code).
+
+
+
+\subsection{Pre- and Post- Normlization}
+In general, there are two ways of doing layer normlization, Post-LN and Pre-LN. 
+In the original implementation of transformer, post-LN is used. 
+However, pre-LN has become the modern default, which is used in GPT-2/3/4, T5, LLaMA, PaLM, Perceiver, etc.
+The benefits of using pre-LN includes the follows:
+\begin{itemize}
+  \item {\bf (Help gradient flow \& increasing training stability)}: In a deep stack, residual paths carry the untouched signal forward. 
+  With Pre-LN, those residual paths also carry unit-variance, zero-mean activations (because they are already normalized). 
+  That keeps gradients well-scaled and prevents the exploding / vanishing issues that appeared when stacking 24 - 100+ layers with Post-LN.
+  Empirically, Pre-LN lets you train hundreds (even thousands) of layers with a stable learning rate schedule, whereas Post-LN often needed warm-up tricks or gradient clipping.
+  \item {\bf (Easier optimization of very long sequences)}: Cross-entropy loss is applied after the final LayerNorm.
+  With Post-LN every sub-layer's output is renormalized, the network must constantly “undo” those shifts.
+  Pre-LN leaves the residual branch untouched, so the model can accumulate information across time steps or tokens without repeatedly rescaling it.
+  \item {\bf (Faster convergence)}: Many ablations show ~ 1.3 - 1.5x faster convergence for GPT/T5 style models when switching from Post-LN → Pre-LN. This is because every tensor that flows straight down the stack (both forward activations and backward gradients through the residual skip) has mean 0 and variance 1, which helps stabilize second-moment estimate quickly for Adam.
+  \item {\bf (Safer with half-precision / mixed-precision)}: Normalizing before the high-variance matrix multiplications keeps activations in a narrower numeric range, reducing overflow/underflow risk in FP16/BF16 training.
+\end{itemize}
+
+
+\textbf{LayerNorm:} Mathematically speaking, consider an input $\mX$ in the space $\R^{B \times L \times d_{\text{model}}}$, for the $l$-th token in the $b$-th batch
+\begin{align*}
+  \mL[b, l, :] = \text{LayerNorm}(\mX[b, l, :]) = \gamma \cdot \frac{X[b, l, :] - \mu_{n, l}}{\sqrt{\sigma^2_{b, l}} + \epsilon} + \beta, 
+\end{align*}
+where 
+\begin{align*}
+  \mu_{b, l} = \frac{1}{d_{\text{model}}}\sum_{i=1}^{d_{\text{model}}}\mX[b, l, i], \quad \sigma^2_{b, l} = \frac{1}{d_{\text{model}}}\sum_{i=1}^{d_{\text{model}}}\rbrac{\mX[b, l, i] - \mu_{b, l}}^2,
+\end{align*}
+$\gamma, \beta \in \R^{d_{\text{model}}}$ are learned shift and scale vectors.
+Notice that statistics are computed per sample, per position, no batch coupling, so the network behaves the same in training and inference and is robust to batch-size 1. 
+Its benefits includes: 
+\begin{itemize}
+  \item {\bf (Zero-mean, unit-var features).} Keeps dot-products in a predictable range, resulting in stable softmax gradients.
+  \item {\bf (Identical behaviour in training / inferencing).} Important for autoregressive generation where batch size changes.
+  \item {\bf (Works with any sequence length).} No running-average statistics needed.
+\end{itemize}
+In a simpler form, layernorm can be written as 
+\begin{align*}
+  \mL = \gamma \odot \frac{\mX - \mu}{\sqrt{\sigma + \epsilon}} + \beta,
+\end{align*}
+where all operations are elementwise.
+Notice that $\gamma, \beta \in \R^{d_{\text{model}}}$ are learnable parameters.
+
+
+
+
+\section{Normalizations}
+Besides the layer norm mentioned in the previous chapter, there are other norms used quite often.
+
+\subsection{BatchNorm}
+Batch norm is rarely used in language modeling especially in modern architectures. 
+It is not sequence or position aware, and it requires consistent statistics over a batch, with variable-length sequences in language modeling, the batch statistics can be unstable and unreliable.
+Furthermore, it mixes information from each sequences, but ideally we want to keep it separate. 
+However, it is great for vision tasks
+
+Mathematically, given an input $\mX \in \R^{B \times d}$, for each feature $j$, we have 
+\begin{align*}
+  \mu_j = \frac{1}{B}\sum_{i=1}^{B}\mX[i, j], \quad \sigma^2_j = \frac{1}{B}\sum_{i=1}^{B}(\mX[i, j] - \mu_j)^2.
+\end{align*}
+Then each value is normlized in a way that 
+\begin{align*}
+  \hat{X}[i, j] = \gamma[j] \frac{X[i, j] - \mu_j}{\sqrt{\sigma_j^2 + \epsilon}} + \beta[j],
+\end{align*}
+where $\gamma, \beta \in \R^d$ are learnable parameters per feature / channel.
+
+If we are given an input 2D/Convolutional data $\mX \in \R^{B \times C \times H \times W}$, we have 
+\begin{align*}
+  \mu_c = \frac{1}{BHW}\sum_{b,h,w}\mX[b, c, h, w], \quad \sigma_c^2 = \frac{1}{BHW}\sum_{b,h,w}(\mX[b, c, h, w] - \mu_c)^2,
+\end{align*}
+basically, we are computing mean and variance per channel.
+
+\subsection{RMSNorm}
+Its name is Root Mean Square Layer Normalization, which has become popular in some recent LLMs, especially as a lighter and sometimes more numerically stable alternative to LayerNorm.
 
 
 
