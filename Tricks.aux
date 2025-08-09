@@ -29,8 +29,22 @@
 \@writefile{toc}{\contentsline {section}{\numberline {6}Precisions}{8}{section.6}\protected@file@percent }
 \@writefile{lot}{\contentsline {table}{\numberline {1}{\ignorespaces Mid-/high-precision dtypes widely used during LLM training.$^\dagger $Smallest positive \emph  {normal} value to largest finite.$^{*}$TF32 is a compute mode; tensors stored as FP32.}}{8}{table.1}\protected@file@percent }
 \@writefile{lot}{\contentsline {table}{\numberline {2}{\ignorespaces Very low-precision formats used for efficient training research (FP8) or deployment quantisation (INT).}}{8}{table.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {7}Computing the Number of Parameters}{9}{section.7}\protected@file@percent }
-\newlabel{LastPage}{{}{9}{}{page.9}{}}
-\xdef\lastpage@lastpage{9}
-\xdef\lastpage@lastpageHy{9}
-\gdef \@abspage@last{9}
+\@writefile{toc}{\contentsline {paragraph}{How they (FP8) are used on H100:}{10}{section*.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Scaling is not optional:}{10}{section*.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Per channel vs. per tensor:}{10}{section*.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Automation on H100:}{10}{section*.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {7}Encoder and Decoder Structure}{11}{section.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Encoder}{11}{section*.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Decoder}{11}{figure.caption.10}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{The original seq2seq transformer:}{12}{section*.11}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.1}Encoder only models}{12}{subsection.7.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.2}Decoder only models}{13}{subsection.7.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.3}Encoder-decoder models}{13}{subsection.7.3}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {3}{\ignorespaces Comparison of encoder-only, decoder-only, and encoder--decoder Transformer architectures.}}{13}{table.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.4}The Linear Layers}{13}{subsection.7.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {8}Computing the Number of Parameters}{14}{section.8}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces Pre-LN Transformer \textbf  {Decoder} block. Each sublayer consumes a LayerNormed input. The masked self-attention applies a \emph  {causal mask} (no future tokens). Cross-attention queries come from the decoder stream, while keys/values are derived from the encoder memory $\mathbf  {M}$ (encoder hidden states: $\mathbf  {K}=\mathbf  {W}_\mathbf  {K}\mathbf  {M}$, $\mathbf  {V}=\mathbf  {W}_\mathbf  {V}\mathbf  {M}$).}}{15}{figure.caption.10}\protected@file@percent }
+\newlabel{LastPage}{{}{15}{}{page.15}{}}
+\xdef\lastpage@lastpage{15}
+\xdef\lastpage@lastpageHy{15}
+\gdef \@abspage@last{15}

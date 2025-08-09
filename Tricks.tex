@@ -12,6 +12,16 @@
 %\usepackage{setspace}          % Uncomment for line spacing adjustments (e.g., \doublespacing)
 \usepackage[most]{tcolorbox}
 \usepackage{enumitem} 
+\usepackage{tikz}
+\usetikzlibrary{positioning,shapes,arrows.meta,calc} % <-- added calc
+
+\tikzset{
+  block/.style={draw, rounded corners, minimum width=26mm, minimum height=7mm, align=center},
+  norm/.style={draw, rounded corners, minimum width=20mm, minimum height=7mm, align=center},
+  plus/.style={circle, draw, inner sep=0pt, minimum size=4mm},
+}
+
+
 
 % =============================
 % Color Box
@@ -450,8 +460,369 @@ INT8 / INT4 & 8/4 & — & $\pm127$ / $\pm7$ & 1 / $1/16$ & Post-training inferen
 \caption{Very low-precision formats used for efficient training research (FP8) or deployment quantisation (INT).}
 \end{table}
 
+A floating point number in IEEE-style formats is stored as:
+\begin{verbatim}
+  Sign bit | Exponent bits | Mantissa (fraction) bits
+\end{verbatim}
+\begin{enumerate}
+  \item \textbf{Sign bit}: ($1$ bit), $0$ positive and $1$ negative.
+  \item \textbf{Exponent bits}: control the scale (powers of $2$). 
+  More exponent bits means wider dynamic range.
+  \item \textbf{Mantissa bits}: control the precision (how many distinct numbers you can represent between powers of 2). More mantissa bits means smaller ULP\footnote{Unit in the Last Place: The smallest possible difference between two representable floating-point numbers around a given value} (more precise).
+\end{enumerate}
+A number is typically constructed in this way:
+\begin{align*}
+  (-1)^{\text{sign}} \times (1.\text{mantissa bits}) \times 2^{\text{exponent} - \text{bias}}.
+\end{align*}
+
+\begin{itemize}
+  \item \textbf{FP32} is used as the safe baseline in deep learning, it is almost always used for the master weigts\footnote{Master weight refers to the full-precision copy of the model's parameter that we keep during mixed-precision training.} and optimizer state because it is numerically stable.
+  
+  \item \textbf{FP16} is used in forward/backward pass to save memory in Volta(Nvidia V100)/T4 mixed-precision training. Prone to overflow/underflow unless scaled (hence loss scaling).
+  
+  \item \textbf{Loss scaling} refers to the practice we multiply our loss by a large constant $S$ before back propagation: $L_{\text{scaled}} = S \cdot L$, this scales up gradients which avoids gradient underflow. 
+  However, after computing the gradients, we divide them by $S$ before updating the weights to restore correct magnitude. 
+  NVIDIA's AMP (Automatic Mixed Precision) does dynamic loss scaling, adjusting $S$ automatically to prevent overflow. 
+
+  \item \textbf{bfloat16} is Brain floating point came from Google Brain, whose exp bits are same as \textbf{FP32}, but the mantissa bits are much fewer, this avoids the over/under-flow problem in \textbf{BF16}. 
+  This comes at a price of lower precision, but it is the default choice on A100 and H100.
+
+  FP16 on Volta/T4 is fast but fragile, and requires loss scaling, which is why bfloat16 became popular. 
+  It enjoys the same range as FP32, but no scaling headaches.
+
+  Its advantage includes: (i) no losss scaling needed to handle with over/under flow, (ii) half the memory of \textbf{FP32}, (iii) speed up in matmul on A100/H100, (iv) can used as a drop in for \textbf{FP32}, because the dynamic range is the same.
+
+  For downsides: (a) precisiob loss, (b) optimizers often still keep master weights in \textbf{FP32} to avoid cumulative rounding error, (c) numerically sensitive operations such as $\text{softmax}$/ normalization, kernel still uses \textbf{FP32} internally.
+
+  \item \textbf{TF32}: NVIDIA introduced with Ampere GPUs (A100, RTX 3000 series), default in cuBLAS/cuDNN matmul on Ampere if you pass FP32 inputs. FP32's size and range, FP16's precision.
+  
+  \item \textbf{FP8-E4M3, FP8-E5M2}: We can now tell directly from their names that FP8-E4M3 has a narrower dynamic range at a higher precision. For FP8-E4M3, ULP@1 is $\frac{1}{2^3} = 0.125$ and for FP8-E5M2, the ULP@1 becomes $\frac{1}{2^2} = 0.25$ which is very coarse.
+  
+  E4M3: good for weights and activations that stay within a moderate range.
+
+  E5M2: good for gradients or loss-related values that can swing wildly in magnitude.
+\end{itemize}
+
+\paragraph{How they (FP8) are used on H100:} It can be applied both for training and inferencing.
+
+During \textbf{training:}
+\begin{enumerate}
+  \item Keep master weights in FP32 (like with FP16/bfloat16 training).
+  \item Cast activations/gradients to FP8 for GEMMs inside the forward/backward pass.
+  \item Apply per-tensor or per-channel \textbf{scaling} to map values into FP8's limited range.
+  \item Often mix E4M3 for forward activations, E5M2 for backward gradients.
+\end{enumerate}
+
+During \textbf{Inferencing:}
+Post-training quantization to FP8 for ultra-fast inference with minimal memory footprint.
+
+\paragraph{Scaling is not optional:} FP8's numeric range is so tiny that, without actively scaling tensors before casting to FP8, we'll either hit overflow or underflow constantly.
+The fix is that we multiply the tensor by a scaling factor S before FP8 conversion,
+\begin{align*}
+  x_{\text{scaled}} = x \times S.
+\end{align*}
+We may choose $S$ so that $\max{x_{\text{scaled}} }$ fits nicely into FP8's max normal value, and we store $S$ as a separate FP32 number. We can later undo the the scaling after computation:
+\begin{align*}
+  y = y_{\text{scaled}} \times S^{-1}.
+\end{align*}
+This keeps numbers inside FP8's safe zone while still preserving the original magnitude relationship.
+
+\paragraph{Per channel vs. per tensor:}
+Often, there are \textbf{per channel} scaling and \textbf{per tensor} scaling. Let us image that we are doing a fully-connected layer, where we have this weight matrix $\mW \in \R^{d_{\text{out}} \times d_{\text{in}}}$.
+Per channel scaling means that we have a scaling factor for each output feature (each row), so there will be $d_{\text{out}}$ scalars, while for per tensor scaling, we only have $1$ scaling factor. In this sense, per tensor scaling is simpler, but will be suboptimal is some channels are loud and the others are quiet, while per channel scaling has better precisions, especially in convolutional layers or transformers where variance differs accross each head / filter.
+
+\paragraph{Automation on H100:} Notice that there is automated scaling on NVIDIA H100, which tracks running max values for each tensor, and picks E4M3 (more precision) for forward activations, E5M2 (more range) for backward gradients.
+The engine applies scaling transparently, so we mostly see FP8 without manually tuning the scaling factor $S$.
+ 
+As an example of scaling, let us consider the previous example of fully connected layer, where we are expected to do $\mO = \mW\mX$, originally, both $\mW$ and $\mX$ are FP32 (master weights and full precision activations). 
+Before GEMM\footnote{GEneral Matrix-Matrix Multiplication, in the form of $\mD = \alpha\cdot\mA\mB + \beta\mC$, where $\alpha, \beta$ are scalars. This is the workhorse of modern deep learning.}, we independently scaled them to FP8 (to fit the range) by 
+\begin{align*}
+  \mX_{\text{scaled}} = \mX \cdot S_{\mX}; \qquad \mW_{\text{scaled}} = \mW \cdot S_{\mW},
+\end{align*}
+then we performed the matmul in FP8, 
+\begin{align*}
+  \mO_{\text{scaled}} = \text{FP8GEMM}(\mW_{\text{scaled}}, \mX_{\text{scaled}}).
+\end{align*}
+To restore the original magnitude, we take advantage of the scaling factor $S_{\mX}, S_{\mW}$ who are FP32,
+\begin{align*}
+  \mO = \mO_{\text{scaled}} \cdot \frac{1}{S_{\mX}S_{\mW}}.
+\end{align*}
+
+
+
+
+
+\section{Encoder and Decoder Structure}
+
+\paragraph{Encoder}
+Typically, encodes looks like:
+
+\begin{figure}[ht]
+\centering
+
+% ---------------- Pre-LN ----------------
+\begin{minipage}{0.45\textwidth}
+\centering
+\begin{tikzpicture}[>=Latex, node distance=12mm, font=\small]
+\node (x)   {$\mX$};
+\node (ln0) [norm, below=of x] {LayerNorm};
+\node (msa) [block, below=of ln0] {Multi-Head\\Self-Attention};
+\node (add1)[plus,  below=of msa] {\small $+$};
+\node (ln1) [norm,  below=of add1] {LayerNorm};
+\node (ffn) [block, below=of ln1] {Feed-Forward\\Network};
+\node (add2)[plus,  below=of ffn] {\small $+$};
+\node (y)   [below=of add2] {$\mY$};
+
+% main path
+\draw[->] (x) -- (ln0);
+\draw[->] (ln0) -- (msa);
+\draw[->] (msa) -- (add1);
+\draw[->] (add1) -- (ln1);
+\draw[->] (ln1) -- (ffn);
+\draw[->] (ffn) -- (add2);
+\draw[->] (add2) -- (y);
+
+% residuals
+\coordinate (res1start) at ($(x.east)+(20mm,0)$);
+\draw[->] (x.east) -- (res1start) node[midway,above] {\scriptsize residual};
+\draw[->] (res1start) |- ($(add1.east)+(20mm,0)$) -- (add1.east);
+
+\coordinate (res2start) at ($(add1.east)+(20.2mm,0)$);
+\draw[->] (res2start) |- (add2.east);
+\end{tikzpicture}
+
+\small Pre-LayerNorm Transformer block
+\end{minipage}%
+\hfill
+% ---------------- Post-LN ----------------
+\begin{minipage}{0.45\textwidth}
+\centering
+\begin{tikzpicture}[>=Latex, node distance=12mm, font=\small]
+\node (x)   {$\mX$};
+\node (msa) [block, below=of x] {Multi-Head\\Self-Attention};
+\node (add1)[plus,  below=of msa] {\small $+$};
+\node (ln1) [norm,  below=of add1] {LayerNorm};
+\node (ffn) [block, below=of ln1] {Feed-Forward\\Network};
+\node (add2)[plus,  below=of ffn] {\small $+$};
+\node (ln2) [norm,  below=of add2] {LayerNorm};
+\node (y)   [below=of ln2] {$\mY$};
+
+% main path
+\draw[->] (x) -- (msa);
+\draw[->] (msa) -- (add1);
+\draw[->] (add1) -- (ln1);
+\draw[->] (ln1) -- (ffn);
+\draw[->] (ffn) -- (add2);
+\draw[->] (add2) -- (ln2) -- (y);
+
+% residuals
+\coordinate (res1start) at ($(x.east)+(20mm,0)$);
+\draw[->] (x.east) -- (res1start) node[midway,above] {\scriptsize residual};
+\draw[->] (res1start) |- ($(add1.east)+(20mm,0)$) -- (add1.east);
+
+\coordinate (res2start) at ($(add1.east)+(20.2mm,0)$);
+\draw[->] (res2start) |- (add2.east);
+\end{tikzpicture}
+
+\small Post-LayerNorm Transformer block
+\end{minipage}
+
+\end{figure}
+As we have discussed before, the Pre-LayerNorm fashion is the current state of the art as its training is more stable, as well as its convergence. 
+It helps gradient flow, and deep model stability, does not requries learning rate warm up and works better with long context.
+It do has downside though, Pre-LN has a weaker normalizing effect so sometimes people add an extra final LayerNorm after the last layer for output stability (``final LN'' in GPT models).
+
+\paragraph{Decoder}
+\tikzset{
+  block/.style={draw, rounded corners, minimum width=30mm, minimum height=7mm, align=center},
+  norm/.style={draw, rounded corners, minimum width=22mm, minimum height=7mm, align=center},
+  plus/.style={circle, draw, inner sep=0pt, minimum size=4mm},
+}
+
+
+\begin{figure}[ht]
+
+\centering
+\begin{tikzpicture}[>=Latex, node distance=12mm, font=\small]
+
+% --- main vertical path (Pre-LN) ---
+\node (x)   {$\mX$}; % decoder input (token embeddings or previous layer output)
+\node (ln0) [norm,  below=of x]   {LayerNorm};
+\node (msa) [block, below=of ln0] {Masked Multi-Head\\Self-Attention};
+\node (add1)[plus,  below=of msa] {\small $+$};
+
+\node (ln1) [norm,  below=of add1] {LayerNorm};
+\node (csa) [block, below=of ln1] {Multi-Head\\Cross-Attention};
+\node (add2)[plus,  below=of csa] {\small $+$};
+
+\node (ln2) [norm,  below=of add2] {LayerNorm};
+\node (ffn) [block, below=of ln2] {Feed-Forward\\Network};
+\node (add3)[plus,  below=of ffn] {\small $+$};
+\node (y)   [below=of add3] {$y$}; % decoder output
+
+% --- encoder memory feeding cross-attention ---
+% M: encoder hidden states, shape [T_enc x d_model]
+\node (memtitle) [left=34mm of csa, align=left] {Encoder memory $\mM$\\ \footnotesize $\mM \in \mathbb{R}^{L_{\text{enc}}\times d_{\text{model}}}$};
+% K,V label
+\node (kvlabel) [below=1mm of memtitle, anchor=north west, align=left] {\footnotesize $\mK=\mW_{\mK} \mM,\;\;\mV=\mW_V \mM$};
+\draw[->] (memtitle.east) -- (csa.west) node[midway,above] {\scriptsize $\mK,\mV$};
+
+% --- main downward arrows ---
+\draw[->] (x) -- (ln0) -- (msa) -- (add1) -- (ln1) -- (csa) -- (add2) -- (ln2) -- (ffn) -- (add3) -- (y);
+
+% --- causal mask annotation into MSA ---
+
+\node (masknote) [right=14mm of msa, align=left] {\scriptsize causal mask \\[-1pt] \scriptsize};
+\draw[-{Latex}] (masknote.west) -- ++(-4mm,0) |- (msa.east);
+
+% Optional: label MSA inputs as Q,K,V from LN(x)
+\node (qkvmsa) [left=8mm of msa, align=right] {\scriptsize $\mQ,\mK,\mV$ \\ \scriptsize from $\mathrm{LN}(\mX)$};
+\draw[-{Latex}] (qkvmsa.east) -- (msa.west);
+
+
+% --- residuals aligned on a right column ---
+\coordinate (rcol) at ($(x.east)+(23.3mm,0)$); % common right column for loops
+
+% residual from x to add1 with explicit origin arrow
+\draw[->] (x.east) -- (rcol) node[midway,above] {\scriptsize Residual};
+\draw[->] (rcol) |- (add1.east);
+
+% residual from after add1 to add2
+\draw[->] ($(add1.east)+(24mm,0)$) |- (add2.east);
+
+% residual from after add2 to add3
+\draw[->] ($(add2.east)+(24mm,0)$) |- (add3.east);
+
+\end{tikzpicture}
+
+\caption{Pre-LN Transformer \textbf{Decoder} block. Each sublayer consumes a LayerNormed input. The masked self-attention applies a \emph{causal mask} (no future tokens). Cross-attention queries come from the decoder stream, while keys/values are derived from the encoder memory $\mM$ (encoder hidden states: $\mK=\mW_\mK\mM$, $\mV=\mW_\mV\mM$).}
+\end{figure}
+
+As a further explanation besides the figure: this $\mM$ is the matrix of encoder hidden states produced by the last encoder layer. It is what the decoder attends to in cross attention.
+Let us image that an input $\mX \in \R^{B \times L_{\text{enc}} \times d_{\text{model}}}$ is fed into the encoder blocks. 
+After embedding and positional encoding, we have 
+\begin{align*}
+  \mH^0 \in \R^{B \times L_{\text{enc}} \times d_{\text{model}}}.
+\end{align*}
+Each encoder will do 
+\begin{align*}
+  \mH^{k+1} = \text{Encoder}(\mH^k) \in \R^{B \times L_{\text{enc}} \times d_{\text{model}}}, \quad \forall k \in [N_{\text{enc}}],
+\end{align*}
+And $\mM$ is exactly $\mM = \mH^{N_{\text{enc}}}$.
+As a result, for the cross attention layer: $\mK, \mV \in \R^{B \times L_{\text{enc}} \times d_{\text{model}}}$ and $\mQ \in \R^{B \times L_{\text{dec}} \times d_{\text{model}}}$, so the output of decoder block will always be $\R^{B \times L_{\text{dec}} \times d_{\text{model}}}$.
+
+The two types of blocks are different:
+\begin{itemize}
+  \item Encoder: Self attention only, no masking, aiming to build a contextual representation of the entire source sequence.
+  
+  \item Decoder: Masked self attention, which prevents seeing future tokens so that the generation is autoregressive. 
+  Cross attention, which lets each target position attend to the encoder's output $\mM$ (source context)
+  The purpose overall is to generate the target sequence one step at a time, with access to both past target tokens and the entire source sequence.
+\end{itemize}
+
+What happens if we are using one type?
+\begin{itemize}
+  \item Encoder: leaking future target tokens during training (no causal mask), so the model wouldn't learn autoregressive generation.
+  \item Decoder: useless masked self-attention in the encoder that blocks half the context for no reason, waste compute on a cross-attention sublayer when no encoder memory exists yet.
+\end{itemize}
+
+\paragraph{The original seq2seq transformer:} Things happens in two phases, 
+\begin{verbatim}
+Source tokens ---> [Encoder stack] ----------------> M (memory)
+                                         |   
+                                         v
+Shifted target tokens ------> [Decoder stack] ---> Output logits
+\end{verbatim}
+Encoder runs once on the full source, decoder runs once (training) or incrementally (inference), always starting with shifted target embeddings as its own input stream.
+The input of encoder is the source sequence $x = [x_1, x_2, ..., x_{L_{\text{enc}}}]$, after embedding we get $\mX$, while the input of the decoder is the target sequence $y$ so far, but shifted ($\hat{y}$) so that the model predicts the next token.
+\begin{enumerate}
+  \item We take the original gold target sequence $y = [y_1, y_2, ..., y_{L_{\text{dec}}}]$.
+  \item Shift right by one and add the <BOS> special token, and obtain $\hat{y} = [<BOS>, y_1, ..., y_{L_{\text{dec}} - 1}]$, we then embed to get $\hat{\mY}$ ans use it as an input to the decoder blocks.
+\end{enumerate}
+
+\subsection{Encoder only models} 
+BERT, RoBERTa, DeBERTa, ELECTRA, Sentence-BERT (SBERT). 
+
+The architecture mostly are: \textbullet~ Stacks of encoder blocks only, \textbullet~ Full self attention, \textbullet~ Input sequence length stay fixed, \textbullet~ output contextualized embeddings for every token.
+
+Purpose: Understand text: classification, regression, retrieval, token-level labeling (NER, POS tagging, QA span prediction). In those cases the model needs bidirectional context: token sees both left and right neighbors.
+
+For many NLP tasks, we already have the full text and just need to analyze it, not generate it.
+
+Advantages:
+\begin{itemize}
+  \item \textbf{Better context capture:} every token attends to all others.
+  \item \textbf{More efficient training} for non-generative tasks (no need to autoregress).
+  \item \textbf{Easier fine-tuning} for classification tasks: just take the [CLS] embedding\footnote{In BERT and similar models, we prepend a special token [CLS] (“classification”) to the start of every input sequence before feeding it to the encoder. [CLS] has its own trainable embedding vector in the model's vocabulary, just like any word. It is treated as position $0$ in the sequence and goes through all encoder layers along with the other tokens. After the final encoder layer, [CLS] has a contextualized vector $h \in \R^{d_{\text{model}}}$, which encodes information from the entire sequence (thanks to self-attention).}.
+\end{itemize}
+
+\subsection{Decoder only models}
+
+GPT family (GPT-2, GPT-3, GPT-4, LLaMA, Mistral, Falcon, etc.); BLOOM, OPT, Pythia; Code generation models (CodeLLaMA, StarCoder)
+
+Architecture: \textbullet~ Stack of decoder blocks only \textbullet~ Causal self-attention (mask future positions) \textbullet~ \textbf{No cross-attention} \textbullet~ Input length = current sequence length during generation.
+
+Purpose: Generate text: language modeling, code generation; model learns 
+\begin{align*}
+  P(\text{next token} \mid \text{prev tokens})
+\end{align*}
+
+Advantages:
+\begin{itemize}
+  \item \textbf{Simpler}: do not need an encoder, since we aim to predict the next token given the past. Same architecture works for both pretraining (predict next token) and inference (sample next token)
+  \item \textbf{Massive scalability}: can ingest any text corpus, no need for aligned parallel data.
+  \item \textbf{Flexible prompts}: can condition on arbitrary text in-context.
+\end{itemize}
+
+\subsection{Encoder-decoder models}
+often on seq2seq task, requires paired data\footnote{An example is that machine translation needs paired data: Source: "I like apples", Target: "J'aime les pommes".}.
+
+As a summary:
+\begin{table}[h]
+\centering
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{|l|p{5cm}|p{5cm}|}
+\hline
+\textbf{Model type} & \textbf{Pros} & \textbf{Cons} \\
+\hline
+\textbf{Encoder-only} & 
+\textbullet~ Strong understanding with bidirectional context 
+
+\textbullet~Great for classification, retrieval, and embedding learning
+& 
+\textbullet~ Not suited for generative tasks \\
+\hline
+\textbf{Decoder-only} &
+\textbullet~ Simpler architecture 
+
+\textbullet~ Easy to train generatively 
+
+\textbullet~ Highly flexible for any prompt-based generation
+&
+\textbullet~ Lacks bidirectional context
+
+\textbullet~ Weaker for pure understanding tasks without adaptation \\
+\hline
+\textbf{Encoder--decoder} &
+\textbullet~ Best for sequence-to-sequence tasks (translation, summarization, speech-to-text)
+&
+\textbullet~ Requires paired data
+
+\textbullet~ Heavier compute at inference (two stacks) \\
+\hline
+\end{tabular}
+\caption{Comparison of encoder-only, decoder-only, and encoder--decoder Transformer architectures.}
+\end{table}
+
+
+\subsection{The Linear Layers}
+FFNs (Feed Forward Neural networks) are a part of the encoder, decoder block, there are several design choices here.
+
+
 
 \section{Computing the Number of Parameters}
+
+
 
 
 \end{document}

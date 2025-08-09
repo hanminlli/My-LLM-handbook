@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.25 (MiKTeX 24.1) (preloaded format=pdflatex 2025.7.27)  2 AUG 2025 17:06
+This is pdfTeX, Version 3.141592653-2.6-1.40.25 (MiKTeX 24.1) (preloaded format=pdflatex 2025.7.27)  9 AUG 2025 18:28
 entering extended mode
  restricted \write18 enabled.
  file:line:error style messages enabled.
@@ -514,28 +514,80 @@ Package: enumitem 2025/02/06 v3.11 Customized lists
 \enit@inbox=\box79
 \enit@count@id=\count315
 \enitdp@description=\count316
+) (C:\Users\19358\AppData\Local\Programs\MiKTeX\tex/generic/pgf/frontendlayer/tikz/libraries\tikzlibrarypositioning.code.tex
+File: tikzlibrarypositioning.code.tex 2023-01-15 v3.1.10 (3.1.10)
+) (C:\Users\19358\AppData\Local\Programs\MiKTeX\tex/generic/pgf/frontendlayer/tikz/libraries\tikzlibraryshapes.code.tex
+File: tikzlibraryshapes.code.tex 2023-01-15 v3.1.10 (3.1.10)
+ (C:\Users\19358\AppData\Local\Programs\MiKTeX\tex/generic/pgf/frontendlayer/tikz/libraries\tikzlibraryshapes.geometric.code.tex
+File: tikzlibraryshapes.geometric.code.tex 2023-01-15 v3.1.10 (3.1.10)
+ (C:\Users\19358\AppData\Local\Programs\MiKTeX\tex/generic/pgf/libraries/shapes\pgflibraryshapes.geometric.code.tex
+File: pgflibraryshapes.geometric.code.tex 2023-01-15 v3.1.10 (3.1.10)
+)) (C:\Users\19358\AppData\Local\Programs\MiKTeX\tex/generic/pgf/frontendlayer/tikz/libraries\tikzlibraryshapes.misc.code.tex
+File: tikzlibraryshapes.misc.code.tex 2023-01-15 v3.1.10 (3.1.10)
+ (C:\Users\19358\AppData\Local\Programs\MiKTeX\tex/generic/pgf/libraries/shapes\pgflibraryshapes.misc.code.tex
+File: pgflibraryshapes.misc.code.tex 2023-01-15 v3.1.10 (3.1.10)
+)) (C:\Users\19358\AppData\Local\Programs\MiKTeX\tex/generic/pgf/frontendlayer/tikz/libraries\tikzlibraryshapes.symbols.code.tex
+File: tikzlibraryshapes.symbols.code.tex 2023-01-15 v3.1.10 (3.1.10)
+ (C:\Users\19358\AppData\Local\Programs\MiKTeX\tex/generic/pgf/libraries/shapes\pgflibraryshapes.symbols.code.tex
+File: pgflibraryshapes.symbols.code.tex 2023-01-15 v3.1.10 (3.1.10)
+)) (C:\Users\19358\AppData\Local\Programs\MiKTeX\tex/generic/pgf/frontendlayer/tikz/libraries\tikzlibraryshapes.arrows.code.tex
+File: tikzlibraryshapes.arrows.code.tex 2023-01-15 v3.1.10 (3.1.10)
+ (C:\Users\19358\AppData\Local\Programs\MiKTeX\tex/generic/pgf/libraries/shapes\pgflibraryshapes.arrows.code.tex
+File: pgflibraryshapes.arrows.code.tex 2023-01-15 v3.1.10 (3.1.10)
+)) (C:\Users\19358\AppData\Local\Programs\MiKTeX\tex/generic/pgf/frontendlayer/tikz/libraries\tikzlibraryshapes.callouts.code.tex (C:\Users\19358\AppData\Local\Programs\MiKTeX\tex/generic/pgf/libraries/shapes\pgflibraryshapes.callouts.code.tex)) (C:\Users\19358\AppData\Local\Programs\MiKTeX\tex/generic/pgf/frontendlayer/tikz/libraries\tikzlibraryshapes.multipart.code.tex
+File: tikzlibraryshapes.multipart.code.tex 2023-01-15 v3.1.10 (3.1.10)
+ (C:\Users\19358\AppData\Local\Programs\MiKTeX\tex/generic/pgf/libraries/shapes\pgflibraryshapes.multipart.code.tex
+File: pgflibraryshapes.multipart.code.tex 2023-01-15 v3.1.10 (3.1.10)
+\pgfnodepartlowerbox=\box80
+\pgfnodeparttwobox=\box81
+\pgfnodepartthreebox=\box82
+\pgfnodepartfourbox=\box83
+\pgfnodeparttwentybox=\box84
+\pgfnodepartnineteenbox=\box85
+\pgfnodeparteighteenbox=\box86
+\pgfnodepartseventeenbox=\box87
+\pgfnodepartsixteenbox=\box88
+\pgfnodepartfifteenbox=\box89
+\pgfnodepartfourteenbox=\box90
+\pgfnodepartthirteenbox=\box91
+\pgfnodeparttwelvebox=\box92
+\pgfnodepartelevenbox=\box93
+\pgfnodeparttenbox=\box94
+\pgfnodepartninebox=\box95
+\pgfnodeparteightbox=\box96
+\pgfnodepartsevenbox=\box97
+\pgfnodepartsixbox=\box98
+\pgfnodepartfivebox=\box99
+))) (C:\Users\19358\AppData\Local\Programs\MiKTeX\tex/generic/pgf/libraries\pgflibraryarrows.meta.code.tex
+File: pgflibraryarrows.meta.code.tex 2023-01-15 v3.1.10 (3.1.10)
+\pgfarrowinset=\dimen275
+\pgfarrowlength=\dimen276
+\pgfarrowwidth=\dimen277
+\pgfarrowlinewidth=\dimen278
+) (C:\Users\19358\AppData\Local\Programs\MiKTeX\tex/generic/pgf/frontendlayer/tikz/libraries\tikzlibrarycalc.code.tex
+File: tikzlibrarycalc.code.tex 2023-01-15 v3.1.10 (3.1.10)
 ) (macros.tex (C:\Users\19358\AppData\Local\Programs\MiKTeX\tex/latex/url\url.sty
 \Urlmuskip=\muskip17
 Package: url 2013/09/16  ver 3.4  Verb mode for urls, etc.
 ) (C:\Users\19358\AppData\Local\Programs\MiKTeX\tex/latex/booktabs\booktabs.sty
 Package: booktabs 2020/01/12 v1.61803398 Publication quality tables
-\heavyrulewidth=\dimen275
-\lightrulewidth=\dimen276
-\cmidrulewidth=\dimen277
-\belowrulesep=\dimen278
-\belowbottomsep=\dimen279
-\aboverulesep=\dimen280
-\abovetopsep=\dimen281
-\cmidrulesep=\dimen282
-\cmidrulekern=\dimen283
-\defaultaddspace=\dimen284
+\heavyrulewidth=\dimen279
+\lightrulewidth=\dimen280
+\cmidrulewidth=\dimen281
+\belowrulesep=\dimen282
+\belowbottomsep=\dimen283
+\aboverulesep=\dimen284
+\abovetopsep=\dimen285
+\cmidrulesep=\dimen286
+\cmidrulekern=\dimen287
+\defaultaddspace=\dimen288
 \@cmidla=\count317
 \@cmidlb=\count318
-\@aboverulesep=\dimen285
-\@belowrulesep=\dimen286
+\@aboverulesep=\dimen289
+\@belowrulesep=\dimen290
 \@thisruleclass=\count319
 \@lastruleclass=\count320
-\@thisrulewidth=\dimen287
+\@thisrulewidth=\dimen291
 ) (C:\Users\19358\AppData\Local\Programs\MiKTeX\tex/latex/units\nicefrac.sty
 Package: nicefrac 1998/08/04 v0.9b Nice fractions
 \L@UnitsRaiseDisplaystyle=\skip68
@@ -546,14 +598,14 @@ Package: ifthen 2022/04/13 v1.1d Standard LaTeX ifthen package (DPC)
 )) (C:\Users\19358\AppData\Local\Programs\MiKTeX\tex/latex/microtype\microtype.sty
 Package: microtype 2025/02/11 v3.2a Micro-typographical refinements (RS)
 \MT@toks=\toks43
-\MT@tempbox=\box80
+\MT@tempbox=\box100
 \MT@count=\count321
 LaTeX Info: Redefining \noprotrusionifhmode on input line 1087.
 LaTeX Info: Redefining \leftprotrusion on input line 1088.
 \MT@prot@toks=\toks44
 LaTeX Info: Redefining \rightprotrusion on input line 1107.
 LaTeX Info: Redefining \textls on input line 1449.
-\MT@outer@kern=\dimen288
+\MT@outer@kern=\dimen292
 LaTeX Info: Redefining \microtypecontext on input line 2053.
 LaTeX Info: Redefining \textmicrotypecontext on input line 2070.
 \MT@listname@count=\count322
@@ -582,15 +634,15 @@ LaTeX Font Info:    Overwriting math alphabet `\EuScript' in version `bold'
 Package: makecell 2009/08/03 V0.1e Managing of Tab Column Heads and Cells
  (C:\Users\19358\AppData\Local\Programs\MiKTeX\tex/latex/tools\array.sty
 Package: array 2023/10/16 v2.5g Tabular extension package (FMi)
-\col@sep=\dimen289
-\ar@mcellbox=\box81
-\extrarowheight=\dimen290
+\col@sep=\dimen293
+\ar@mcellbox=\box101
+\extrarowheight=\dimen294
 \NC@list=\toks45
 \extratabsurround=\skip72
 \backup@length=\skip73
-\ar@cellbox=\box82
+\ar@cellbox=\box102
 )
-\rotheadsize=\dimen291
+\rotheadsize=\dimen295
 \c@nlinenum=\count323
 \TeXr@lab=\toks46
 ) (C:\Users\19358\AppData\Local\Programs\MiKTeX\tex/latex/psnfss\times.sty
@@ -638,23 +690,23 @@ Package: siunitx 2025-05-22 v3.4.12 A comprehensive (SI) units package
 \l__siunitx_number_group_first_int=\count337
 \l__siunitx_number_group_size_int=\count338
 \l__siunitx_number_group_minimum_int=\count339
-\l__siunitx_angle_tmp_dim=\dimen292
-\l__siunitx_angle_marker_box=\box83
-\l__siunitx_angle_unit_box=\box84
+\l__siunitx_angle_tmp_dim=\dimen296
+\l__siunitx_angle_marker_box=\box103
+\l__siunitx_angle_unit_box=\box104
 \l__siunitx_compound_count_int=\count340
  (C:\Users\19358\AppData\Local\Programs\MiKTeX\tex/latex/translations\translations.sty
 Package: translations 2022/02/05 v1.12 internationalization of LaTeX2e packages (CN)
 )
-\l__siunitx_table_tmp_box=\box85
-\l__siunitx_table_tmp_dim=\dimen293
-\l__siunitx_table_column_width_dim=\dimen294
-\l__siunitx_table_integer_box=\box86
-\l__siunitx_table_decimal_box=\box87
-\l__siunitx_table_uncert_box=\box88
-\l__siunitx_table_before_box=\box89
-\l__siunitx_table_after_box=\box90
-\l__siunitx_table_before_dim=\dimen295
-\l__siunitx_table_carry_dim=\dimen296
+\l__siunitx_table_tmp_box=\box105
+\l__siunitx_table_tmp_dim=\dimen297
+\l__siunitx_table_column_width_dim=\dimen298
+\l__siunitx_table_integer_box=\box106
+\l__siunitx_table_decimal_box=\box107
+\l__siunitx_table_uncert_box=\box108
+\l__siunitx_table_before_box=\box109
+\l__siunitx_table_after_box=\box110
+\l__siunitx_table_before_dim=\dimen299
+\l__siunitx_table_carry_dim=\dimen300
 \l__siunitx_unit_tmp_int=\count341
 \l__siunitx_unit_position_int=\count342
 \l__siunitx_unit_total_int=\count343
@@ -662,9 +714,9 @@ Package: translations 2022/02/05 v1.12 internationalization of LaTeX2e packages 
 Package: float 2001/11/08 v1.3d Float enhancements (AL)
 \c@float@type=\count344
 \float@exts=\toks48
-\float@box=\box91
+\float@box=\box111
 \@float@everytoks=\toks49
-\@floatcapt=\box92
+\@floatcapt=\box112
 )
 \@float@every@table=\toks50
  (C:\Users\19358\AppData\Local\Programs\MiKTeX\tex/latex/setspace\setspace.sty
@@ -685,33 +737,33 @@ Package: adjcalc 2012/05/16 v1.1 Provides advanced setlength with multiple back-
 Package: trimclip 2025/02/21 v1.2a Trim and clip general TeX material
  (C:\Users\19358\AppData\Local\Programs\MiKTeX\tex/latex/collectbox\collectbox.sty
 Package: collectbox 2022/10/17 v0.4c Collect macro arguments as boxes
-\collectedbox=\box93
+\collectedbox=\box113
 )
-\tc@llx=\dimen297
-\tc@lly=\dimen298
-\tc@urx=\dimen299
-\tc@ury=\dimen300
+\tc@llx=\dimen301
+\tc@lly=\dimen302
+\tc@urx=\dimen303
+\tc@ury=\dimen304
 Package trimclip Info: Using driver 'tc-pdftex.def'.
  (C:\Users\19358\AppData\Local\Programs\MiKTeX\tex/latex/adjustbox\tc-pdftex.def
 File: tc-pdftex.def 2025/02/26 v2.3 Clipping driver for pdftex
 ))
-\adjbox@Width=\dimen301
-\adjbox@Height=\dimen302
-\adjbox@Depth=\dimen303
-\adjbox@Totalheight=\dimen304
-\adjbox@pwidth=\dimen305
-\adjbox@pheight=\dimen306
-\adjbox@pdepth=\dimen307
-\adjbox@ptotalheight=\dimen308
+\adjbox@Width=\dimen305
+\adjbox@Height=\dimen306
+\adjbox@Depth=\dimen307
+\adjbox@Totalheight=\dimen308
+\adjbox@pwidth=\dimen309
+\adjbox@pheight=\dimen310
+\adjbox@pdepth=\dimen311
+\adjbox@ptotalheight=\dimen312
  (C:\Users\19358\AppData\Local\Programs\MiKTeX\tex/latex/ifoddpage\ifoddpage.sty
 Package: ifoddpage 2022/10/18 v1.2 Conditionals for odd/even page detection
 \c@checkoddpage=\count346
 ) (C:\Users\19358\AppData\Local\Programs\MiKTeX\tex/latex/varwidth\varwidth.sty
 Package: varwidth 2009/03/30 ver 0.92;  Variable-width minipages
-\@vwid@box=\box94
+\@vwid@box=\box114
 \sift@deathcycles=\count347
-\@vwid@loff=\dimen309
-\@vwid@roff=\dimen310
+\@vwid@loff=\dimen313
+\@vwid@roff=\dimen314
 )) (C:\Users\19358\AppData\Local\Programs\MiKTeX\tex/latex/lastpage\lastpage.sty
 Package: lastpage 2025/06/06 v2.1g lastpage: 2.09 or 2e? (HMM)
  (C:\Users\19358\AppData\Local\Programs\MiKTeX\tex/latex/lastpage\lastpage2e.sty
@@ -737,20 +789,20 @@ Package: soul-ori 2023-06-14 v3.1 letterspacing/underlining (mf)
 \SOUL@cmds=\toks56
 \SOUL@buffer=\toks57
 \SOUL@token=\toks58
-\SOUL@syllgoal=\dimen311
-\SOUL@syllwidth=\dimen312
-\SOUL@charkern=\dimen313
-\SOUL@hyphkern=\dimen314
-\SOUL@dimen=\dimen315
-\SOUL@dimeni=\dimen316
+\SOUL@syllgoal=\dimen315
+\SOUL@syllwidth=\dimen316
+\SOUL@charkern=\dimen317
+\SOUL@hyphkern=\dimen318
+\SOUL@dimen=\dimen319
+\SOUL@dimeni=\dimen320
 \SOUL@minus=\count348
 \SOUL@comma=\count349
 \SOUL@apo=\count350
 \SOUL@grave=\count351
 \SOUL@spaceskip=\skip74
-\SOUL@ttwidth=\dimen317
-\SOUL@uldp=\dimen318
-\SOUL@ulht=\dimen319
+\SOUL@ttwidth=\dimen321
+\SOUL@uldp=\dimen322
+\SOUL@ulht=\dimen323
 ) (C:\Users\19358\AppData\Local\Programs\MiKTeX\tex/generic/etexcmds\etexcmds.sty
 Package: etexcmds 2019/12/15 v1.7 Avoid name clashes with e-TeX commands (HO)
 )) (C:\Users\19358\AppData\Local\Programs\MiKTeX\tex/latex/was\icomma.sty
@@ -768,20 +820,20 @@ Package pict2e Info: Driver file for pict2e: p2e-pdftex.def on input line 114.
 File: p2e-pdftex.def 2016/02/05 v0.1u Driver-dependant file (RN,HjG,JT)
 )
 \pIIe@GRAPH=\toks59
-\@arclen=\dimen320
-\@arcrad=\dimen321
-\pIIe@tempdima=\dimen322
-\pIIe@tempdimb=\dimen323
-\pIIe@tempdimc=\dimen324
-\pIIe@tempdimd=\dimen325
-\pIIe@tempdime=\dimen326
-\pIIe@tempdimf=\dimen327
+\@arclen=\dimen324
+\@arcrad=\dimen325
+\pIIe@tempdima=\dimen326
+\pIIe@tempdimb=\dimen327
+\pIIe@tempdimc=\dimen328
+\pIIe@tempdimd=\dimen329
+\pIIe@tempdime=\dimen330
+\pIIe@tempdimf=\dimen331
 ) (C:\Users\19358\AppData\Local\Programs\MiKTeX\tex/latex/tools\calc.sty
 Package: calc 2023/07/08 v4.3 Infix arithmetic (KKT,FJ)
 \calc@Acount=\count352
 \calc@Bcount=\count353
-\calc@Adimen=\dimen328
-\calc@Bdimen=\dimen329
+\calc@Adimen=\dimen332
+\calc@Bdimen=\dimen333
 \calc@Askip=\skip75
 \calc@Bskip=\skip76
 LaTeX Info: Redefining \setlength on input line 80.
@@ -789,21 +841,21 @@ LaTeX Info: Redefining \addtolength on input line 81.
 \calc@Ccount=\count354
 \calc@Cskip=\skip77
 )
-\diagbox@boxa=\box95
-\diagbox@boxb=\box96
-\diagbox@boxm=\box97
-\diagbox@wd=\dimen330
-\diagbox@ht=\dimen331
-\diagbox@insepl=\dimen332
-\diagbox@insepr=\dimen333
-\diagbox@outsepl=\dimen334
-\diagbox@outsepr=\dimen335
+\diagbox@boxa=\box115
+\diagbox@boxb=\box116
+\diagbox@boxm=\box117
+\diagbox@wd=\dimen334
+\diagbox@ht=\dimen335
+\diagbox@insepl=\dimen336
+\diagbox@insepr=\dimen337
+\diagbox@outsepl=\dimen338
+\diagbox@outsepr=\dimen339
 ) (C:\Users\19358\AppData\Local\Programs\MiKTeX\tex/latex/eqparbox\eqparbox.sty
 Package: eqparbox 2017/09/03 v4.1 Create equal-widthed boxes
 \eqp@tempdima=\skip78
 \eqp@tempdimb=\skip79
-\eqp@tabular@box=\box98
-\eqp@list@box=\box99
+\eqp@tabular@box=\box118
+\eqp@list@box=\box119
 \eqp@list@indent=\skip80
 ) (C:\Users\19358\AppData\Local\Programs\MiKTeX\tex/latex/tools\hhline.sty
 Package: hhline 2020/01/04 v2.04 Table rule package (DPC)
@@ -813,16 +865,16 @@ Package: mathtools 2024/10/04 v1.31 mathematical typesetting tools
 Package: mhsetup 2021/03/18 v1.4 programming setup (MH)
 )
 \g_MT_multlinerow_int=\count355
-\l_MT_multwidth_dim=\dimen336
+\l_MT_multwidth_dim=\dimen340
 \origjot=\skip81
-\l_MT_shortvdotswithinadjustabove_dim=\dimen337
-\l_MT_shortvdotswithinadjustbelow_dim=\dimen338
-\l_MT_above_intertext_sep=\dimen339
-\l_MT_below_intertext_sep=\dimen340
-\l_MT_above_shortintertext_sep=\dimen341
-\l_MT_below_shortintertext_sep=\dimen342
-\xmathstrut@box=\box100
-\xmathstrut@dim=\dimen343
+\l_MT_shortvdotswithinadjustabove_dim=\dimen341
+\l_MT_shortvdotswithinadjustbelow_dim=\dimen342
+\l_MT_above_intertext_sep=\dimen343
+\l_MT_below_intertext_sep=\dimen344
+\l_MT_above_shortintertext_sep=\dimen345
+\l_MT_below_shortintertext_sep=\dimen346
+\xmathstrut@box=\box120
+\xmathstrut@dim=\dimen347
 ) (C:\Users\19358\AppData\Local\Programs\MiKTeX\tex/latex/etextools\etextools.sty
 Package: etextools 2010/12/07 v3.1415926 e-TeX more useful tools for LaTeX package writers
  (C:\Users\19358\AppData\Local\Programs\MiKTeX\tex/latex/etex-pkg\etex.sty
@@ -844,14 +896,14 @@ Package: letltxmacro 2019/12/03 v1.6 Let assignment for LaTeX macros (HO)
 Package: caption 2023/08/05 v3.6o Customizing captions (AR)
  (C:\Users\19358\AppData\Local\Programs\MiKTeX\tex/latex/caption\caption3.sty
 Package: caption3 2023/07/31 v2.4d caption3 kernel (AR)
-\caption@tempdima=\dimen344
-\captionmargin=\dimen345
-\caption@leftmargin=\dimen346
-\caption@rightmargin=\dimen347
-\caption@width=\dimen348
-\caption@indent=\dimen349
-\caption@parindent=\dimen350
-\caption@hangindent=\dimen351
+\caption@tempdima=\dimen348
+\captionmargin=\dimen349
+\caption@leftmargin=\dimen350
+\caption@rightmargin=\dimen351
+\caption@width=\dimen352
+\caption@indent=\dimen353
+\caption@parindent=\dimen354
+\caption@hangindent=\dimen355
 Package caption Info: Standard document class detected.
 )
 \c@caption@flags=\count358
@@ -877,7 +929,7 @@ Package: amsthm 2020/05/29 v2.20.6
 \dth@everypar=\toks65
 ) (C:\Users\19358\AppData\Local\Programs\MiKTeX\tex/latex/threeparttable\threeparttable.sty
 Package: threeparttable 2003/06/13  v 3.0
-\@tempboxb=\box101
+\@tempboxb=\box121
 ) (C:\Users\19358\AppData\Local\Programs\MiKTeX\tex/latex/fundus-calligra\calligra.sty
 Package: calligra 2012/04/10 v1.9 LaTeX package calligra
 ) (C:\Users\19358\AppData\Local\Programs\MiKTeX\tex/latex/tools\layout.sty
@@ -918,7 +970,7 @@ Package: expl3 2024-01-04 L3 programming layer (loader)
  (C:\Users\19358\AppData\Local\Programs\MiKTeX\tex/latex/l3backend\l3backend-pdftex.def
 File: l3backend-pdftex.def 2024-01-04 L3 backend support: PDF output (pdfTeX)
 \l__color_backend_stack_int=\count393
-\l__pdf_internal_box=\box102
+\l__pdf_internal_box=\box122
 ))
 Package: l3keys2e 2023-10-10 LaTeX2e option processing using LaTeX3 keys
 )
@@ -932,47 +984,27 @@ Package: mathrsfs 1996/01/01 Math RSFS package v1.0 (jk)
 ) (C:\Users\19358\AppData\Local\Programs\MiKTeX\tex/latex/tools\multicol.sty
 Package: multicol 2023/03/30 v1.9f multicolumn formatting (FMi)
 \c@tracingmulticols=\count397
-\mult@box=\box103
-\multicol@leftmargin=\dimen352
+\mult@box=\box123
+\multicol@leftmargin=\dimen356
 \c@unbalance=\count398
 \c@collectmore=\count399
 \doublecol@number=\count400
 \multicoltolerance=\count401
 \multicolpretolerance=\count402
-\full@width=\dimen353
-\page@free=\dimen354
-\premulticols=\dimen355
-\postmulticols=\dimen356
+\full@width=\dimen357
+\page@free=\dimen358
+\premulticols=\dimen359
+\postmulticols=\dimen360
 \multicolsep=\skip85
 \multicolbaselineskip=\skip86
-\partial@page=\box104
-\last@line=\box105
-\mc@boxedresult=\box106
-\maxbalancingoverflow=\dimen357
-\mult@rightbox=\box107
-\mult@grightbox=\box108
-\mult@firstbox=\box109
-\mult@gfirstbox=\box110
-\@tempa=\box111
-\@tempa=\box112
-\@tempa=\box113
-\@tempa=\box114
-\@tempa=\box115
-\@tempa=\box116
-\@tempa=\box117
-\@tempa=\box118
-\@tempa=\box119
-\@tempa=\box120
-\@tempa=\box121
-\@tempa=\box122
-\@tempa=\box123
-\@tempa=\box124
-\@tempa=\box125
-\@tempa=\box126
-\@tempa=\box127
-\@tempa=\box128
-\@tempa=\box129
-\@tempa=\box130
+\partial@page=\box124
+\last@line=\box125
+\mc@boxedresult=\box126
+\maxbalancingoverflow=\dimen361
+\mult@rightbox=\box127
+\mult@grightbox=\box128
+\mult@firstbox=\box129
+\mult@gfirstbox=\box130
 \@tempa=\box131
 \@tempa=\box132
 \@tempa=\box133
@@ -989,14 +1021,34 @@ Package: multicol 2023/03/30 v1.9f multicolumn formatting (FMi)
 \@tempa=\box144
 \@tempa=\box145
 \@tempa=\box146
+\@tempa=\box147
+\@tempa=\box148
+\@tempa=\box149
+\@tempa=\box150
+\@tempa=\box151
+\@tempa=\box152
+\@tempa=\box153
+\@tempa=\box154
+\@tempa=\box155
+\@tempa=\box156
+\@tempa=\box157
+\@tempa=\box158
+\@tempa=\box159
+\@tempa=\box160
+\@tempa=\box161
+\@tempa=\box162
+\@tempa=\box163
+\@tempa=\box164
+\@tempa=\box165
+\@tempa=\box166
 \c@minrows=\count403
 \c@columnbadness=\count404
 \c@finalcolumnbadness=\count405
-\last@try=\dimen358
-\multicolovershoot=\dimen359
-\multicolundershoot=\dimen360
-\mult@nat@firstbox=\box147
-\colbreak@box=\box148
+\last@try=\dimen362
+\multicolovershoot=\dimen363
+\multicolundershoot=\dimen364
+\mult@nat@firstbox=\box167
+\colbreak@box=\box168
 \mc@col@check@num=\count406
 ) (C:\Users\19358\AppData\Local\Programs\MiKTeX\tex/latex/filecontents\filecontents.sty
 Package: filecontents 2023/04/02 v1.5a Create an external file from within a LaTeX document
@@ -1008,11 +1060,11 @@ Package filecontents Warning: This package is obsolete. Disabling it and
 
 ) (C:\Users\19358\AppData\Local\Programs\MiKTeX\tex/latex/tools\tabularx.sty
 Package: tabularx 2023/07/08 v2.11c `tabularx' package (DPC)
-\TX@col@width=\dimen361
-\TX@old@table=\dimen362
-\TX@old@col=\dimen363
-\TX@target=\dimen364
-\TX@delta=\dimen365
+\TX@col@width=\dimen365
+\TX@old@table=\dimen366
+\TX@old@col=\dimen367
+\TX@target=\dimen368
+\TX@delta=\dimen369
 \TX@cols=\count407
 \TX@ftn=\toks66
 ) (C:\Users\19358\AppData\Local\Programs\MiKTeX\tex/latex/tabulary\tabulary.sty
@@ -1026,16 +1078,16 @@ LaTeX Warning: You have requested, on input line 20, version
                is available.
 
 \TY@count=\count408
-\TY@linewidth=\dimen366
-\tymin=\dimen367
-\tymax=\dimen368
-\TY@tablewidth=\dimen369
+\TY@linewidth=\dimen370
+\tymin=\dimen371
+\tymax=\dimen372
+\TY@tablewidth=\dimen373
 ) (C:\Users\19358\AppData\Local\Programs\MiKTeX\tex/latex/multirow\multirow.sty
 Package: multirow 2024/11/12 v2.9 Span multiple rows of a table
 \multirow@colwidth=\skip87
 \multirow@cntb=\count409
 \multirow@dima=\skip88
-\bigstrutjot=\dimen370
+\bigstrutjot=\dimen374
 ) (C:\Users\19358\AppData\Local\Programs\MiKTeX\tex/latex/theoremref\theoremref.sty
 Package: theoremref 2013/05/22 References with automatic theorem names
 \thmref@num=\count410
@@ -1073,9 +1125,6 @@ Document Style - pseudocode environments for use with the `algorithmicx' style
 ) (C:\Users\19358\AppData\Local\Programs\MiKTeX\tex/latex/todonotes\todonotes.sty
 Package: todonotes 2024/01/05 v1.1.7 Todonotes source and documentation.
 Package: todonotes 2024/01/05
- (C:\Users\19358\AppData\Local\Programs\MiKTeX\tex/generic/pgf/frontendlayer/tikz/libraries\tikzlibrarypositioning.code.tex
-File: tikzlibrarypositioning.code.tex 2023-01-15 v3.1.10 (3.1.10)
-)
 \c@@todonotes@numberoftodonotes=\count419
 ) (C:\Users\19358\AppData\Local\Programs\MiKTeX\tex/latex/tools\xspace.sty
 Package: xspace 2014/10/28 v1.13 Space after command names (DPC,MH)
@@ -1100,7 +1149,7 @@ Package: kvoptions 2022-06-15 v3.15 Key value format for package options (HO)
 ))
 \c@section@level=\count420
 )
-\@linkdim=\dimen371
+\@linkdim=\dimen375
 \Hy@linkcounter=\count421
 \Hy@pagecounter=\count422
  (C:\Users\19358\AppData\Local\Programs\MiKTeX\tex/latex/hyperref\pd1enc.def
@@ -1125,15 +1174,15 @@ Package hyperref Info: Implicit mode ON; LaTeX internals redefined.
 Package hyperref Info: Bookmarks ON on input line 4448.
 \c@Hy@tempcnt=\count424
 LaTeX Info: Redefining \url on input line 4786.
-\XeTeXLinkMargin=\dimen372
+\XeTeXLinkMargin=\dimen376
  (C:\Users\19358\AppData\Local\Programs\MiKTeX\tex/generic/bitset\bitset.sty
 Package: bitset 2019/12/09 v1.3 Handle bit-vector datatype (HO)
  (C:\Users\19358\AppData\Local\Programs\MiKTeX\tex/generic/bigintcalc\bigintcalc.sty
 Package: bigintcalc 2019/12/15 v1.5 Expandable calculations on big integers (HO)
 ))
 \Fld@menulength=\count425
-\Field@Width=\dimen373
-\Fld@charsize=\dimen374
+\Field@Width=\dimen377
+\Fld@charsize=\dimen378
 Package hyperref Info: Hyper figures OFF on input line 6065.
 Package hyperref Info: Link nesting OFF on input line 6070.
 Package hyperref Info: Hyper index ON on input line 6073.
@@ -1183,10 +1232,10 @@ Package cleveref Info: `amsthm' support loaded on input line 3026.
 Package cleveref Info: `algorithmicx' support loaded on input line 3120.
 Package cleveref Info: `listings' support loaded on input line 3131.
 ) (C:\Users\19358\AppData\Local\Programs\MiKTeX\tex/latex/wrapfig\wrapfig.sty
-\wrapoverhang=\dimen375
-\WF@size=\dimen376
+\wrapoverhang=\dimen379
+\WF@size=\dimen380
 \c@WF@wrappedlines=\count431
-\WF@box=\box149
+\WF@box=\box169
 \WF@everypar=\toks68
 Package: wrapfig 2003/01/31  v 3.6
 ) (C:\Users\19358\AppData\Local\Programs\MiKTeX\tex/latex/listings\lstlang1.sty
@@ -1204,31 +1253,31 @@ File: lstlang1.sty 2023/02/27 1.9 listings language file
 )
 Package csquotes Info: Checking for multilingual support...
 Package csquotes Info: ... none found.
-Package translations Info: No language package found. I am going to use `english' as default language. on input line 64.
-LaTeX Font Info:    Trying to load font information for T1+ptm on input line 64.
+Package translations Info: No language package found. I am going to use `english' as default language. on input line 74.
+LaTeX Font Info:    Trying to load font information for T1+ptm on input line 74.
  (C:\Users\19358\AppData\Local\Programs\MiKTeX\tex/latex/psnfss\t1ptm.fd
 File: t1ptm.fd 2001/06/04 font definitions for T1/ptm.
 )<<t1.cmap>> (Tricks.aux)
 \openout1 = `Tricks.aux'.
 
-LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 64.
-LaTeX Font Info:    ... okay on input line 64.
-LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 64.
-LaTeX Font Info:    ... okay on input line 64.
-LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 64.
-LaTeX Font Info:    ... okay on input line 64.
-LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 64.
-LaTeX Font Info:    ... okay on input line 64.
-LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 64.
-LaTeX Font Info:    ... okay on input line 64.
-LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 64.
-LaTeX Font Info:    ... okay on input line 64.
-LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 64.
-LaTeX Font Info:    ... okay on input line 64.
-LaTeX Font Info:    Checking defaults for PD1/pdf/m/n on input line 64.
-LaTeX Font Info:    ... okay on input line 64.
-LaTeX Font Info:    Checking defaults for PU/pdf/m/n on input line 64.
-LaTeX Font Info:    ... okay on input line 64.
+LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 74.
+LaTeX Font Info:    ... okay on input line 74.
+LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 74.
+LaTeX Font Info:    ... okay on input line 74.
+LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 74.
+LaTeX Font Info:    ... okay on input line 74.
+LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 74.
+LaTeX Font Info:    ... okay on input line 74.
+LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 74.
+LaTeX Font Info:    ... okay on input line 74.
+LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 74.
+LaTeX Font Info:    ... okay on input line 74.
+LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 74.
+LaTeX Font Info:    ... okay on input line 74.
+LaTeX Font Info:    Checking defaults for PD1/pdf/m/n on input line 74.
+LaTeX Font Info:    ... okay on input line 74.
+LaTeX Font Info:    Checking defaults for PU/pdf/m/n on input line 74.
+LaTeX Font Info:    ... okay on input line 74.
 
 *geometry* driver: auto-detecting
 *geometry* detected driver: pdftex
@@ -1267,13 +1316,13 @@ LaTeX Font Info:    ... okay on input line 64.
 (C:\Users\19358\AppData\Local\Programs\MiKTeX\tex/context/base/mkii\supp-pdf.mkii
 [Loading MPS to PDF converter (version 2006.09.02).]
 \scratchcounter=\count441
-\scratchdimen=\dimen377
-\scratchbox=\box150
+\scratchdimen=\dimen381
+\scratchbox=\box170
 \nofMPsegments=\count442
 \nofMParguments=\count443
 \everyMPshowfont=\toks69
 \MPscratchCnt=\count444
-\MPscratchDim=\dimen378
+\MPscratchDim=\dimen382
 \MPnumerator=\count445
 \makeMPintoPDFobject=\count446
 \everyMPtoPDFconversion=\toks70
@@ -1285,22 +1334,22 @@ File: epstopdf-sys.cfg 2021/03/18 v2.0 Configuration of epstopdf for MiKTeX
 ))
 \c@lstlisting=\count447
 Package microtype Info: Patching varwidth to enable character protrusion.
-\MT@vwid@leftmargin=\dimen379
-\MT@vwid@rightmargin=\dimen380
-LaTeX Info: Redefining \microtypecontext on input line 64.
-Package microtype Info: Applying patch `item' on input line 64.
-Package microtype Info: Applying patch `toc' on input line 64.
-Package microtype Info: Applying patch `eqnum' on input line 64.
-Package microtype Info: Applying patch `footnote' on input line 64.
-Package microtype Info: Applying patch `verbatim' on input line 64.
-LaTeX Info: Redefining \microtypesetup on input line 64.
+\MT@vwid@leftmargin=\dimen383
+\MT@vwid@rightmargin=\dimen384
+LaTeX Info: Redefining \microtypecontext on input line 74.
+Package microtype Info: Applying patch `item' on input line 74.
+Package microtype Info: Applying patch `toc' on input line 74.
+Package microtype Info: Applying patch `eqnum' on input line 74.
+Package microtype Info: Applying patch `footnote' on input line 74.
+Package microtype Info: Applying patch `verbatim' on input line 74.
+LaTeX Info: Redefining \microtypesetup on input line 74.
 Package microtype Info: Generating PDF output.
 Package microtype Info: Character protrusion enabled (level 2).
 Package microtype Info: Using default protrusion set `alltext'.
 Package microtype Info: Automatic font expansion enabled (level 2),
 (microtype)             stretch: 20, shrink: 20, step: 1, non-selected.
 Package microtype Info: Using default expansion set `alltext-nott'.
-LaTeX Info: Redefining \showhyphens on input line 64.
+LaTeX Info: Redefining \showhyphens on input line 74.
 Package microtype Info: No adjustment of tracking.
 Package microtype Info: No adjustment of interword spacing.
 Package microtype Info: No adjustment of character kerning.
@@ -1312,49 +1361,49 @@ Package caption Info: hyperref package is loaded.
 Package caption Info: threeparttable package is loaded.
 Package caption Info: wrapfig package is loaded.
 Package caption Info: End \AtBeginDocument code.
-Package hyperref Info: Link coloring OFF on input line 64.
+Package hyperref Info: Link coloring OFF on input line 74.
  (Tricks.out) (Tricks.out)
 \@outlinefile=\write5
 \openout5 = `Tricks.out'.
 
-LaTeX Font Info:    Trying to load font information for OT1+lmr on input line 70.
+LaTeX Font Info:    Trying to load font information for OT1+lmr on input line 80.
  (C:\Users\19358\AppData\Local\Programs\MiKTeX\tex/latex/lm\ot1lmr.fd
 File: ot1lmr.fd 2015/05/01 v1.6.1 Font defs for Latin Modern
 )<<ot1.cmap>> (C:\Users\19358\AppData\Local\Programs\MiKTeX\tex/latex/microtype\mt-cmr.cfg
 File: mt-cmr.cfg 2013/05/19 v2.2 microtype config. file: Computer Modern Roman (RS)
 )
-LaTeX Font Info:    Trying to load font information for OML+lmm on input line 70.
+LaTeX Font Info:    Trying to load font information for OML+lmm on input line 80.
  (C:\Users\19358\AppData\Local\Programs\MiKTeX\tex/latex/lm\omllmm.fd
 File: omllmm.fd 2015/05/01 v1.6.1 Font defs for Latin Modern
 )<<oml.cmap>>
-LaTeX Font Info:    Trying to load font information for OMS+lmsy on input line 70.
+LaTeX Font Info:    Trying to load font information for OMS+lmsy on input line 80.
  (C:\Users\19358\AppData\Local\Programs\MiKTeX\tex/latex/lm\omslmsy.fd
 File: omslmsy.fd 2015/05/01 v1.6.1 Font defs for Latin Modern
 )<<oms.cmap>>
-LaTeX Font Info:    Trying to load font information for OMX+lmex on input line 70.
+LaTeX Font Info:    Trying to load font information for OMX+lmex on input line 80.
  (C:\Users\19358\AppData\Local\Programs\MiKTeX\tex/latex/lm\omxlmex.fd
 File: omxlmex.fd 2015/05/01 v1.6.1 Font defs for Latin Modern
 )
 LaTeX Font Info:    External font `lmex10' loaded for size
-(Font)              <10.95> on input line 70.
+(Font)              <10.95> on input line 80.
 <<omx.cmap>>
 LaTeX Font Info:    External font `lmex10' loaded for size
-(Font)              <8> on input line 70.
+(Font)              <8> on input line 80.
 LaTeX Font Info:    External font `lmex10' loaded for size
-(Font)              <6> on input line 70.
-LaTeX Font Info:    Trying to load font information for U+msa on input line 70.
+(Font)              <6> on input line 80.
+LaTeX Font Info:    Trying to load font information for U+msa on input line 80.
  (C:\Users\19358\AppData\Local\Programs\MiKTeX\tex/latex/amsfonts\umsa.fd
 File: umsa.fd 2013/01/14 v3.01 AMS symbols A
 ) (C:\Users\19358\AppData\Local\Programs\MiKTeX\tex/latex/microtype\mt-msa.cfg
 File: mt-msa.cfg 2006/02/04 v1.1 microtype config. file: AMS symbols (a) (RS)
 )
-LaTeX Font Info:    Trying to load font information for U+msb on input line 70.
+LaTeX Font Info:    Trying to load font information for U+msb on input line 80.
  (C:\Users\19358\AppData\Local\Programs\MiKTeX\tex/latex/amsfonts\umsb.fd
 File: umsb.fd 2013/01/14 v3.01 AMS symbols B
 ) (C:\Users\19358\AppData\Local\Programs\MiKTeX\tex/latex/microtype\mt-msb.cfg
 File: mt-msb.cfg 2005/06/01 v1.0 microtype config. file: AMS symbols (b) (RS)
 )
-LaTeX Font Info:    Trying to load font information for U+rsfs on input line 70.
+LaTeX Font Info:    Trying to load font information for U+rsfs on input line 80.
  (C:\Users\19358\AppData\Local\Programs\MiKTeX\tex/latex/jknappen\ursfs.fd
 File: ursfs.fd 1998/03/24 rsfs font definition file (jk)
 )
@@ -1369,9 +1418,9 @@ Package fancyhdr Warning: \headheight is too small (12.0pt):
 
 {C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/enc/dvips/lm/lm-rm.enc}{C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/enc/dvips/lm/lm-mathsy.enc}{C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/enc/dvips/lm/lm-mathit.enc}{C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/enc/dvips/lm/lm-mathex.enc}]
 LaTeX Font Info:    External font `lmex10' loaded for size
-(Font)              <9> on input line 143.
+(Font)              <9> on input line 153.
 LaTeX Font Info:    External font `lmex10' loaded for size
-(Font)              <5> on input line 143.
+(Font)              <5> on input line 153.
 
 
 Package fancyhdr Warning: \headheight is too small (12.0pt): 
@@ -1381,7 +1430,7 @@ Package fancyhdr Warning: \headheight is too small (12.0pt):
 (fancyhdr)                \addtolength{\topmargin}{-1.59999pt}.
 
 [2]
-LaTeX Font Info:    Trying to load font information for TS1+ptm on input line 171.
+LaTeX Font Info:    Trying to load font information for TS1+ptm on input line 181.
  (C:\Users\19358\AppData\Local\Programs\MiKTeX\tex/latex/psnfss\ts1ptm.fd
 File: ts1ptm.fd 2001/06/04 font definitions for TS1/ptm.
 )
@@ -1401,7 +1450,7 @@ Package fancyhdr Warning: \headheight is too small (12.0pt):
 (fancyhdr)                \addtolength{\topmargin}{-1.59999pt}.
 
 [4]
-LaTeX Font Info:    Trying to load font information for T1+pcr on input line 265.
+LaTeX Font Info:    Trying to load font information for T1+pcr on input line 275.
  (C:\Users\19358\AppData\Local\Programs\MiKTeX\tex/latex/psnfss\t1pcr.fd
 File: t1pcr.fd 2001/06/04 font definitions for T1/pcr.
 )
@@ -1411,7 +1460,7 @@ Package microtype Info: Loading generic protrusion settings for font family
 (microtype)             See the microtype manual for details.
 LaTeX Info: Symbol \textleftarrow not provided by
             font family pcr in TS1 encoding.
-            Default family used instead on input line 267.
+            Default family used instead on input line 277.
 Package microtype Info: Loading generic protrusion settings for font family
 (microtype)             `cmtt' (encoding: T1).
 (microtype)             For optimal results, create family-specific settings.
@@ -1422,22 +1471,22 @@ Package microtype Info: Loading generic protrusion settings for font family
 (microtype)             See the microtype manual for details.
 LaTeX Info: Symbol \textleftarrow not provided by
             font family pcr in TS1 encoding.
-            Default family used instead on input line 267.
+            Default family used instead on input line 277.
 LaTeX Info: Symbol \textleftarrow not provided by
             font family pcr in TS1 encoding.
-            Default family used instead on input line 267.
+            Default family used instead on input line 277.
 LaTeX Info: Symbol \textleftarrow not provided by
             font family pcr in TS1 encoding.
-            Default family used instead on input line 268.
+            Default family used instead on input line 278.
 LaTeX Info: Symbol \textleftarrow not provided by
             font family pcr in TS1 encoding.
-            Default family used instead on input line 268.
+            Default family used instead on input line 278.
 LaTeX Info: Symbol \textleftarrow not provided by
             font family pcr in TS1 encoding.
-            Default family used instead on input line 268.
+            Default family used instead on input line 278.
 LaTeX Info: Symbol \textrightarrow not provided by
             font family ptm in TS1 encoding.
-            Default family used instead on input line 287.
+            Default family used instead on input line 297.
 
 
 Package fancyhdr Warning: \headheight is too small (12.0pt): 
@@ -1462,8 +1511,7 @@ Package fancyhdr Warning: \headheight is too small (12.0pt):
 (fancyhdr)                You might also make \topmargin smaller:
 (fancyhdr)                \addtolength{\topmargin}{-1.59999pt}.
 
-[7] 
-AED: lastpage setting LastPage
+[7]
 
 Package fancyhdr Warning: \headheight is too small (12.0pt): 
 (fancyhdr)                Make it at least 13.59999pt, for example:
@@ -1479,26 +1527,90 @@ Package fancyhdr Warning: \headheight is too small (12.0pt):
 (fancyhdr)                You might also make \topmargin smaller:
 (fancyhdr)                \addtolength{\topmargin}{-1.59999pt}.
 
-[9] (Tricks.aux)
+[9]
+LaTeX Font Info:    External font `lmex10' loaded for size
+(Font)              <10> on input line 567.
+LaTeX Font Info:    External font `lmex10' loaded for size
+(Font)              <7> on input line 567.
+
+
+Package fancyhdr Warning: \headheight is too small (12.0pt): 
+(fancyhdr)                Make it at least 13.59999pt, for example:
+(fancyhdr)                \setlength{\headheight}{13.59999pt}.
+(fancyhdr)                You might also make \topmargin smaller:
+(fancyhdr)                \addtolength{\topmargin}{-1.59999pt}.
+
+[10]
+
+Package fancyhdr Warning: \headheight is too small (12.0pt): 
+(fancyhdr)                Make it at least 13.59999pt, for example:
+(fancyhdr)                \setlength{\headheight}{13.59999pt}.
+(fancyhdr)                You might also make \topmargin smaller:
+(fancyhdr)                \addtolength{\topmargin}{-1.59999pt}.
+
+[11]
+
+Package fancyhdr Warning: \headheight is too small (12.0pt): 
+(fancyhdr)                Make it at least 13.59999pt, for example:
+(fancyhdr)                \setlength{\headheight}{13.59999pt}.
+(fancyhdr)                You might also make \topmargin smaller:
+(fancyhdr)                \addtolength{\topmargin}{-1.59999pt}.
+
+[12]
+Underfull \hbox (badness 1838) in paragraph at lines 791--792
+[]\TS1/ptm/m/n/10.95 (+20) ˆ \T1/ptm/m/n/10.95 (+20) Great for clas-si-fi-ca-tion, re-
+ []
+
+
+Underfull \hbox (badness 1902) in paragraph at lines 807--808
+\T1/ptm/m/n/10.95 (+20) tasks (trans-la-tion, sum-ma-riza-
+ []
+
+
+AED: lastpage setting LastPage
+
+Package fancyhdr Warning: \headheight is too small (12.0pt): 
+(fancyhdr)                Make it at least 13.59999pt, for example:
+(fancyhdr)                \setlength{\headheight}{13.59999pt}.
+(fancyhdr)                You might also make \topmargin smaller:
+(fancyhdr)                \addtolength{\topmargin}{-1.59999pt}.
+
+[13]
+
+Package fancyhdr Warning: \headheight is too small (12.0pt): 
+(fancyhdr)                Make it at least 13.59999pt, for example:
+(fancyhdr)                \setlength{\headheight}{13.59999pt}.
+(fancyhdr)                You might also make \topmargin smaller:
+(fancyhdr)                \addtolength{\topmargin}{-1.59999pt}.
+
+[14]
+
+Package fancyhdr Warning: \headheight is too small (12.0pt): 
+(fancyhdr)                Make it at least 13.59999pt, for example:
+(fancyhdr)                \setlength{\headheight}{13.59999pt}.
+(fancyhdr)                You might also make \topmargin smaller:
+(fancyhdr)                \addtolength{\topmargin}{-1.59999pt}.
+
+[15] (Tricks.aux)
  ***********
 LaTeX2e <2023-11-01> patch level 1
 L3 programming layer <2024-01-04>
  ***********
 Package rerunfilecheck Info: File `Tricks.out' has not changed.
-(rerunfilecheck)             Checksum: 7B9A2CCE3A25CCCD2AC11E96114A1551;3516.
+(rerunfilecheck)             Checksum: 38EC8E97475B3283EFAF38C8C7547A8E;4352.
  ) 
 Here is how much of TeX's memory you used:
- 43900 strings out of 474486
- 909031 string characters out of 5743755
- 1946542 words of memory out of 5000000
- 65113 multiletter control sequences out of 15000+600000
- 633753 words of font info for 215 fonts, out of 8000000 for 9000
+ 46526 strings out of 474486
+ 980187 string characters out of 5743755
+ 1948542 words of memory out of 5000000
+ 67549 multiletter control sequences out of 15000+600000
+ 655479 words of font info for 291 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
  101i,18n,120p,1063b,1278s stack positions out of 10000i,1000n,20000p,200000b,200000s
- <C:\Users\19358\AppData\Local\MiKTeX\fonts/pk/ljfour/jknappen/ec/dpi657\tcrm1000.pk> <C:\Users\19358\AppData\Local\MiKTeX\fonts/pk/ljfour/jknappen/ec/dpi657\tctt1000.pk><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmbx10.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmbx8.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmbx9.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmex10.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmmi10.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmmi6.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmmi8.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmmi9.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmr10.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmr8.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmsy10.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmsy8.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmsy9.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/symbols/msbm10.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/urw/courier/ucrr8a.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/urw/times/utmb8a.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/urw/times/utmr8a.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/urw/times/utmri8a.pfb>
-Output written on Tricks.pdf (9 pages, 285559 bytes).
+ <C:\Users\19358\AppData\Local\MiKTeX\fonts/pk/ljfour/jknappen/ec/dpi657\tcrm1000.pk> <C:\Users\19358\AppData\Local\MiKTeX\fonts/pk/ljfour/jknappen/ec/dpi657\tctt1000.pk><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmbx10.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmbx6.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmbx8.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmbx9.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmex10.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmmi10.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmmi6.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmmi8.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmmi9.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmr10.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmr6.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmr8.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmr9.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmsy10.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmsy6.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmsy8.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmsy9.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/symbols/msbm10.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/urw/courier/ucrr8a.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/urw/times/utmb8a.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/urw/times/utmr8a.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/urw/times/utmri8a.pfb>
+Output written on Tricks.pdf (15 pages, 401646 bytes).
 PDF statistics:
- 313 PDF objects out of 1000 (max. 8388607)
- 57 named destinations out of 1000 (max. 500000)
- 49001 words of extra memory for PDF output out of 51595 (max. 10000000)
+ 410 PDF objects out of 1000 (max. 8388607)
+ 92 named destinations out of 1000 (max. 500000)
+ 57233 words of extra memory for PDF output out of 61914 (max. 10000000)
 
