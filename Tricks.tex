@@ -853,6 +853,21 @@ In many large models, FFNs account for $50\% - 60\%$ of total parameters.
 \end{itemize}
 The original Transformer paper uses ReLU, but GELU is more popular in modern models (BERT, GPT-2/3).
 
+ReLU: piecewise linear, fast, but can lead to dead neurons (zero gradients for negative inputs). 
+\begin{align*}
+  \text{ReLU}(x) = \max(0, x).
+\end{align*}
+
+GELU: a smoother, probabilistic activation function that approximates the Gaussian distribution.
+\begin{align*}
+  \text{GELU}(x) = x \cdot \Phi(x) = x \cdot \frac{1}{2}\left(1 + \text{erf}\left(\frac{x}{\sqrt{2}}\right)\right),
+\end{align*}
+where $\Phi(x)$ is the cumulative distribution function of the standard normal distribution, and $\text{erf}$ is the error function.
+\begin{itemize}
+  \item Pros: \textbf{Smooth, i.e., differentiable everywhere}\footnote{Smoothness in this context refers to infinitely differentiable functions $C^{\infty}$, not the smoothness in the optimization theory sense.}, which enables better gradient flows. It often yields better performance in transformers, understanding and generation tasks.
+  \item Cons: \textbf{Computationally more expensive}, sligltly more than ReLU.
+\end{itemize}
+
 
 
 
