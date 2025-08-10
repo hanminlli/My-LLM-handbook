@@ -816,7 +816,43 @@ As a summary:
 
 
 \subsection{The Linear Layers}
-FFNs (Feed Forward Neural networks) are a part of the encoder, decoder block, there are several design choices here.
+FFNs (Feed Forward Networks) are a part of the encoder, decoder block, there are several design choices here.
+They are also known as MLPs (Multi-Layer Perceptrons), and they are used to transform the input features into a higher-dimensional space, apply non-linear activation, and then project back to the original dimension.
+For the 1-$d$ case, imagine we have a vector $x \in \R^{d_{\text{model}}}$, then the FFN does the following:
+\begin{align*}
+  \text{FFN}(x) = \mW_2\cdot\sigma(\mW_1 x + b_1) + b_2,
+\end{align*}
+where $mW_1 \in \R^{d_{\text{ffn}} \times d_{\text{model}}}$ is the matrix that projects the input to a higher dimension, $\sigma$ is a non-linear activation function (e.g., ReLU, GELU), and $\mW_2 \in \R^{d_{\text{model}} \times d_{\text{ffn}}}$ projects it back to the original dimension.
+$d_{\text{ffn}}$ is often $2 ~ 4 \times$ $d_{\text{model}}$.
+Now if we consider the true input $\mX \in \R^{B \times L \times d_{\text{model}}}$, then basically, for each sequence in the batch, we apply the same FFN to each token, and there will be no interactions between different tokens.
+
+\paragraph{Why do we put FFNs in the encoder/decoder blocks?}
+The FFN is used to introduce non-linearity into the model, allowing it to learn more complex representations. 
+Self-attention is linear in the feature dimension for a fixed set of attention weights.
+It mixes tokens but does not increase the per-token expressivity much.
+To see this, consider the following attention formula:
+\begin{align*}
+  \text{Attn}(\mQ, \mK, \mV) = \underbrace{\text{softmax}\left(\frac{\mQ\mK^\top}{\sqrt{d_{\text{model}}}}\right)}_{\eqdef \mA}\mV,
+\end{align*}
+if the attention weight matrix $\mA$ is fixed, then the output is a linear combination of the input $\mV$ which is linear in $\mX$, i.e, linear in the feature dimension.
+
+If we \textbf{remove the FFN}, the model would reduce to mostly linear mixing layers accross tokens, which leads to collapse of expressivity (model underfits complex transformations), and much worse performance.
+
+
+\paragraph{Design choices for FFNs:}
+There are several design choices for FFNs, which can affect the model's performance and efficiency.
+\begin{itemize}
+  \item Expansion ratio: $d_{\text{ffn}}/d_{\text{model}}$.
+\end{itemize}
+This is typically around $2 ~ 4 \times$.
+In the original Transformer paper, it is $4 \times$, while in LLaMA, it is $2 \times$.
+In many large models, FFNs account for $50\% - 60\%$ of total parameters.
+
+\begin{itemize}
+  \item Activation function: ReLU, GELU, SiLU, etc.
+\end{itemize}
+The original Transformer paper uses ReLU, but GELU is more popular in modern models (BERT, GPT-2/3).
+
 
 
 
