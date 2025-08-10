@@ -56,7 +56,7 @@ class MultiHeadSelfAttention(nn.Module):
         return self.W_o(output)
         
 
-
+__all__ = ["MultiHeadSelfAttention"]
 
 
 

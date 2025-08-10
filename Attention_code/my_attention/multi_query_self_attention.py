@@ -58,3 +58,6 @@ class MultiQuerySelfAttention(nn.Module):
         output = torch.matmul(attn, V).transpose(1, 2).contiguous().view(B, L, d_model)
         # Step 6
         return self.Wo(output)
+
+
+__all__ = ["MultiQuerySelfAttention"]

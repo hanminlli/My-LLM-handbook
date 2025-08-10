@@ -127,3 +127,5 @@ class LatentTransformer(nn.Module):
             z = block(z, x)
         
         return z # (B, M, d_model)
+
+__all__ = ["LatentTransformer", "LatentTransformerBlock", "MultiHeadAttention_QKV", "MultiHeadLatentAttention"]

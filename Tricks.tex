@@ -640,7 +640,7 @@ It do has downside though, Pre-LN has a weaker normalizing effect so sometimes p
 }
 
 
-\begin{figure}[ht]
+\begin{figure}[H]
 
 \centering
 \begin{tikzpicture}[>=Latex, node distance=12mm, font=\small]
@@ -867,6 +867,142 @@ where $\Phi(x)$ is the cumulative distribution function of the standard normal d
   \item Pros: \textbf{Smooth, i.e., differentiable everywhere}\footnote{Smoothness in this context refers to infinitely differentiable functions $C^{\infty}$, not the smoothness in the optimization theory sense.}, which enables better gradient flows. It often yields better performance in transformers, understanding and generation tasks.
   \item Cons: \textbf{Computationally more expensive}, sligltly more than ReLU.
 \end{itemize}
+
+SiLU: another smooth activation function, models such as EfficientNet used it. 
+\begin{align*}
+  \text{SiLU}(x) = x \cdot \sigma(x),
+\end{align*}
+where $\sigma(x) = \frac{1}{1 + e^{-x}}$ is the sigmoid function.
+It is sometimes called the Swish-1 (Swish with $\beta = 1$.)
+
+
+\subsection{Gated Linear Units}
+GLU (Gated Linear Unit) takes an input, splits it into two parts (value \& gate), and uses one to gate the other via an elementwise product.
+Mathematically, for $\mX \in \R^{B \times L \times d_{\text{model}}}$, we first apply two independent linear projections using $\mW_g, \mW_v \in \R^{d_{\text{ffn}} \times d_{\text{model}}}$, 
+\begin{align*}
+  \mG = \mW_g \mX + \mB_g, \qquad \mV = \mW_v \mX + \mB_v;
+\end{align*}
+We then apply a nonlinear activation to the gate part, after which we do elementwise multiplication.
+\begin{align*}
+  \mG^\prime = \sigma(\mG), \qquad \text{GLU}(\mX) = \mV \odot \mG^\prime.
+\end{align*}
+
+Note that we are applying activation to $\mG$ (the gate) instead of $\mV$, because we are applying the non-linearity here to shape its gating behaviour.
+This separation between gate and value allows us to learn specialized gating pattern, which acts like an learned feature selector.
+
+\paragraph{SwiGLU:} we are essentially replacing the original activation function $\sigma(\cdot)$ with $\text{SiLU}(\cdot)$, which is smoother. 
+This is used in LLaMA, PaLM, etc.
+
+\paragraph{GEGLU:} we are essentially replacing the original activation with $\text{GELU}(\cdot)$ or its approximations with tanh.
+
+
+\subsection{Mixture-of-Experts FFNs}
+In a standard Transformer block, the FFN is a single feed-forward network (sometimes gated like SwiGLU) applied to every token. 
+In MoE, instead of one FFN, we have $E$ separate FFN ``experts''. 
+For each token, a router chooses a subset (often 1 or 2) of experts to run.
+The outputs are combined according to the router's weights.
+Its advantages include 
+\begin{itemize}
+  \item \textbf{Scaling parameters without scaling compute:} We can have lots of experts trained but we only invoke one of them. 
+  \item \textbf{Specialization:} The model specializes experts for different types of inputs (topics, syntactic structures, etc.).
+\end{itemize}
+
+Mathematically, let $\mX \in \R^{B \times L \times d_{\text{model}}}$, $E$ be the number of experts in this case. 
+
+The forward pass:
+
+\begin{itemize}
+  \item[(i)] Router logits:
+  \begin{align*}
+    \mR = \mW_r \mX + \mB_r \quad \in \RBLE,
+  \end{align*}
+  where $\mB_r = \mathbf{1}b_r^{\top}$ is the extended bias matrix. 
+  \item[(ii)] Gating probabilities:
+  \begin{align*}
+    \mP = \softmax (\mR) \quad \in \RBLE.
+  \end{align*}
+
+  \item[(iii)] Top-$k$ routing: 
+  Keep the best-$k$ experts per token according to the probabilities, and renormalize.
+  Specifically, for each token $l$ in each batch $b$, denote $\cT_k(b, l)$ as the indices of top-$k$ experts according to $\mP[b, l, :]$, we do 
+  \begin{align*}
+    \tilde{\mP}[b, l, d] = \frac{\mP[b, l, d]}{\sum_{j=1}^{\cT_k(b, l)}\mP[b, l, j]},\quad \forall d \in \cT_k(b, l), \quad \lvert \cT_k(b, l) \rvert = k,
+  \end{align*} 
+  and sets the other coordinates to be zero, which allows us to obtain $\tilde{\mP}$.
+  The renormalization here is to avoid suppressing magnitude purely because we dropped low-prob experts.
+
+  \item[(iv)] Dispatch:
+  For each expert $e$, define the packed input by selecting tokens routed to $e$ as $\mX_e$.
+  Let $N_e$ be the number of tokens whose top-$k$ includes expert $e$, $\pi_e(\cdot)$ be the corresponding map of expert $e$ (from $\cbrac{1, \dots, N_e} \mapsto \cbrac{[b, l]}$) to the original indices pair $(b, l)$ and let $\eta_e(\cdot)$ be the map from $\cbrac{[b, l]}$ to the index in $[N_e]$.
+  Then the input for an expert is 
+  \begin{align*}
+    \mX_e \in \R^{N_e \times \dmodel}, \quad \text{    where    }\quad \mX_e[j, :] = \mX[\pi_e(j), :], \qquad \forall j \in [N_e]
+  \end{align*}
+  with the renormalized gate weight 
+  \begin{align*}
+    g_e \in \R^{N_e}, \quad \text{    where    }\quad g_e[j] = \tilde{\mP}[\pi_e(j), e].
+  \end{align*}
+
+  \item[(v)] Expert maps:
+  Depending on the expert type (dense FFN / Gated FFN), we create 
+  \begin{align*}
+    \mY_e = \text{FFN}_e(\mX_e) \quad \in \R^{N_e \times \dmodel}.
+  \end{align*}
+
+  \item[(vi)] Gate scaling and combine:
+  Apply per token gate (weight) to the output 
+  \begin{align*}
+    \tilde{\mY}_e = \diag (g_e) \cdot \mY_e, \qquad (\text{in ML literature} \qquad g_e \odot \mY_e \text{ using broadcast.}) 
+  \end{align*}
+  Then the output $\mZ \in \RBLDm$ would be filled such that 
+  \begin{align*}
+    \mZ[b, l, :] = \sum_{e \in \cT_k(b, l)} \tilde{\mY}_e[\eta_e(b, l), :]
+  \end{align*}
+  before outputing.
+\end{itemize}
+
+\paragraph{Capacity constraint:} In practical implementation, we often set \textbf{capacity constraint} in its formalization, which is the limit on how many tokens each expert is allowed to process in a single forward pass.
+The reason to have it is 
+\begin{itemize}
+  \item \textbf{Load imbalance is common:} one ``hot'' expert could get far more tokens than the average, causing GPU memory overflow for that expert, and slower steps since we need to wait for it.
+  \item \textbf{Hardware needs fixed allocation:} In distributed training, each expert lives on one or more GPUs, memory buffers for expert input/output must be pre-allocated. 
+  If the number of tokens per expert varies wildly, we cannot pre-allocate efficiently without wasting huge amounts of memory.
+\end{itemize}
+We set a capacity per expert:
+\begin{align*}
+  C_e = \floor{\alpha \cdot \frac{BL}{E}},
+\end{align*}
+where $E$ is the number of experts and $\alpha \geq 1$ is the capacity factor to allow slackness. 
+If an expert get more than $C_e$ tokens:
+\begin{enumerate}
+  \item \textbf{Dropping:} (common in Switch Transformers) Excess tokens are simply dropped for that expert: they don't get processed there, and their contribution from that expert is zeroed.
+  \item \textbf{Rerouting} (less common) Excess tokens are sent to a backup expert.
+\end{enumerate}
+If an expert get fewer than $C_e$ tokens: one may use \textbf{padding} we pad its buffer to $C_e$ entries for vectorization but those padded entris are ignored.
+
+
+\paragraph{Load balancing auxiliary loss:} 
+We need an extra loss term during training so that the router doesn't collapse onto just a few experts. 
+The reasion is that, without any extra incentive, the model may prefer some experts a lot more than others, leaving many experts underused or unused.
+We have 
+\begin{align*}
+  \cL_{\text{total}} = \cL_{\text{task}} + \lambda \cdot \cL_{\text{aux}},
+\end{align*}
+where $\cL_{\text{task}}$ is the task loss, and in the common GShard / Switch Transfomer\footnote{Both of these are specific MoE implementations from Google that popularized large-scale sparse FFNs. Switch is basically a simplified, more efficient GShard.}, we have 
+\begin{align*}
+  \cL_{\text{aux}} = E \cdot \sum_{e=1}^{E} f_e \cdot m_e.
+\end{align*}
+$f_e$ is defined as the fraction of tokens assigned to expert $e$,
+\begin{align*}
+  f_e = \frac{N_e}{BL} = \frac{1}{BL}\sum_{b=1}^{B}\sum_{l=1}^{L}\mathbf{1}^{\top} \cdot \cbrac{e \in \cT_k(b, l)},
+\end{align*}
+where $\cbrac{e \in \cT_k(b, l)}$ is the indicator vector (sum of corresponding one hot vector) in $\R^{B \times L}$ suggesting if expert $e$ is selected by this token, while $m_e$ is defined as 
+\begin{align*}
+  m_e = \frac{1}{BL} \sum_{b=1}^{B} \sum_{l=1}^{L} P[b, l, e],
+\end{align*}
+which is the average probability of assigning to expert $e$.
+One can show that the loss is smaller when $f_e$ and $m_e$ are more evenly distributed across experts. 
+$\cL_{\text{aux}}$ can be though of as an load balancing regularizer.
 
 
 

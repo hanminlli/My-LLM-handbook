@@ -58,3 +58,6 @@ class GroupedQueryAttention(nn.Module):
         output = torch.matmul(attn, V).reshape(B, self.H_q, L, self.d_head_q) # matmul returns (B, H_kv, Q_per_KV, L, d_head_q)
         output = output.transpose(1, 2).contiguous().view(B, L, d_model)
         return self.Wo(output)
+
+
+__all__ = ["GroupedQueryAttention"]

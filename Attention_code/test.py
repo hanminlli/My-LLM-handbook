@@ -9,6 +9,7 @@ from my_attention.multi_head_latent_attention import MultiHeadLatentAttention
 from my_attention.multi_head_latent_attention import LatentTransformer
 from my_normlization.rms_norm import RMSNorm
 from my_normlization.layer_norm import LayerNorm
+from my_attention.encoder import MLP, GatedMLP
 
 # ---- TEST MODULE FOR ATTENTION ----
 class Test(torch.nn.Module):
@@ -85,8 +86,25 @@ def test_layernorm_basic():
     assert torch.isfinite(y).all()
     print("LayerNorm basic test passed.")
 
+def test_mlp_basic():
+    B, L, D = 3, 4, 5
+    x = torch.randn(B, L, D)
+    mlp = MLP(d_model=D, d_ffn=10, activation="gelu_tanh")
+    y = mlp(x)
+    assert y.shape == (B, L, D)
+    assert torch.isfinite(y).all()
+    print("MLP basic test passed.")
+
+def test_gated_mlp_basic():
+    B, L, D = 3, 4, 5
+    x = torch.randn(B, L, D)
+    mlp = GatedMLP(d_model=D, d_ffn=10, gate_activation="silu")
+    y = mlp(x)
+    assert y.shape == (B, L, D)
+    assert torch.isfinite(y).all()
+    print("GatedMLP basic test passed.")
+
+
 if __name__ == "__main__":
-    main()
-    test_attention_shapes_and_validity()
-    test_rmsnorm_basic()
-    test_layernorm_basic()
+    test_mlp_basic()
+    test_gated_mlp_basic()
