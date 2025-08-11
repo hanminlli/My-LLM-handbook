@@ -12,6 +12,8 @@
 %\usepackage{setspace}          % Uncomment for line spacing adjustments (e.g., \doublespacing)
 \usepackage[most]{tcolorbox}
 \usepackage{enumitem} 
+\usepackage{hyperref}   % for clickable refs
+\usepackage{cleveref}   % optional, for "Table 1" style
 \usepackage{tikz}
 \usetikzlibrary{positioning,shapes,arrows.meta,calc} % <-- added calc
 
@@ -91,6 +93,11 @@ Any matrix $\mA \in \R^{m \times n}$ can be decomposed into the sum of its rows:
 \end{align}
 where $e_i$ are standard basis vectors of $\R^m$.
 Notice that this is a rank $1$ decomposition.
+
+
+\section{Multithreading}
+Per-thread scratch buffers (aka thread-local workspaces) are a very common pattern to cut allocation overhead and lock contention in multi-threaded code.
+In this way we do not create lots of short-lived temporaries, and have better cache locality and to avoid false sharing on shared buffers.
 
 
 \section{LLM Training}
@@ -332,9 +339,7 @@ Specifically, for $\mX \in \R^{B \times L \times d_{\text{model}}}$ and the drop
 \end{align*}
 $q$ is referred to as the keep probability, and we are trying to make $\Exp{\widehat{\mX}} = \mX$.
 \paragraph{During Inferencing:}
-At inference time the mask is removed and $\mX$ passes through unchanged.
-
-Code: 
+At inference time the mask is removed and $\mX$ passes through unchanged. Code: 
 \begin{verbatim}
   torch.nn.Dropout(p=p)
 \end{verbatim}
@@ -343,6 +348,67 @@ Code:
 This one seems to be less well known, on medical image tasks.
 
 \subsection{Linear Attention}
+Let us first look at the asymptotic time complexity and memory complexity of attention.
+\begin{table}[H]
+\label{table1}
+\centering
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{@{}l c@{}}
+\toprule
+\textbf{Operation} & \textbf{Complexity} \\
+\midrule
+Projections $\mX \mapsto (\mQ,\mK,\mV)$ & $\cO\left(BLd_{\text{model}}^{2}\right)$ \\
+Score computation $\mQ\mK^{\top}$ (per head) & $\cO\left(BHL^{2}\dhead\right)$ \\
+Softmax over scores & $\cO\left(BHL^{2}\right)$ \\
+Weighted sum $\mathrm{softmax}(\mQ\mK^{\top})\mV$ & $\cO\left(BHL^{2}\dhead\right)$ \\
+Output projection (concat heads $\to d_{\text{model}}$) & $\cO\left(BLd_{\text{model}}^{2}\right)$ \\
+\bottomrule
+\end{tabular}
+\caption{Computation complexity of the main steps in a standard self-attention block. 
+Here $B$ = batch size, $L$ = sequence length, $H$ = number of heads, $\dhead$ = head dimension, and $d_{\text{model}} = H \cdot \dhead$.}
+\end{table}
+For naive self-attention, we can see that as sequence length becomes longer, the dominating term would be $\cO(BHL^2\dhead)$, which becomes $\cO(BHL_qL_k\dhead)$, which is quadratic in $L$.
+
+\paragraph{Memory consumption:} 
+\begin{itemize}
+  \item Store $\mQ, \mK$ and $\mV$: $\cO(BL\dmodel)$
+  \item Store attention scores/probs: $\cO(BHL^2)$
+  \item Output activations for backprob add similar terms.
+  \item By FlashAttention / PyTorch SDPA (streaming): we keep compute the same $\cO(BHL^2\dhead)$ but reduce memory from $\cO(BHL^2)$ to roughly $\cO(BL\dmodel)$ by not materializing the full $L \times L$ matrix. 
+\end{itemize}
+
+\begin{table}[h]
+\centering
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{@{}lcc@{}}
+\toprule
+\textbf{Scenario} & \textbf{Time (leading term)} & \textbf{Memory (leading term)} \\
+\midrule
+Self-attention (train) & $O\!\left(BHL^{2}d_{\text{head}}\right)$ & $O\!\left(BHL^{2}\right)$ \\
+Cross-attention & $O\!\left(BHL_{q}L_{k}d_{\text{head}}\right)$ & $O\!\left(BHL_{q}L_{k}\right)$ \\
+With FlashAttention / SDPA & same time & $O\!\left(BLd_{\text{model}}\right)$ \\
+Autoregressive decoding (per token at step $t$) & $O\!\left(Htd_{\text{head}}\right)$ & cache $O\!\left(Ld_{\text{model}}\right)$ \\
+\bottomrule
+\end{tabular}
+\caption{Asymptotic compute and memory complexity for different attention scenarios. 
+Here $B$ = batch size, $L$ = sequence length (train), $H$ = number of heads, $d_{\text{head}}$ = per-head dimension, $d_{\text{model}} = H \cdot d_{\text{head}}$, $L_q$/$L_k$ = query/key lengths for cross-attention, and $t$ = current decoding step in autoregressive inference. Autoregressive decoding is with KV cache.}
+\end{table}
+
+\paragraph{Linear attention:} The linear attention is introduced to avoid the quadratic dependence using attention kernels which allow us to obtain linear dependence. 
+Note that the attention of token $i$ is given by 
+\begin{align*}
+  \text{attn}_i = \frac{\sum_{j=1}^{L}\exp\rbrac{\frac{q_i^{\top}k_j}{\sqrt{\dhead}}}v_j}{\sum_{j=1}^{L}\exp\rbrac{\frac{q_i^{\top}k_j}{\sqrt{\dhead}}}}.
+\end{align*}
+To compute it, we need to perform $\mQ\mK^{\top}$ and apply softmax rowwise.
+We introduce the kernel trick just as we did in SVM, imagine we can write 
+\begin{align*}
+  \exp\rbrac{\frac{q_i^{\top}k_j}{\sqrt{\dhead}}} = \phi(q_i)^{\top} \phi(k_j),
+\end{align*}
+for some feature map $\phi: \R^{\dhead} \mapsto \R^{d_{\phi}}$ with non-negative outputs, then
+\begin{eqnarray*}
+  \text{Numerator:} && \sum_{j=1}^{L}\phi(q_i)^{\top}\phi(k_j)v_j = \sum_{j=1}^{max}
+\end{eqnarray*}
+
 
 \subsection{Sparse Attention}
 
@@ -737,7 +803,7 @@ Encoder runs once on the full source, decoder runs once (training) or incrementa
 The input of encoder is the source sequence $x = [x_1, x_2, ..., x_{L_{\text{enc}}}]$, after embedding we get $\mX$, while the input of the decoder is the target sequence $y$ so far, but shifted ($\hat{y}$) so that the model predicts the next token.
 \begin{enumerate}
   \item We take the original gold target sequence $y = [y_1, y_2, ..., y_{L_{\text{dec}}}]$.
-  \item Shift right by one and add the <BOS> special token, and obtain $\hat{y} = [<BOS>, y_1, ..., y_{L_{\text{dec}} - 1}]$, we then embed to get $\hat{\mY}$ ans use it as an input to the decoder blocks.
+  \item Shift right by one and add the <BOS> special token, and obtain $\hat{y} = [\text{<BOS>}, y_1, ..., y_{L_{\text{dec}} - 1}]$, we then embed to get $\hat{\mY}$ ans use it as an input to the decoder blocks.
 \end{enumerate}
 
 \subsection{Encoder only models} 
@@ -775,10 +841,59 @@ Advantages:
 \end{itemize}
 
 \subsection{Encoder-decoder models}
-often on seq2seq task, requires paired data\footnote{An example is that machine translation needs paired data: Source: "I like apples", Target: "J'aime les pommes".}.
+Often on seq2seq task, requires paired data\footnote{An example is that machine translation needs paired data: Source: "I like apples", Target: "J'aime les pommes".}.
 
+
+\subsection{Prefix-decoder models}
+Slightly less main stream variant in the tranformer family, similar to an interpolation between decoder-only and encoder-decoder models.
+
+\textbf{Key difference:} In prefix decoder blocks, we only have one prefix self attention layer (causal self attention layer with prefix mask), and we do not have two attentions (cross attention + self attention) pattern as in the normal decoder block.
+We are essentially changing the externel information from encoder to prefix region in the mask.
+
+
+Imagine now we take a sequence of length $L = m + n$
+\begin{align*}
+  \textbf{x} = [\underbrace{p_1, \hdots, p_m}_{\textbf{p}}, \underbrace{g_1, \hdots, g_n}_{\textbf{g}}],
+\end{align*}
+where $\mpp$ is the prefix tokens which are given in full before text generation starts.
+This could be tokens from a source sentence (like the ``encoder output'' flattened into tokens), learnable virtual tokens (prefix tuning), encoded representations from another modality (e.g., image embeddings mapped to token space),or just a long text prompt. $\mg$ here is the generation tokens that we will generate causually one by one.
+
+A standard decoder (decoder-only transformers) uses a strict causal mask, which is a lower triangular matrix,
+\begin{align*}
+  \text{Mask}[i, j] = \begin{cases}
+    1 &\quad \text{ if } \quad j \leq i \\
+    0 &\quad \text{ otherwise }
+  \end{cases}
+\end{align*}
+for all $i, j \in [L]$, this says that token $i$ can only attends to positions $j \leq i$.
+While for a prefix decoder, we relaxes the prefix region 
+\begin{align*}
+  \text{Mask}[i, j] = \begin{cases}
+    1 & \quad \text{ if } \quad i \leq m \text{ and } j \leq m \qquad \text{prefix attends to all prefix} \\
+    1 & \quad \text{ if } \quad i \geq m \text{ and } j \leq m \qquad \text{generation attends to all prefix} \\
+    1 & \quad \text{ if } \quad i > m, m < j \leq i \qquad \text{generation attends to its own past}\\
+    0 & \quad \text{ otherwise }
+  \end{cases}
+\end{align*}
+
+An example is that when we want to generate a translation for a sentence $\mt$ (of tokens), we will use it as a prefix, and we know that $\mt_0$ is translated into $\ms_0$ already, in this case, our prefix would be $[\mt_0, \text{<sep>}, \ms_0, \text{<BOS>}]$ and our generation tokens would be $\mt$.
+We include <BOS> in the prefix because it is a known token which is used to anchor.
+
+We prefer prefix decoder sometimes, because 
+\begin{itemize}
+  \item \textbf{Fewer Parameters:} Parameter in the attention part drop roughly half.
+  \item \textbf{Lower compute cost:} When prefix length is modest compared to generation length, prefix decoder can be fast overall, especially on hardware where fusing the attention into one pass matters.
+  \item \textbf{Simpler architecture:} Do not need a separate encoder-decoder split
+  \item \textbf{Easier caching for autoregressive generation}: In standard decoder with cross attention, we need to cache (i) decoder past key/values for masked self attention (ii) the encoder outputs for cross attention.
+  In a prefix decoder, the prefix tokens are just part of the same KV-cache. 
+\end{itemize}
+Down sides: (1) less flexibility in terms of shared layer stack and parameters. (2) for long prefixes, attention is more expansive.
+
+
+\subsection{Summary}
 As a summary:
-\begin{table}[h]
+\begin{table}[H]
+\label{tablex1}
 \centering
 \renewcommand{\arraystretch}{1.2}
 \begin{tabular}{|l|p{5cm}|p{5cm}|}
@@ -1004,11 +1119,51 @@ which is the average probability of assigning to expert $e$.
 One can show that the loss is smaller when $f_e$ and $m_e$ are more evenly distributed across experts. 
 $\cL_{\text{aux}}$ can be though of as an load balancing regularizer.
 
+\paragraph{The all to all trick:}
+In distributed training, experts are sharded across devices (e.g., $1$ expert per GPU or multiple experts per GPU.)
+
+
+\subsection{Parallel Attention + FFN}
+The parallel design changes the flow so that attention and FFN happen at the same time on the same input (after normalization), instead of one after the other.
+Their outputs are summed together with the residual connection in a single step.
+\begin{verbatim}
+          ↑      → FFns      →     ↓
+   x → LayerNorm → Attention → Summation
+   ↓             → Residual  →     ↑
+\end{verbatim}
+Why do we do this:
+\begin{itemize}
+  \item \textbf{Parallelism:} Attention and FFN can be computed concurrently.
+  \item \textbf{Fewer LayerNorms:} Saves computation.
+  \item \textbf{Information Flow:} In sequential design, the FFN only sees the post-attention representation. In parallel, FFN sees the original representation directly, possibly preserving more raw token information.
+  \item \textbf{Better gradient flow:} Shorter path between input and output in the computation graph.
+\end{itemize}
+This architecture is used in some newer LLMs, e.g. PaLM and GPT-JT, to improve speed without hurting performance.
+
+Some practical notes:
+
+\textbullet~ \textbf{Scaling:} Some designs scale the attention and FFN outputs to balance their contributions.
+  
+\textbullet~ \textbf{DropPath / Stochastic depth:} In residual networks, instead of always computing the residual branch, we may randomly drop it during training according to some probabilities, so that the model learns to rely on multiple paths, not just one.
+In parallel attention, we may consider dropping attention branch and FFN branch independently. 
+In this way we reduces overfitting by introducing randomness, and encourages robustness.
+
+\textbullet~ \textbf{Variance stability:} When we sum two residual branches instead of one, we risk blowing up the variance of activations early in training. 
+This is another reason why we do scaling:
+\begin{align*}
+  x^\prime = x + \frac{1}{\sqrt{2}}\rbrac{\text{attn\_out} + \text{ffn\_out}}
+\end{align*}
+We can also control by careful weight initializations, or considering set a learnable scaling parameters like $\alpha_{\text{attn}}$ and $\alpha_{\text{ffn}}$ which is small intially and train up.
+
+
+
 
 
 
 \section{Computing the Number of Parameters}
 
+
+\section{Fintuning}
 
 
 

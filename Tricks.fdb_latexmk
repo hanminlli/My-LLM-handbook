@@ -1,5 +1,5 @@
 # Fdb version 4
-["pdflatex"] 1754845137.58012 "c:/Users/19358/Desktop/Documents/Commonly-used-facts-tricks/Tricks.tex" "Tricks.pdf" "Tricks" 1754845139.43874 0
+["pdflatex"] 1754926423.60507 "c:/Users/19358/Desktop/Documents/Commonly-used-facts-tricks/Tricks.tex" "Tricks.pdf" "Tricks" 1754926425.30955 0
   "C:/Users/19358/AppData/Local/MiKTeX/fonts/map/pdftex/pdftex.map" 1753617015 82507 a9eef8696c92627b87e9975edea03b2a ""
   "C:/Users/19358/AppData/Local/MiKTeX/fonts/pk/ljfour/jknappen/ec/dpi657/tcrm1000.pk" 1754135237 12648 dc87e36e8ab46199ca56f74d1570a8c5 ""
   "C:/Users/19358/AppData/Local/MiKTeX/fonts/pk/ljfour/jknappen/ec/dpi657/tctt1000.pk" 1754132008 10480 12f8d0f1e6cc0312613777311ec7aba2 ""
@@ -355,11 +355,11 @@
   "C:/Users/19358/AppData/Local/Programs/MiKTeX/tex/latex/wrapfig/wrapfig.sty" 1044403200 26220 3701aebf80ccdef248c0c20dd062fea9 ""
   "C:/Users/19358/AppData/Local/Programs/MiKTeX/tex/latex/xcolor/xcolor.sty" 1700127522 55487 80a65caedd3722f4c20a14a69e785d8f ""
   "C:/Users/19358/AppData/Local/Programs/MiKTeX/tex/latex/xkeyval/xkeyval.sty" 1656236919 4937 4ce600ce9bd4ec84d0250eb6892fcf4f ""
-  "Tricks.aux" 1754845139 6884 8f4da81009f91d024c401596e8fe69e8 "pdflatex"
-  "Tricks.out" 1754845139 4682 d5f05d3ab69dca77e8f9c00accaae078 "pdflatex"
-  "Tricks.tex" 1754845136 58273 28f5ef5e82b3df75c9d964fb155a3196 ""
-  "c:/Users/19358/Desktop/Documents/Commonly-used-facts-tricks/Tricks.tex" 1754845136 58273 28f5ef5e82b3df75c9d964fb155a3196 ""
-  "macros.tex" 1754832487 9874 2405ea8f6960866e2f17581974954f26 ""
+  "Tricks.aux" 1754926425 9041 b8b11ce681778a25b1c51b253df76a36 "pdflatex"
+  "Tricks.out" 1754926425 5332 5b6802c0dc50276cfeaff054abccee5b "pdflatex"
+  "Tricks.tex" 1754926420 67964 81bf609e55d0ccb7f57fbf1c932acaf6 ""
+  "c:/Users/19358/Desktop/Documents/Commonly-used-facts-tricks/Tricks.tex" 1754926420 67964 81bf609e55d0ccb7f57fbf1c932acaf6 ""
+  "macros.tex" 1754907825 10660 a8deb7b680efa94ee5e47695736c9c1b ""
   (generated)
   "Tricks.aux"
   "Tricks.log"

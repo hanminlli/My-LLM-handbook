@@ -10,6 +10,7 @@ from my_attention.multi_head_latent_attention import LatentTransformer
 from my_normlization.rms_norm import RMSNorm
 from my_normlization.layer_norm import LayerNorm
 from my_attention.encoder import MLP, GatedMLP
+from my_attention.parallel_attention import ParallelTransformerBlock
 
 # ---- TEST MODULE FOR ATTENTION ----
 class Test(torch.nn.Module):
@@ -28,7 +29,7 @@ class Test(torch.nn.Module):
             "MLA": self.MLA(x),             # (B, 5, 512)
         }
 
-def main():
+def test_latent_transformer():
     x = torch.randn(1, 10, 512)  # dummy input: (batch=1, seq_len=10, dim=512)
     model = Test()
     out_dict = model(x)
@@ -105,6 +106,66 @@ def test_gated_mlp_basic():
     print("GatedMLP basic test passed.")
 
 
+def test_parallel_attention():
+    torch.manual_seed(0)
+
+    B, T, d_model = 2, 6, 32
+    num_heads = 4
+    d_ffn = 64
+    dropout = 0.1
+
+    block = ParallelTransformerBlock(
+        d_model=d_model, num_heads=num_heads, d_ffn=d_ffn, dropout=dropout
+    )
+
+    x = torch.randn(B, T, d_model)
+
+    y = block(x)
+    print("[shape]", y.shape)
+    print("[finite]", torch.isfinite(y).all().item())
+
+    y.sum().backward()
+    total_grad = 0.0
+    num_params = 0
+    with torch.no_grad():
+        for p in block.parameters():
+            if p.grad is not None:
+                g = p.grad.detach()
+                total_grad += g.abs().sum().item()
+                num_params += 1
+    print("[params_with_grad]", num_params)
+    print("[total_grad_abs_sum]", round(total_grad, 4))
+
+    block.train()
+    y1 = block(x)
+    y2 = block(x)
+    print("[train_equal]", torch.allclose(y1, y2))
+
+    block.eval()
+    y3 = block(x)
+    y4 = block(x)
+    print("[eval_equal]", torch.allclose(y3, y4))
+
+    causal_mask = torch.triu(torch.ones(T, T, dtype=torch.bool), diagonal=1)
+    block.eval()
+    y_nomask = block(x)
+    y_mask = block(x, mask=causal_mask)
+    diff = (y_nomask - y_mask).abs().mean().item()
+    print("[mask_effect_mean_abs_diff]", round(diff, 6))
+
+    if torch.cuda.is_available():
+        try:
+            major, minor = torch.cuda.get_device_capability(0)
+            if major >= 6:  # Pascal+ typically OK for cu118+
+                device_block = ParallelTransformerBlock(d_model, num_heads, d_ffn, dropout).cuda()
+                x_cuda = x.cuda()
+                y_cuda = device_block(x_cuda)
+                print("[cuda]", y_cuda.is_cuda, y_cuda.shape)
+            else:
+                print(f"[cuda] Skipping: compute capability {major}.{minor} not supported by this torch build.")
+        except Exception as e:
+            print("[cuda] Skipping due to error:", e)
+
+
 if __name__ == "__main__":
-    test_mlp_basic()
-    test_gated_mlp_basic()
+    test_parallel_attention()

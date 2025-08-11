@@ -15,3 +15,5 @@ class LayerNorm(nn.Module):
         mu_x = x.mean(dim=-1, keepdim=True)
         sigma_sqrt_x = (x - mu_x).pow(2).mean(dim=-1, keepdim=True).add(self.eps).sqrt()
         return self.scale * (x - mu_x) / sigma_sqrt_x + self.shift
+
+__all__ = ["LayerNorm"]

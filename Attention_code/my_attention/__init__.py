@@ -4,9 +4,12 @@ from .grouped_query_attention import GroupedQueryAttention
 from .multi_head_latent_attention import LatentTransformer, LatentTransformerBlock, MultiHeadAttention_QKV, MultiHeadLatentAttention
 from .multi_head_self_attention import MultiHeadSelfAttention
 from .multi_query_self_attention import MultiQuerySelfAttention
+from .parallel_attention import ParallelTransformerBlock
+from .decoder import PrefixDecoderBlock, DecoderBlock
 
 __all__ = [
     "MoEConfig", "MoEFFN", "ExpertFFN", "MLP", "GatedMLP", "GroupedQueryAttention",
     "LatentTransformer", "LatentTransformerBlock", "MultiHeadAttention_QKV", "MultiHeadLatentAttention",
-    "MultiHeadSelfAttention", "MultiQuerySelfAttention",
+    "MultiHeadSelfAttention", "MultiQuerySelfAttention", "ParallelTransformerBlock", 
+    "PrefixDecoderBlock", "DecoderBlock",
 ]

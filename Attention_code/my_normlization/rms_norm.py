@@ -15,3 +15,5 @@ class RMSNorm(nn.Module):
         rms = x.pow(2).mean(dim=-1, keepdim=True).add(self.eps).sqrt() # (B, L, 1)
         x_normed = x/ rms # (B, L, D)
         return self.scale * x_normed
+
+__all__ = ["RMSNorm"]
