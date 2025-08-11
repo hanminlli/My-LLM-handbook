@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.25 (MiKTeX 24.1) (preloaded format=pdflatex 2025.7.27)  11 AUG 2025 18:33
+This is pdfTeX, Version 3.141592653-2.6-1.40.25 (MiKTeX 24.1) (preloaded format=pdflatex 2025.7.27)  11 AUG 2025 20:50
 entering extended mode
  restricted \write18 enabled.
  file:line:error style messages enabled.
@@ -1639,41 +1639,13 @@ Package fancyhdr Warning: \headheight is too small (12.0pt):
 (fancyhdr)                \addtolength{\topmargin}{-1.59999pt}.
 
 [20]
-LaTeX Info: Symbol \textuparrow not provided by
-            font family pcr in TS1 encoding.
-            Default family used instead on input line 1130.
 LaTeX Info: Symbol \textrightarrow not provided by
-            font family pcr in TS1 encoding.
-            Default family used instead on input line 1130.
+            font family ptm in TS1 encoding.
+            Default family used instead on input line 1141.
 LaTeX Info: Symbol \textrightarrow not provided by
-            font family pcr in TS1 encoding.
-            Default family used instead on input line 1130.
-LaTeX Info: Symbol \textdownarrow not provided by
-            font family pcr in TS1 encoding.
-            Default family used instead on input line 1130.
-LaTeX Info: Symbol \textrightarrow not provided by
-            font family pcr in TS1 encoding.
-            Default family used instead on input line 1131.
-LaTeX Info: Symbol \textrightarrow not provided by
-            font family pcr in TS1 encoding.
-            Default family used instead on input line 1131.
-LaTeX Info: Symbol \textrightarrow not provided by
-            font family pcr in TS1 encoding.
-            Default family used instead on input line 1131.
-LaTeX Info: Symbol \textdownarrow not provided by
-            font family pcr in TS1 encoding.
-            Default family used instead on input line 1132.
-LaTeX Info: Symbol \textrightarrow not provided by
-            font family pcr in TS1 encoding.
-            Default family used instead on input line 1132.
-LaTeX Info: Symbol \textrightarrow not provided by
-            font family pcr in TS1 encoding.
-            Default family used instead on input line 1132.
-LaTeX Info: Symbol \textuparrow not provided by
-            font family pcr in TS1 encoding.
-            Default family used instead on input line 1132.
- 
-AED: lastpage setting LastPage
+            font family ptm in TS1 encoding.
+            Default family used instead on input line 1142.
+
 
 Package fancyhdr Warning: \headheight is too small (12.0pt): 
 (fancyhdr)                Make it at least 13.59999pt, for example:
@@ -1682,6 +1654,41 @@ Package fancyhdr Warning: \headheight is too small (12.0pt):
 (fancyhdr)                \addtolength{\topmargin}{-1.59999pt}.
 
 [21]
+LaTeX Info: Symbol \textuparrow not provided by
+            font family pcr in TS1 encoding.
+            Default family used instead on input line 1165.
+LaTeX Info: Symbol \textrightarrow not provided by
+            font family pcr in TS1 encoding.
+            Default family used instead on input line 1165.
+LaTeX Info: Symbol \textrightarrow not provided by
+            font family pcr in TS1 encoding.
+            Default family used instead on input line 1165.
+LaTeX Info: Symbol \textdownarrow not provided by
+            font family pcr in TS1 encoding.
+            Default family used instead on input line 1165.
+LaTeX Info: Symbol \textrightarrow not provided by
+            font family pcr in TS1 encoding.
+            Default family used instead on input line 1166.
+LaTeX Info: Symbol \textrightarrow not provided by
+            font family pcr in TS1 encoding.
+            Default family used instead on input line 1166.
+LaTeX Info: Symbol \textrightarrow not provided by
+            font family pcr in TS1 encoding.
+            Default family used instead on input line 1166.
+LaTeX Info: Symbol \textdownarrow not provided by
+            font family pcr in TS1 encoding.
+            Default family used instead on input line 1167.
+LaTeX Info: Symbol \textrightarrow not provided by
+            font family pcr in TS1 encoding.
+            Default family used instead on input line 1167.
+LaTeX Info: Symbol \textrightarrow not provided by
+            font family pcr in TS1 encoding.
+            Default family used instead on input line 1167.
+LaTeX Info: Symbol \textuparrow not provided by
+            font family pcr in TS1 encoding.
+            Default family used instead on input line 1167.
+ 
+AED: lastpage setting LastPage
 
 Package fancyhdr Warning: \headheight is too small (12.0pt): 
 (fancyhdr)                Make it at least 13.59999pt, for example:
@@ -1698,11 +1705,11 @@ Package rerunfilecheck Info: File `Tricks.out' has not changed.
 (rerunfilecheck)             Checksum: 5B6802C0DC50276CFEAFF054ABCCEE5B;5332.
  ) 
 Here is how much of TeX's memory you used:
- 46583 strings out of 474486
- 979911 string characters out of 5743755
+ 46604 strings out of 474486
+ 980074 string characters out of 5743755
  1950542 words of memory out of 5000000
- 67538 multiletter control sequences out of 15000+600000
- 661382 words of font info for 316 fonts, out of 8000000 for 9000
+ 67539 multiletter control sequences out of 15000+600000
+ 661766 words of font info for 322 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
  101i,21n,120p,1063b,1264s stack positions out of 10000i,1000n,20000p,200000b,200000s
 
@@ -1736,9 +1743,9 @@ pdfTeX warning (dest): name{Hfootnote.2} has been referenced but does not exist,
 pdfTeX warning (dest): name{Hfootnote.1} has been referenced but does not exist, replaced by a fixed one
 
  <C:\Users\19358\AppData\Local\MiKTeX\fonts/pk/ljfour/jknappen/ec/dpi657\tcrm1000.pk> <C:\Users\19358\AppData\Local\MiKTeX\fonts/pk/ljfour/jknappen/ec/dpi657\tctt1000.pk><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmbx10.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmbx6.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmbx8.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmbx9.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmex10.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmmi10.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmmi6.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmmi8.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmmi9.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmr10.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmr6.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmr8.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmr9.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmsy10.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmsy6.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmsy8.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmsy9.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/symbols/msbm10.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/urw/courier/ucrr8a.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/urw/times/utmb8a.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/urw/times/utmr8a.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/urw/times/utmri8a.pfb>
-Output written on Tricks.pdf (22 pages, 450845 bytes).
+Output written on Tricks.pdf (22 pages, 454342 bytes).
 PDF statistics:
- 493 PDF objects out of 1000 (max. 8388607)
- 121 named destinations out of 1000 (max. 500000)
+ 505 PDF objects out of 1000 (max. 8388607)
+ 132 named destinations out of 1000 (max. 500000)
  63433 words of extra memory for PDF output out of 74296 (max. 10000000)
 

@@ -1121,6 +1121,41 @@ $\cL_{\text{aux}}$ can be though of as an load balancing regularizer.
 
 \paragraph{The all to all trick:}
 In distributed training, experts are sharded across devices (e.g., $1$ expert per GPU or multiple experts per GPU.)
+Naively, we must 
+\begin{enumerate}
+  \item Send tokens to the device hosting their assigned expert.
+  \item Process them locally in the expert's feed-forward network.
+  \item Send back the processed outputs to the original device to continue the model pipeline.
+\end{enumerate}
+This is a typical many-to-many communication patter, where  every GPU may need to send tokens to every other GPU.
+The most straight forward way is to let all tokens sent to all devices before filtering using a series of all\_gather operations, but this can waste bandwitdh.
+
+We can do it with the \textbf{all to all} trick, which use a collective communication primitive where each GPU directly sends only the tokens that the other GPUs need, in one coordinated call.
+In NCCL and similar libraries
+\begin{verbatim}
+  torch.distributed.all_to_all_single(output, input, ...)
+\end{verbatim}
+
+In practice, MoE frameworks do two all-to-all per MoE layer:
+\begin{enumerate}
+  \item \textbf{Dispatch:} tokens → owning expert GPU.
+  \item \textbf{Combine:} expert outputs → original token order.
+\end{enumerate}
+In this way, redundant communication is reduced.
+Real world examples includes GShard / Switch Transformer / DeepSpeed-MoE / Megatron-MoE.
+
+\paragraph{Processes and threads:} The legacy $\boxed{\text{nn.DataParallel}}$ (\textbf{DP}) is based on one process multi-threading, which is generally slower and less scalable (single optimizer state, host-side bottlenecks, GIL contention, extra device = host hops).
+This is why \textbf{DDP} (multiprocess, one rank per GPU) is recommended.
+
+Reasons:
+\begin{enumerate}
+  \item \textbf{CUDA context is per-process:} Each process gets a clean, single-GPU context, which leads to simpler, safer memory management and fewer heisenbugs.
+  \item \textbf{Communication stacks (NCCL)} are designed around ranks = processes.
+  \item \textbf{Python GIL:} Python threads can't execute Python bytecode truly in parallel. Many CUDA ops release the GIL(Global Interpreter Lock), but coordination/launch logic still contends. One process per GPU avoids that bottleneck.
+  \item \textbf{Failure isolation:}  If one GPU OOMs or a kernel errors, you don't take down every replica in the same process.
+  \item \textbf{Deterministic performance:} Independent schedulers per process avoid thread scheduling contention and reduce cross-device interference within a single interpreter.
+\end{enumerate}
+
 
 
 \subsection{Parallel Attention + FFN}
