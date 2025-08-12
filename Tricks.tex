@@ -193,7 +193,7 @@ There a bunch of reasons why we are using multi heads instead of scaled dot prod
 
   \item \textbf{Improved gradient flow and representation mixing}: Independent paths improve gradient flow and richness of learned representations.
 \end{itemize}
-Notice that the compuatational cost are the \textbf{SAME}!
+Notice that the computational cost are the \textbf{SAME}!
 
 \subsection{Multi Query Attention (MQA)}
 In MQA, different heads have its own query, but share the same key and value.
@@ -397,17 +397,41 @@ Here $B$ = batch size, $L$ = sequence length (train), $H$ = number of heads, $d_
 \paragraph{Linear attention:} The linear attention is introduced to avoid the quadratic dependence using attention kernels which allow us to obtain linear dependence. 
 Note that the attention of token $i$ is given by 
 \begin{align*}
-  \text{attn}_i = \frac{\sum_{j=1}^{L}\exp\rbrac{\frac{q_i^{\top}k_j}{\sqrt{\dhead}}}v_j}{\sum_{j=1}^{L}\exp\rbrac{\frac{q_i^{\top}k_j}{\sqrt{\dhead}}}}.
+  \text{attn}_i = \frac{\sum_{j=1}^{L}\exp\rbrac{\frac{\mq_i^{\top}\mk_j}{\sqrt{\dhead}}}\mv_j}{\sum_{j=1}^{L}\exp\rbrac{\frac{\mq_i^{\top}\mk_j}{\sqrt{\dhead}}}}.
 \end{align*}
 To compute it, we need to perform $\mQ\mK^{\top}$ and apply softmax rowwise.
 We introduce the kernel trick just as we did in SVM, imagine we can write 
 \begin{align*}
-  \exp\rbrac{\frac{q_i^{\top}k_j}{\sqrt{\dhead}}} = \phi(q_i)^{\top} \phi(k_j),
+  \exp\rbrac{\frac{\mq_i^{\top}\mk_j}{\sqrt{\dhead}}} \approx \phi(\mq_i)^{\top} \phi(\mk_j),
 \end{align*}
-for some feature map $\phi: \R^{\dhead} \mapsto \R^{d_{\phi}}$ with non-negative outputs, then
+for some feature map $\phi: \R^{\dhead} \mapsto \R^{d_{\phi}}$ with non-negative outputs, then we have
 \begin{eqnarray*}
-  \text{Numerator:} && \sum_{j=1}^{L}\phi(q_i)^{\top}\phi(k_j)v_j = \sum_{j=1}^{max}
+  \text{Numerator:} \qquad && \sum_{j=1}^{L} \phi(\mq_i)^{\top}\phi(\mk_j) \mv_j^{\top} = \rbrac{\sum_{j=1}^{L}\mv_j\phi(\mk_j)^{\top}} \cdot \phi(\mq_i), \\
+  \text{Denominator:} \qquad && \sum_{j=1}^{L} \phi(\mq_i)^{\top}\phi(\mk_j) = \rbrac{\sum_{j=1}^{L}\phi(\mk_j)^{\top}} \cdot \phi(\mq_i).
 \end{eqnarray*}
+Now denote $\mS_\mV \eqdef \sum_{j=1}^{L}\mv_j\phi(\mk_j)^{\top} \in \R^{\dhead \times d_{\phi}}$, and $\mS_{\mK} \eqdef \sum_{j=1}^{L}\phi(\mk_j)^{\top} \in \R^{1 \times d_{\phi}}$, we would have 
+\begin{align*}
+  \text{attn}_i = \frac{\mS_\mV \phi(\mq_i)}{\mS_\mK\phi(q_i) + \epsilon}.
+\end{align*}
+Notice that we may compute $\mS_{\mV}$ and $\mS_{\mK}$ in an linear fasion dependent on $\cO(L)$ (since there are in total $L$ terms).
+In this way we get a better dependence.
+
+\paragraph{Causal (autoregressive) case:}
+All we have to change is that we maintain running sum: at time (token) $t$:
+\begin{align*}
+  \mS_{\mV}^{(t)} \eqdef \sum_{j\leq t}\mv_j\phi(\mk_j)^{\top} \qquad \text{and} \qquad \mS_{\mK}^{(t)} \eqdef \sum_{j\leq t}\phi(\mk_j)^{\top}.
+\end{align*}
+and 
+\begin{align*}
+  \text{attn}_t = \frac{\mS_\mV^{(t)} \phi(\mq_i)}{\mS_\mK^{(t)}\phi(q_i) + \epsilon}.
+\end{align*}
+
+There are a bunch of common choices for the feature maps, 
+\begin{enumerate}
+  \item \textbf{Positive feature maps (kernel trick for softmax)}: (1) ELU + 1 ($\phi(x) = \text{ELU}(x) + 1$), (2) ReLU / Square ReLU, (3) Exp with scaling $\phi(x) = \exp\rbrac{\frac{x}{d_{\text{head}}}}$, (4) Random Fourier features ...
+  \item \textbf{Other maps}: Orthogonal / normalized maps; Exponential-normalized maps ...
+\end{enumerate}
+
 
 
 \subsection{Sparse Attention}

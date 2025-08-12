@@ -444,6 +444,8 @@ def _worker(rank, world_size, port):
 def run_spawn(world_size=2, port=29500):
     mp.spawn(_worker, args=(world_size, port), nprocs=world_size, join=True)
 
+__all__ = ["MoETop2TwoExpertsPerRank"]
+
 if __name__ == "__main__":
     run_spawn(world_size=2, port=29500)
     # using command python moe_top2_alltoall.py

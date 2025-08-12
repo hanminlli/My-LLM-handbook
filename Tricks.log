@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.25 (MiKTeX 24.1) (preloaded format=pdflatex 2025.7.27)  11 AUG 2025 20:50
+This is pdfTeX, Version 3.141592653-2.6-1.40.25 (MiKTeX 24.1) (preloaded format=pdflatex 2025.7.27)  12 AUG 2025 18:30
 entering extended mode
  restricted \write18 enabled.
  file:line:error style messages enabled.
@@ -1550,11 +1550,6 @@ Package fancyhdr Warning: \headheight is too small (12.0pt):
 (fancyhdr)                \addtolength{\topmargin}{-1.59999pt}.
 
 [11]
-LaTeX Font Info:    External font `lmex10' loaded for size
-(Font)              <10> on input line 633.
-LaTeX Font Info:    External font `lmex10' loaded for size
-(Font)              <7> on input line 633.
-
 
 Package fancyhdr Warning: \headheight is too small (12.0pt): 
 (fancyhdr)                Make it at least 13.59999pt, for example:
@@ -1563,8 +1558,10 @@ Package fancyhdr Warning: \headheight is too small (12.0pt):
 (fancyhdr)                \addtolength{\topmargin}{-1.59999pt}.
 
 [12]
-Overfull \vbox (386.62389pt too high) has occurred while \output is active []
-
+LaTeX Font Info:    External font `lmex10' loaded for size
+(Font)              <10> on input line 657.
+LaTeX Font Info:    External font `lmex10' loaded for size
+(Font)              <7> on input line 657.
 
 
 Package fancyhdr Warning: \headheight is too small (12.0pt): 
@@ -1574,6 +1571,9 @@ Package fancyhdr Warning: \headheight is too small (12.0pt):
 (fancyhdr)                \addtolength{\topmargin}{-1.59999pt}.
 
 [13]
+Overfull \vbox (386.62389pt too high) has occurred while \output is active []
+
+
 
 Package fancyhdr Warning: \headheight is too small (12.0pt): 
 (fancyhdr)                Make it at least 13.59999pt, for example:
@@ -1590,15 +1590,6 @@ Package fancyhdr Warning: \headheight is too small (12.0pt):
 (fancyhdr)                \addtolength{\topmargin}{-1.59999pt}.
 
 [15]
-Underfull \hbox (badness 1838) in paragraph at lines 906--907
-[]\TS1/ptm/m/n/10.95 (+20) ˆ \T1/ptm/m/n/10.95 (+20) Great for clas-si-fi-ca-tion, re-
- []
-
-
-Underfull \hbox (badness 1902) in paragraph at lines 922--923
-\T1/ptm/m/n/10.95 (+20) tasks (trans-la-tion, sum-ma-riza-
- []
-
 
 Package fancyhdr Warning: \headheight is too small (12.0pt): 
 (fancyhdr)                Make it at least 13.59999pt, for example:
@@ -1607,6 +1598,15 @@ Package fancyhdr Warning: \headheight is too small (12.0pt):
 (fancyhdr)                \addtolength{\topmargin}{-1.59999pt}.
 
 [16]
+Underfull \hbox (badness 1838) in paragraph at lines 930--931
+[]\TS1/ptm/m/n/10.95 (+20) ˆ \T1/ptm/m/n/10.95 (+20) Great for clas-si-fi-ca-tion, re-
+ []
+
+
+Underfull \hbox (badness 1902) in paragraph at lines 946--947
+\T1/ptm/m/n/10.95 (+20) tasks (trans-la-tion, sum-ma-riza-
+ []
+
 
 Package fancyhdr Warning: \headheight is too small (12.0pt): 
 (fancyhdr)                Make it at least 13.59999pt, for example:
@@ -1639,13 +1639,6 @@ Package fancyhdr Warning: \headheight is too small (12.0pt):
 (fancyhdr)                \addtolength{\topmargin}{-1.59999pt}.
 
 [20]
-LaTeX Info: Symbol \textrightarrow not provided by
-            font family ptm in TS1 encoding.
-            Default family used instead on input line 1141.
-LaTeX Info: Symbol \textrightarrow not provided by
-            font family ptm in TS1 encoding.
-            Default family used instead on input line 1142.
-
 
 Package fancyhdr Warning: \headheight is too small (12.0pt): 
 (fancyhdr)                Make it at least 13.59999pt, for example:
@@ -1654,39 +1647,54 @@ Package fancyhdr Warning: \headheight is too small (12.0pt):
 (fancyhdr)                \addtolength{\topmargin}{-1.59999pt}.
 
 [21]
+LaTeX Info: Symbol \textrightarrow not provided by
+            font family ptm in TS1 encoding.
+            Default family used instead on input line 1165.
+LaTeX Info: Symbol \textrightarrow not provided by
+            font family ptm in TS1 encoding.
+            Default family used instead on input line 1166.
+
+
+Package fancyhdr Warning: \headheight is too small (12.0pt): 
+(fancyhdr)                Make it at least 13.59999pt, for example:
+(fancyhdr)                \setlength{\headheight}{13.59999pt}.
+(fancyhdr)                You might also make \topmargin smaller:
+(fancyhdr)                \addtolength{\topmargin}{-1.59999pt}.
+
+[22]
 LaTeX Info: Symbol \textuparrow not provided by
             font family pcr in TS1 encoding.
-            Default family used instead on input line 1165.
+            Default family used instead on input line 1189.
 LaTeX Info: Symbol \textrightarrow not provided by
             font family pcr in TS1 encoding.
-            Default family used instead on input line 1165.
+            Default family used instead on input line 1189.
 LaTeX Info: Symbol \textrightarrow not provided by
             font family pcr in TS1 encoding.
-            Default family used instead on input line 1165.
+            Default family used instead on input line 1189.
 LaTeX Info: Symbol \textdownarrow not provided by
             font family pcr in TS1 encoding.
-            Default family used instead on input line 1165.
+            Default family used instead on input line 1189.
 LaTeX Info: Symbol \textrightarrow not provided by
             font family pcr in TS1 encoding.
-            Default family used instead on input line 1166.
+            Default family used instead on input line 1190.
 LaTeX Info: Symbol \textrightarrow not provided by
             font family pcr in TS1 encoding.
-            Default family used instead on input line 1166.
+            Default family used instead on input line 1190.
 LaTeX Info: Symbol \textrightarrow not provided by
             font family pcr in TS1 encoding.
-            Default family used instead on input line 1166.
+            Default family used instead on input line 1190.
 LaTeX Info: Symbol \textdownarrow not provided by
             font family pcr in TS1 encoding.
-            Default family used instead on input line 1167.
+            Default family used instead on input line 1191.
 LaTeX Info: Symbol \textrightarrow not provided by
             font family pcr in TS1 encoding.
-            Default family used instead on input line 1167.
+            Default family used instead on input line 1191.
 LaTeX Info: Symbol \textrightarrow not provided by
             font family pcr in TS1 encoding.
-            Default family used instead on input line 1167.
+            Default family used instead on input line 1191.
 LaTeX Info: Symbol \textuparrow not provided by
             font family pcr in TS1 encoding.
-            Default family used instead on input line 1167.
+            Default family used instead on input line 1191.
  
 AED: lastpage setting LastPage
 
@@ -1696,7 +1704,7 @@ Package fancyhdr Warning: \headheight is too small (12.0pt):
 (fancyhdr)                You might also make \topmargin smaller:
 (fancyhdr)                \addtolength{\topmargin}{-1.59999pt}.
 
-[22] (Tricks.aux)
+[23] (Tricks.aux)
  ***********
 LaTeX2e <2023-11-01> patch level 1
 L3 programming layer <2024-01-04>
@@ -1705,9 +1713,9 @@ Package rerunfilecheck Info: File `Tricks.out' has not changed.
 (rerunfilecheck)             Checksum: 5B6802C0DC50276CFEAFF054ABCCEE5B;5332.
  ) 
 Here is how much of TeX's memory you used:
- 46604 strings out of 474486
- 980074 string characters out of 5743755
- 1950542 words of memory out of 5000000
+ 46608 strings out of 474486
+ 980106 string characters out of 5743755
+ 1948542 words of memory out of 5000000
  67539 multiletter control sequences out of 15000+600000
  661766 words of font info for 322 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
@@ -1743,9 +1751,9 @@ pdfTeX warning (dest): name{Hfootnote.2} has been referenced but does not exist,
 pdfTeX warning (dest): name{Hfootnote.1} has been referenced but does not exist, replaced by a fixed one
 
  <C:\Users\19358\AppData\Local\MiKTeX\fonts/pk/ljfour/jknappen/ec/dpi657\tcrm1000.pk> <C:\Users\19358\AppData\Local\MiKTeX\fonts/pk/ljfour/jknappen/ec/dpi657\tctt1000.pk><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmbx10.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmbx6.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmbx8.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmbx9.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmex10.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmmi10.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmmi6.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmmi8.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmmi9.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmr10.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmr6.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmr8.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmr9.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmsy10.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmsy6.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmsy8.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmsy9.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/symbols/msbm10.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/urw/courier/ucrr8a.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/urw/times/utmb8a.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/urw/times/utmr8a.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/urw/times/utmri8a.pfb>
-Output written on Tricks.pdf (22 pages, 454342 bytes).
+Output written on Tricks.pdf (23 pages, 459845 bytes).
 PDF statistics:
- 505 PDF objects out of 1000 (max. 8388607)
- 132 named destinations out of 1000 (max. 500000)
+ 513 PDF objects out of 1000 (max. 8388607)
+ 136 named destinations out of 1000 (max. 500000)
  63433 words of extra memory for PDF output out of 74296 (max. 10000000)
 
