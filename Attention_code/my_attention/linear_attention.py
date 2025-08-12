@@ -222,6 +222,8 @@ def test_linear_and_causal(LinearAttention, CausalLinearAttention):
     print("All tests passed.")
 
 
+__all__ = ["LinearAttention", "CausalLinearAttention"]
+
 
 if __name__ == "__main__":
     test_linear_and_causal(LinearAttention, CausalLinearAttention)
