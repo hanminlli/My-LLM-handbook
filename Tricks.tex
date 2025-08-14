@@ -1133,7 +1133,7 @@ where $\cL_{\text{task}}$ is the task loss, and in the common GShard / Switch Tr
 \end{align*}
 $f_e$ is defined as the fraction of tokens assigned to expert $e$,
 \begin{align*}
-  f_e = \frac{N_e}{BL} = \frac{1}{BL}\sum_{b=1}^{B}\sum_{l=1}^{L}\mathbf{1}^{\top} \cdot \cbrac{e \in \cT_k(b, l)},
+  f_e = \frac{N_e}{BL} = \frac{1}{BL}\sum_{b=1}^{B}\sum_{l=1}^{L}\mathbf{1}\cbrac{e \in \cT_k(b, l)},
 \end{align*}
 where $\cbrac{e \in \cT_k(b, l)}$ is the indicator vector (sum of corresponding one hot vector) in $\R^{B \times L}$ suggesting if expert $e$ is selected by this token, while $m_e$ is defined as 
 \begin{align*}
@@ -1224,6 +1224,55 @@ We can also control by careful weight initializations, or considering set a lear
 
 \section{Fintuning}
 
+\subsection{Pretraining Loss (self-supervised)}
+As we know, in pretraining, we are basically doing a self-supervised learning task on predicting the next token.
+Given an sequence $\mx = (\mx_1, \hdots, \mx_L)$, we are trying to model 
+\begin{align*}
+  \probsub{\theta}{\mx_1, \hdots, \mx_L} = \prod_{t=1}^L \probsub{\theta}{\mx_t \mid \mx_{< t}},
+\end{align*}
+where $\theta$ represnets all the trainable parameters of the language model. 
+The standard choice for it is the causal language modeling (CLM) loss:
+\begin{align}
+  \label{eq:CLM}
+  \cL_{\text{pretrain}} \rbrac{\theta} = -\frac{1}{L}\sum_{t=1}^{L}\log\rbrac{\probsub{\theta}{\mx_t \mid \mx_{<t}}}, \tag{CLM}
+\end{align}
+which is the negative log-likelihood over the sequence.
+This can be written equivalently as the cross entropy between the model's predicted distribution $\probsub{\theta}{\cdot \mid x_{< t}} \in \R^{\lvert\cV \rvert}$ and the one-hot true token $\my_t \in \cbrac{0, 1}^{\lvert\cV \rvert}$, where $\cV$ is the vocabulary,
+\begin{align}
+  \label{eq:CrossEntropy}
+  \cL_{\text{pretrain}}\rbrac{\theta} = -\frac{1}{L}\sum_{t=1}^{L}\sum_{v \in \cV} \rbrac{\mx^\prime_{t}}_v \log \probsub{\theta}{v \mid \mx_{<T}}, \tag{Cross Entropy}
+\end{align} 
+where $\rbrac{\mx^\prime_t}_v = \mathbf{1}\cbrac{v = \mx_t} \in \R^{\abs{\cV}}$.
+Basically, we are summing over all possible vocabularies.
+The equivalence is clear once we see that, in \eqref{eq:CrossEntropy} $\mx^\prime_t$ itself is a one hot vector, and it is $1$ nowhere but when $v = \mx_t$, with everywhere else $0$.
+The training itself reduces to a \textbf{maximum likelihood} problem given a trainable set of parameter $\theta$.  
+A quick implementation is that 
+\begin{verbatim}
+  loss = F.cross_entropy(
+      logits[:, :-1, :].reshape(-1,  vocab_size), # (B, L, V) -> (BL, V)
+      tokens[:, 1:].reshape(-1) # (BL, V)
+    )
+\end{verbatim}
+
+
+
+\subsection{Finetuning Loss}
+When adapting to downstream tasks or human preferences, loss functions differ.
+
+\paragraph{Supervised Fine-Tuning (SFT)}
+Our goal is to make the LLM output exactly match human-provided target completions given prompts.
+Our loss is still cross-entropy loss, but computed \textbf{only} over the target part of the sequence.
+
+Given a prompt $\mpp$ of length $L_{\mpp}$ and a target $\my$ of length $L_{\my}$, we compute 
+\begin{align}
+  \cL_{\text{SFT}} = -\frac{1}{L_{\my}} \sum_{t=1}^{L_{\my}} \log \rbrac{\probsub{\theta}{\my_t \mid \my_{< t}, \mpp}} = \frac{1}{L_{\my}}\sum_{t=1}^{L_{\my}}\sum_{v \in \cV}\rbrac{\my^\prime_t}_v\log\rbrac{\probsub{\theta}{v \mid \mpp, \my_{< t}}}, \tag{SFT}
+\end{align}
+where $\rbrac{\my^\prime_t}_v = \mathbf{1}\cbrac{v = \my_t} \in \R^{\abs{\cV}}$.
+Notice that only completetion tokens are included in the sum (masking the prompt tokens in loss calculation).
+In practice we will just mask in the following way.
+\begin{align*}
+  \underbrace{\text{<bos>  } \text{prompt\_tokens}}_{\text{Mask}} \text{ target\_tokens } \text{<eos>}. 
+\end{align*}
 
 
 \end{document}
