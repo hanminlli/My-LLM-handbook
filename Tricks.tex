@@ -1258,8 +1258,10 @@ A quick implementation is that
 
 \subsection{Finetuning Loss}
 When adapting to downstream tasks or human preferences, loss functions differ.
+Typical approaches include Supervised Fine-Tuning (SFT), Parameter-Efficient Fine-Tuning (PEFT) (such as LoRA and QLoRA), Reinforcement Learning from Human Feedback (RLHF)\footnote{Reinforcement learning with a reward model.}, DPO / IPO, continual pretraining, domain adaptation.
 
-\paragraph{Supervised Fine-Tuning (SFT)}
+
+\subsection{Supervised Fine-Tuning (SFT)}
 Our goal is to make the LLM output exactly match human-provided target completions given prompts.
 Our loss is still cross-entropy loss, but computed \textbf{only} over the target part of the sequence.
 
@@ -1273,6 +1275,208 @@ In practice we will just mask in the following way.
 \begin{align*}
   \underbrace{\text{<bos>  } \text{prompt\_tokens}}_{\text{Mask}} \text{ target\_tokens } \text{<eos>}. 
 \end{align*}
+
+
+
+
+\subsection{Parameter-Efficient Fine-Tuning (PEFT)}  Updating all parameters of a model is costly. 
+To resolve this, one way is to use the so called ``adaptors''.
+Other approaches include LoRA, QLoRA.
+
+\paragraph{Adaptors} In parameter-efficient fine-tuning (PEFT), adapters are small trainable modules inserted into a frozen pre-trained model's layers, typically after the feed-forward (FFN) or attention sublayer.
+The core idea is that, 
+
+\textbullet~ We freeze the original model weights.
+
+\textbullet~ Insert a lightweight bottleneck layer (down-projection → non-linearity → up-projection) inside each transformer block.
+
+\textbullet~ Train only these new parameters,
+
+Mathematically, for an ouput $\mh \in \R^{\dmodel}$ (we temporarily skip the batch and sequence length dimension as we are doing this to each token's represenetation.)
+\begin{align*}
+  \text{Adapter}(\mh) = \mh + \mW_{\text{up}} \cdot \sigma\rbrac{\mW_{\text{down}}\mh}, 
+\end{align*}
+We often have $\mW_{\text{down}} \in \R^{d_{\text{down}} \times \dmodel}$ where $d_{\text{down}} << \dmodel$ so that the total number of trainable parameters are drastically reduced ($<5\%$ of the full model).
+
+
+\paragraph{Low-Rank Adaptation of LLMs} Our goal here remains the same, we are trying to fine-tune large models with far fewer trainable parameters by only learning a low-rank update to certain weight matrices.
+
+\textbullet~ \textbf{LoRA}
+
+Formally, consider a weight matrix $\mW_0 \in \R^{\dout \times \din}$ in the pre-trained model, in stead of update its pretrained parameter $\mW_0$ directly, we keep it frozen, and learn: 
+\begin{align*}
+  \mW = \mW_0 + \Delta \mW, \qquad \Delta \mW = \frac{\alpha}{r}\mB\mA,
+\end{align*}
+where $\mA \in \R^{r \times \din}$, $\mB \in \R^{\dout \times r}$, $r$ is the low rank parameter, $\alpha$ is a scaling factor.
+
+\begin{enumerate}
+  \item Usually, LoRA is applied to attention projection matrices ($\mW_q$, $\mW_v$ and sometimes $\mW_k$, $\mW_o$).
+  \item Rank $r$ and scaling $\alpha$ are hyperparams.
+\end{enumerate}
+
+Its advantage includes: 
+\begin{enumerate}
+  \item Drastic parameters savings.
+  \item No added inference latency if merged into $\mW_0$ after training.
+\end{enumerate}
+
+Notice that empirically, touching $\mW_q$ and $\mW_v$ is basically enough since it recovers almost all the performance of full fine-tuning, while touching fewer parameters.
+Intuitively, $\mW_q$ and $\mW_k$ affactes the matching space of attention.
+Since $\mQ\mK^{\top}$ is bilinear, it often suffices to change $\mW_q$.  
+$\mW_v$ controls the attented values and changing it also affects the post projection controlled by $\mW_o$.
+
+There is a reason why do we apply a scaling factor here:
+\begin{enumerate}
+  \item \textbf{Training stability:} If $\mA$, $\mB$ are initialized with small random values, the magnitude of their product varies with $r$, and without scaling, high $r$ can produce much larger updates, destabilizing training. 
+  \item \textbf{rank normalization} This keeps the expected variance of the update constant across different $r$ values. 
+  $\alpha$ then allows manual controls (dependent on sensitivity).
+\end{enumerate}
+Empirically $\alpha = r$ or $\alpha = 1$.
+
+The parameter $r$ controls the capacity of the low rank update.
+Small $r$ means fewer trainable parameters and lower expressive power, works fine for minor domain shifts.
+Large $r$ means more trainable parameters and expressive power, but if it is too large, then there is a risk of overfitting especially if training data is small. 
+Empirically, $r = 4$ to $16$ common for LLaMA, GPT-J, BLOOM, etc.
+Higher $r$ used in complex multi-task fine-tuning.
+Futher improving $r$ often gives negligible benefits.
+
+
+\textbullet \textbf{QLoRA}
+This actually refers to Quantized LoRA, which allows fine-tuning very large language models (e.g., 65B params) on a single GPU without running out of memory.
+It combines $4$-bit quantization for the frozen base model and LoRA.
+
+\begin{enumerate}
+  \item Quantize $\mW_0$ to $4$-bit NormalFloat (NF4)\footnote{It is a $4$-bit quantization scheme that preserves more precision than plain int4 by using a learned normal distribution mapping.}, which cuts memory usage by $4$.
+  \item Keep $\mW_0$ frozen in quantized form.
+  \item Train LoRA modules $\mA$, $\mB$ in FP16 / bfloat16.
+  \item During forward pass: \begin{itemize}
+    \item Dequantize $\mW_0$ on the fly.
+    \item Add $\Delta \mW$ from LoRA, and proceed as usual.
+  \end{itemize}
+\end{enumerate}
+
+Note that there are double quantization effective in QLoRA, 
+\begin{enumerate}
+  \item \textbf{First quantization:} The original pretrained weight tensor $\mW_0$ is quantized is quantized from FP16/BF16 to $4$-bit NF4 values plus per-block scaling factors (distribution-aware mapping, so it preserves more accuracy than uniform int4).
+  \begin{align*}
+    \mW_0 = s \cdot \mW_0^{\text{quantized}}. 
+  \end{align*}
+  
+  \item \textbf{Second quantization:} The scaling factors $s$ themselves are quantized into a lower-precision format (8-bit) plus a meta-scaling factor.
+\end{enumerate}
+
+
+
+\subsection{Reinforcement Learning from Human Feedback (RLHF)}
+The goal is to train (finetune) a language model so its outputs align with human preferences by using reinforcement learning where the “reward” comes from human judgments.
+
+Mathematically, let us first define the concept of the policy.
+Given $\mx$ as an input sequence (prompt, context) and $\my$ of length $T$ as an output sequence (continuation, response), let $\pi_0(\my \mid \mx)$ be defined as the probability that he model generates $\my$ given $\mx$, defined token-by-token:
+\begin{align*}
+  \pi_0(\my \mid \mx) = \prod_{t=1}^T \pi_0(\my_t \mid \mx, \my_{<t}).
+\end{align*}
+We are using $\pi$ as our notation for it is standard in reinforcement learning\footnote{In RL, statues $s_t$ is current context (prompt + generated tokens so far), action $a_t$ is next token to generate, policy $\pi(a_t \mid s_t)$ gives the probability distribution. The pretrained LM is thus an autoregressive policy that maps states (text histories) to action distributions (token probabilities).}.
+
+\paragraph{Stage 1: Supervised Finetuning} We prepare a supervised dataset $\cD_{\text{SFT}} = \cbrac{(\mx_i, \my_i^\star)}_{i=1}^N$ where $\mx_i$ is prompt tokens, $\my_i$ is gold-standard human-written completion (target tokens). 
+Typically, the dataset size is $10^3 - 10^6$, in this stage we do standard SFT trying to minimize the cross-entropy loss on the target tokens, which can be equivalently formulated as 
+\begin{align*}
+  \theta_{\text{SFT}} = \arg\min_{\theta} \ExpSub{(\mx, \my^\star \sim \cD_{\text{SFT}})}{- \log \pi_{\theta}(\my^\star \mid \mx)},
+\end{align*}
+where 
+\begin{align*}
+  \log \pi_{\theta}(\my^\star \mid \mx) = \sum_{t=1}^{L_{\my^\star}}\log \pi_{\theta}\rbrac{\rbrac{\my^\star}_t \mid \mx,  \rbrac{\my^\star}_{<t}}.
+\end{align*}
+Basically\footnote{Here we use $\rbrac{\cdot}_t$ to denote the $t$-the component of the vector.}, we are only computing the cross entropy loss on the human labeled completions (target sequences) without touching the prompt.
+
+
+\paragraph{Stage 2: Reward Modelling} We prepare a preference dataset $\cD_{\text{pref}} = \cbrac{(\mx_j, \my_j^+, \my_j^-)}_{j=1}^M$ where $\mx$ is the prompt, $\my_j^+$ is the preferred output and $\my_j^-$ is the less preferred output, $M$ is the total number of pairs of preference pairs ($10^4$ to $10^6$) coming from human labelers ranking multiple model completions for the same prompt.
+
+
+\textbf{Padding:} We define the reward model $R_{\phi}(\mx, \my)$ whose input is the (input prompt tokens, completion), i.e. $(\mx, \my)$ and outputs a scalar reward score.
+Typically, we start with a base language model architecture (often the same type as the policy, e.g., Transformer decoder), and we rplace the usual LM head (which produces a distribution over next tokens) with a scalar regression head. 
+Without the language modeling head, the output is a hidden state for each $(\mx, \my)$
+\begin{align*}
+  \mh = \rbrac{\mx, \my}0 \in \R^{B \times (L_{\mx} + L_{\my}) \times \dmodel}
+\end{align*}
+One may notice that for each pair of $\mx_i, \my_i$, the length $L_{\mx_i} + L_{\my_i}$ is not the same, so we must do padding in order to make it a batch \textbf{before} inputting them to the model.
+We may pad all sequences on the left/right to ensure that they are the same length $L_{\max}$ to form a batch (not the global maximum, otherwise too wasteful)\footnote{This is called dynamic padding and is standard in Hugging Face DataCollatorWithPadding}, and record a corresponding attention mask $\mm_i \in \cbrac{0, 1}^{B \times L_{\max}}$ ($1$ for real token).
+Often the paddings are treated as normal tokens and its embedding is either a learned vector or all zeros. 
+
+\textbf{Batch Forming:} Now for notational convenience, let us define 
+\begin{align*}
+  \ms^+ = (\mx, \my^+) \in \N^{L_{\mx} + L_{\my^+}} \quad \text{ and } \quad \ms^- = (\mx, \my^-) \in \N^{L_{\mx} + L_{\my^-}},
+\end{align*}
+we padded them locally to form a batch $\mS = \cbrac{\hat{\ms}_1^+, {\ms}_1^-, \hdots {\ms}_B^+, {\ms}_B^-}$ where each element is now $L_{\max}$ long, with its attention mask $\mM \in \cbrac{0, 1}^{2B \times L_{\max}}$.
+We feed them to the headless model and obtain 
+\begin{align*}
+  \mH \in \R^{2B \times L_{\max} \times \dmodel}.
+\end{align*}
+
+\textbf{Pooling:} We now need to do pooling to choose a single vector for the entire sequence to be used for pairwise comparison. 
+We can choose 
+
+\textbullet~ (A) Last-token pooling (most common), which chooses the representation of the last non-PAD tokens (since it contains context from all preceding tokens because of casual attention). 
+
+\textbullet~ (B) Mean pooling over completions (ignore prompt tokens if we only want to summarize the generated output).
+
+\textbullet~ (C) Special token pooling (Insert a <EOS> token and take its hidden state), works as [CLS] pooling in BERT.
+
+After those steps, $\mH$ becomes $\mP \in \R^{2B \times \dmodel}$.
+
+\textbf{Scalar Reward:} After we obtain $\mP$, we apply a reward head to it, which forms the reward 
+\begin{align*}
+  R_{\phi}(\mx, \my) = \mW_r \mP + \mb_r \in \R^{2B},
+\end{align*}
+where we get a scalar value for each sequence.
+
+\textbf{Computing Loss:} We appear the pairwise Bradley-Terry loss: 
+\begin{align*}
+  \cL_{\text{BT}}(\phi) = -\frac{1}{B}\sum_{i=1}^{B}\log \sigma\rbrac{R_{\phi}\rbrac{\mx_i, \my_i^+} - \R_\phi\rbrac{\mx_i, \my_i^-}},
+\end{align*}
+The above loss encourages $R_{\phi}\rbrac{\mx_i, \my_i^+}$ to be much larger than $R_{\phi}\rbrac{\mx_i, \my_i^-}$.
+
+This is not the only way we can choose this loss, we can also pick hinge loss:
+\begin{align*}
+  \cL_{\text{Hinge}}(\phi) = \frac{1}{B}\sum_{i=1}^{B} \max\cbrac{0, m - \rbrac{R_{\phi}\rbrac{\mx_i, \my_i^+} - \R_\phi\rbrac{\mx_i, \my_i^-}}},
+\end{align*}
+where we tries to enforce a margin $m > 0$ and if that is satified, no gradient will be applied.
+Compared to BT-loss, it is non-smooth.
+
+Mean-squared error loss can also be used:
+\begin{align*}
+  \cL_{\text{MSE}}(\phi) = \frac{1}{B}\sum_{i=1}^{B}\rbrac{R_{\phi}\rbrac{\mx_i, \my_i^+} - \R_\phi\rbrac{\mx_i, \my_i^-} - t}^2,
+\end{align*}
+where $t$ is a target gap which assumed to be known (which is also the reason why it is used).
+
+If we have more than $2$ candidates ranked, we can normalize the exponentiated rewards into a softmax, say we have $\my^1, \my^2, \hdots, \my^K$ 
+\begin{align*}
+  P_{\phi}(\my^j \mid \mx) = \frac{\exp\rbrac{R_{\phi}\rbrac{\mx, \my^j}}}{\sum_{j=1}^{K}\exp\rbrac{R_{\phi}\rbrac{\mx, \my^j}}},
+\end{align*}
+then minimize the cross entropy loss based on this,
+\begin{align*}
+  \cL (\phi) = - \sum_{i=1}^M\sum_{j=1}^{K} \text{prob\_of\_rank}_j \cdot \log \rbrac{P_{\phi}(\my^j \mid \mx)}, 
+\end{align*}
+where this prob\_of\_rank can be $1$ for the top choice and $0$ for others, or fractional.
+
+Note that the starting point of $\phi$ is the pretrained headless model.
+We can choose to use the version with/without SFT, most pipelines use the one with SFT.
+\begin{enumerate}
+  \item Pros 1: RM is specialized to the distribution of completions the RL stage will actually produce
+  \item Pros 2: KL penalty in PPO is between two models (policy and reference) that are both in-domain with respect to RM's training data
+  \item Cons 1: RM might overfit to the stylistic quirks of the SFT model and undergeneralize to very different policies
+\end{enumerate}
+
+
+
+\paragraph{Stage 3: RL fine-tuning with PPO} 
+We have the reference policy after SFT, which we denots as $\pi_{\text{SFT}} = \pi_{\text{ref}}$ and the reward model $\R_{\phi}$.
+Assume that now we have a prompt set $\cD_{\text{RL}}$ which are unlabeled instructions / prompt drawn from a prompt distribution (can be the same pool used in SFT, plus extra domains).
+
+\textbf{RL objective:} We intialize our policy as $\pi_{\theta} = \pi_{\text{ref}}$, we want to now update $\pi_{\theta}$ so that it scores high under $R_{\phi}$ and stay close to $\pi_{\text{ref}}$ (to avoid drifting into low-quality or unsafe behavior), which can be described by the following KL-regularized objective:
+\begin{align*}
+  \max_{\theta}
+\end{align*}
+
 
 
 \end{document}
