@@ -1539,7 +1539,7 @@ The total reward per token is
 
 
 \subsection{The Bigger Picture in Reinforcement Learning}
-In RL, theory formal setting is a Markov Decision Process (MDP):
+In RL theory, the formal setting is a Markov Decision Process (MDP):
 \begin{align*}
   \rbrac{\cS, \cA, P, r, \gamma},
 \end{align*}
@@ -1572,7 +1572,7 @@ For example, assume $\tau$ is a trajectory:
 \begin{align*}
   \tau = \rbrac{\ms_0, \ma_0, \ms_1, \ma_1, \hdots, \ms_T, \ma_T},
 \end{align*} 
-since we know the probability $p_\theta(\tau)$
+with the probability $p_\theta(\tau)$
 \begin{align*}
   p_{\theta}(\tau) = p(\ms_0)\prod_{t=0}^{T}\pi_{\theta}(\ma_t \mid \ms_t)\cdot p(\ms_{t+1} \mid \ms_t, \ma_t).
 \end{align*}
@@ -1580,9 +1580,13 @@ we can rewrite $J(\theta)$ as
 \begin{align*}
   J(\theta) = \sum_{\tau} p_\theta(\tau)\cdot\sbrac{\sum_{t=0}^{T}\gamma^tr(s_t, a_t)}.
 \end{align*}
+Notice that we can of course think of using gradient ascent to solve this. 
+However, if we define $R(\tau) \eqdef \sum_{t=0}^{T}\gamma^tr(s_t, a_t)$, notice that $R$ the reward function given by the environment, and it is only implicitly dependent on $\theta$ in terms of the randomness of the trajectory and if we fix one trajectory, the dependence on $\theta$ is gone.
+We cannot backpropagate through this function properly.
+
 
 \paragraph{Policy Gradient:}
-Differentiate $J(\theta)$, denoting $R(\tau) \eqdef \sum_{t=0}^{T}\gamma^tr(s_t, a_t)$, we get 
+Differentiate $J(\theta)$, we get 
 \begin{align*}
   \nabla_{\theta} J(\theta) &= \int \nabla p_\theta(\tau) R(\tau) \quad d\tau \\
   &= \int p_\theta(\tau) \nabla_{\theta} \log p_{\theta}(\tau) \cdot R(\tau) \quad d\tau \\
@@ -1591,7 +1595,7 @@ Differentiate $J(\theta)$, denoting $R(\tau) \eqdef \sum_{t=0}^{T}\gamma^tr(s_t,
 The environment dynamics $p(\ms_{t+1}\mid \ms_t, \ma_t)$ and $p(\ms_0)$ does not depend on $\theta$ which is just a const scaling on the original objective \eqref{eq:J}, we drop them and result in
 \begin{align}
   \label{eq:A}
-  \nabla_{\theta} J(\theta) = \ExpSub{\tau}{\sum_{t=0}^{T}\nabla_\theta \pisub{\theta}{\ma_t}{\ms_t} \cdot R(\tau)}. \tag{A}
+  \nabla_{\theta} J(\theta) = \ExpSub{\tau}{\sum_{t=0}^{T}\nabla_\theta \log \pisub{\theta}{\ma_t}{\ms_t} \cdot R(\tau)}. \tag{A}
 \end{align}
 This is called the \textbf{Reinforce}.
 Now define the return starting at time $t$: $G_t$, which is 
@@ -1605,9 +1609,9 @@ It is a random variable depends on the future state after $t$, note that
 For the $t$-th term in the summation in \eqref{eq:A} and \eqref{eq:J}, notice that the expectation is already conditioned on $\ma_t$ and $\ms_t$, if we remove the past reward, the gradient will not change since it is equivalent to remove a constant on $J(\theta)$, this allows us to obtain 
 \begin{align}
   \label{eq:JG}
-  \nabla_{\theta} J(\theta) = \ExpSub{\tau}{\sum_{t=0}^{T}\nabla_\theta \pisub{\theta}{\ma_t}{\ms_t} \cdot G_t}.
+  \nabla_{\theta} J(\theta) = \ExpSub{\tau}{\sum_{t=0}^{T}\nabla_\theta \log \pisub{\theta}{\ma_t}{\ms_t} \cdot G_t}.
 \end{align}
-Now defining the action-value function $Q^{\pi}(\ms, \ma)$,
+Now defining the \textbf{action-value} function $Q^{\pi}(\ms, \ma)$,
 \begin{align*}
   Q^{\pi}(\ms, \ma) \eqdef \ExpSub{\pi}{G_t \mid \ms_t = \ms, \ma_t = \ma},
 \end{align*}
@@ -1615,10 +1619,175 @@ which is the expected return if we are at $\ms$ state and take $\ma$ as action n
 The expectation itself is over the random future trajectory.
 Using the tower property of expectation, we can further write 
 \begin{align*}
-  \nabla J(\theta) &= \ExpSub{\tau}{\sum_{t=0}^{T}\nabla_\theta \pisub{\theta}{\ma_t}{\ms_t} \cdot G_t}\\
-  &= \ExpSub{\ms_t, \ma_t}{\sum_{t=0}^{T}\nabla_{\theta}\pisub{\theta}{\ma_t}{\ms_t}\cdot\Exp{G_t \mid \ms_t, \ma_t}} =  \ExpSub{\ms_t, \ma_t}{\sum_{t=0}^{T}\nabla_{\theta}\pisub{\theta}{\ma_t}{\ms_t}\cdot Q^{\pi_\theta}(\ms_t, \ma_t)}
+  \nabla_{\theta} J(\theta) &= \ExpSub{\tau}{\sum_{t=0}^{T}\nabla_\theta \log \pisub{\theta}{\ma_t}{\ms_t} \cdot G_t}\\
+  &= \sum_{t=0}^{T}\ExpSub{\ms_t, \ma_t}{\nabla_{\theta} \log\pisub{\theta}{\ma_t}{\ms_t}\cdot\Exp{G_t \mid \ms_t, \ma_t}} =  \sum_{t=0}^{T}\ExpSub{\ms_t, \ma_t}{\nabla_{\theta} \log\pisub{\theta}{\ma_t}{\ms_t}\cdot Q^{\pi_\theta}(\ms_t, \ma_t)}
 \end{align*}
-Now, for variance reduction, we introduce the 
+Now, for variance reduction, we introduce the state-value function:
+\begin{align*}
+  V^{\pi}(s) \eqdef \ExpSub{\ma \sim \pisub{\theta}{\cdot}{\ms}}{Q^{\pi}(\ms, \ma)},
+\end{align*}
+which is the expected return starting in state $\ms$ following $\pi$.
+The advantage function is then 
+\begin{align*}
+  A^{\pi}(\ms, \ma) \eqdef Q^{\pi}(\ms, \ma) - V^{\pi}(s),
+\end{align*}
+which measure how much better the action $\ma$ is compare to the average action in state $\ms$.
+Notice that for any baseline function $b(\ms_t)$ that depends only on the state $\ms_t$ but not on $\ma_t$, we observe that 
+\begin{align*}
+  \ExpSub{\ms_t, \ma_t}{\nabla_\theta \log \pisub{\theta}{\ma_t}{\ms_t} \cdot b(\ms_t)} &= \ExpSub{\ms_t}{b(\ms_t) \cdot \ExpSub{\ma_t}{\nabla_\theta \log \pisub{\theta}{\ma_t}{\ms_t}}} \\
+  &= \ExpSub{\ms_t}{b(\ms_t) \cdot \sum_{\ma_t}\pisub{\theta}{\ma_t}{\ms_t}\nabla_\theta \log \pisub{\theta}{\ma_t}{\ms_t}} \\
+  &\overset{\spadesuit}{=} \ExpSub{\ms_t}{b(\ms_t) \cdot \sum_{\ma_t}\nabla_\theta \pisub{\theta}{\ma_t}{\ms_t}} \\
+  &= \ExpSub{\ms_t}{b(\ms_t) \cdot \nabla_\theta \sum_{\ma_t} \pisub{\theta}{\ma_t}{\ms_t}} = \ExpSub{\ms_t}{b(\ms_t) \cdot \nabla_\theta 1} = 0
+\end{align*} 
+where $\spadesuit$ is due to chain rule.
+As, a result, we have 
+\begin{align*}
+  \nabla_{\theta} J(\theta) = \sum_{t=0}^{T}\ExpSub{\ms_t, \ma_t}{\nabla_{\theta}\log \pisub{\theta}{\ma_t}{\ms_t}\cdot \rbrac{Q^{\pi_\theta}(\ms_t, \ma_t) - b(\ms_t)}(\ms_t, \ma_t)}.
+\end{align*} 
+Now take $b(\ms_t) = V^{\pi_\theta}(\ms_t)$, we result in 
+\begin{align*}
+  \nabla_{\theta} J(\theta) = \sum_{t=0}^{T}\ExpSub{\ms_t, \ma_t}{\nabla_{\theta}\log \pisub{\theta}{\ma_t}{\ms_t}\cdot A^{\pi_\theta}(\ms_t, \ma_t)}.
+\end{align*}
+This is called the \textbf{policy gradient theorem}.
+In practice, we still \textbf{cannot} compute $Q^{\pi_{\theta}}$ or $V^{\pi_\theta}$ exactly.
+So we train an auxiliary \textbf{value network} (Critic) to approximate $V^{\pi_\theta}$, and we estimate $\mA^{\pi_\theta}$ from the rollout data using methods like \textbf{Generalized Advantage Estimation} (GAE), which trades bias for variance reduction, which gives us an estimate $\hat{A}_t$.
+To do this, we relies on three basica building blocks:
+\begin{enumerate}
+  \item \textbf{Monte Carlo (MC) return}: $G_t = \sum_{u=t}^{T}\gamma^{u - t}r_u$. 
+  This is the unbiased estimate of the true return, which is very noisy and of high variance, especially if the horizon $T$ is long.
+
+  \item \textbf{Critic (value function)}: $V_\psi \approx V^{\pi_\theta}(\ms_t) = \Exp{G_t \mid \ms_t}$, as $\theta$ is consistently changing, we need to train critic per iteration. 
+  
+  \item \textbf{TD residual}: $\delta_t \eqdef r_t + \gamma V_{\psi}(\ms_{t+1}) - V_\psi(\ms_t)$, which is the one step error signal telling us how much better/worse things turned out compared to the critic's expectation\footnote{If the critic is perfect, we have $V_{\phi}(\ms_t) = \Exp{r_t + \gamma V^{\pi_\theta}(\ms_{t+1})}$, this is known as Bellman expectation equation which tells us what a critic would satisfy.}.
+  Notice that $\delta_t$ can be viewed as $1$-step estimate of the advantage function, since by definition (we get immediate reward + discounted value of next state)
+  \begin{align*}
+    Q^{\pi_\theta}(\ms_t, \ma_t) \simeq r_t + \gamma V_{\psi}(\ms_{t+1})
+  \end{align*}
+\end{enumerate}
+
+\paragraph{From reward to policy update:}
+We are solving a standard episodic RL problem.
+
+\textbf{Step 1: Rollout with current policy.} 
+Assume we are in iteration $k$, and we collect our trajectories by following $\pi_{\theta_k}$, this gives us data $\rbrac{\ms_t, \ma_t, r_t}$\footnote{During training, we sample many such $\mx$ from $\cD_{\text{RL}}$ in parallel, and collect a batch of rollouts at once.},
+while we are collecting we also store the log probibility of each action $\log \pi_{\theta_k}(\ma_t \mid \ms_t)$.
+
+\textbf{Step 2: Advantage estimation.}
+We would like to know whether each action was better or worse than average.
+
+\textbf{Step 2.1: Train a critic.}
+So we train a critic $V_{\psi_k}$ to approximate the function value $V^{\pi_\theta}$.
+Usually, this $V_{\psi}$ can be a MLP parametrized by $\psi$.\footnote{In complex environments (e.g. Atari, robotics, LLMs), it can be a convolutional net, a transformer, or any architecture suited for the state representation.}
+This result in an extra loss term based on MSE loss in the final PPO loss, which we name critic.
+
+\textbf{Step 2.2: Temporal Difference (TD) residuals.}
+We use the trained critic to compute $1$-step errors 
+\begin{align*}
+  \delta_t = r_t + \gamma V_{\psi}(\ms_{t+1}) - V_\psi(\ms_t) = \big(\text{observed reward} + \text{predicted future value}\big) - \big(\text{predicted value at } s_t\big),
+\end{align*}
+If $\delta_t > 0$, the return is better than expected and the action was better than average, if $\delta_t < 0$, vice versa.
+To understand this intuitively, we only have to remember that $V_{\pi_k}$ is the expected total discounted reward you will get if you start from state $\ms$ then following policy $\pi_{\theta_k}$.
+
+\textbf{Step 2.3: Generalized Advantage Estimation (GAE).}
+We have two choices to estimate advantage, one is the $1$-step estimation generated by TD-residual, which is very noisy because it only looks one step ahead, especially when we are in a long episode and there is a large reward at the end.
+From an opposite point of view, if we use $G_t = r_t + \gamma r_{t+1} + \hdots$ and define 
+\begin{align*}
+  \hat{A}_t = G_t - V_{\psi_k}(\ms_t).
+\end{align*} 
+Although this uses the full trajectory, it introduces bias if the critic is imperfect, and is also slow to compute since we need to wait until the episodes end.
+
+So we just combine them which results in GAE (instead of picking one horizon, we take a weighted average of all horizons).
+Formally, 
+\begin{align*}
+  \hat{A}_t = \delta_t + \gamma\lambda\delta_{t+1} + \rbrac{\gamma\lambda}^2\delta_{t+2} + \hdots,
+\end{align*}
+where $\gamma = 0.99$ and $\lambda = 0.95$ are commom.
+Notice that $\gamma$ is the discounting factor and $\lambda$ controls how far we can look ahead.
+To compute is efficiently, we use backward recursion, and start with $\hat{A}_T = 0$ (by definition at the end of rollout), and 
+\begin{align*}
+  \hat{A}_t = \delta_t + \gamma\lambda\hat{A}_{t+1}.
+\end{align*}
+From the estimate $\hat{A}_t$, we can reconstruct 
+\begin{align}
+  \label{eq:GHAT}
+  \hat{G}_t = \hat{A}_t + V_{\psi}(\ms_t), 
+\end{align}
+which we will later use in loss.
+
+\textbf{Step 2.4: Gradient.} After running GAE, we now have per-time-step advantage estimates $\hat{A}_t$, which allows us to scale the log-probability gradient 
+\begin{align}
+  \label{eq:policy-grad}
+  \nabla_{\theta} \log \pi_{\theta}(\ma_t \mid \ms_t) \cdot \hat{A}_t, \tag{Policy Gradient}
+\end{align} 
+where $\hat{A}_t$ increases the probability and vice versa.
+
+\textbf{Step 3: Policy update with PPO.} Now we want to adjust $\pi_{\theta_k}$, so that actions with positive advantage become more likely, and those with negative advantage less likely.
+If we use the naive policy gradient then the policy might change too much in one step.
+It could also collapse (e.g., probability mass shifts to a single action, causing instability), so we need to regularize the update.
+Notice that the naive objective after policy gradient transform and approximations can be written as 
+\begin{align*}
+  \cL^{\text{PG}}(\theta) = \ExpSub{t, \ms_t, \ma_t}{\log \pisub{\theta}{\ma_t}{\ms_t}\cdot \hat{A}_t}.
+\end{align*}
+Historically, we use \textbf{TRPO} (Trust Region Policy Optimization), where we do 
+\begin{align*}
+  \max_{\theta} \ExpSub{t, \ms_t, \ma_t}{r_t(\theta; 
+  \theta_k) \hat{A}_t} \qquad \text{s.t.} \qquad \ExpSub{\substack{\ms \sim \rho_{\pi_{\theta_{k}}} \\ \ma \sim \pisub{\theta_{k}}{\cdot}{\ms}}}{\log\pisub{\theta_k}{\ma}{\ms} - \log\pisub{\theta}{\ma}{\ms}} \leq \delta,
+\end{align*}
+where $\rho_{\pi_{\theta_{k}}}$ denotes the (on-policy) state distribution under $\pi_{\theta_{k}}$ and 
+\begin{align*}
+  r_t(\theta; \theta_k) \eqdef \frac{\pisub{\theta}{\ma_t}{\ms_t}}{\pisub{\theta_{k}}{\ma_t}{\ms_t}},
+\end{align*}
+is the ratio.
+The constraint can also be written equivalently as 
+\begin{align*}
+  \ExpSub{\ms \sim \rho_{\pi_{\theta_k}} }{\klD{\pisub{\theta_{k}}{\cdot}{\ms}}{\pisub{\theta}{\cdot}{\ms}}} \leq \delta.
+\end{align*}
+There are two layers of expectations: (1) over states $\ms$ that the old policy visits, (2) over actions $\ma$ drawn from the old policy at each state (this is built into the KL).
+However, \textbf{TRPO} is too time consuming in the sense that it often requires second order optimization methods (conjugate gradient with Fisher-vector products to enforce the KL trust region).
+
+
+\paragraph{Importance sampling based on old policy data.} \textbf{PPO} (Proximal Policy Optimization) uses a trick involved the ratio function, and first replaces the objective as 
+\begin{align*}
+  \widehat{\cL}^{\text{PG}}(\theta; \theta_k) = \ExpSub{ \substack{t \\ \ms_t \sim \rho_{\pi_{\theta_k}} \\ \ma_t \sim \pi_{\theta_k}}}{r_t(\theta; \theta_k) \hat{A}^t}.
+\end{align*} 
+If we maximize this directly, the policy can change too aggressively, leading to instability.
+
+\paragraph{Clipping.} As a result, \textbf{PPO} in turn introduces a clipped surrogate,
+\begin{align*}
+  \cL^{\text{Clip}}(\theta; \theta_k) = \ExpSub{\substack{t \\ \ms_t \sim \rho_{\pi_{\theta_k}} \\ \ma_t \sim \pi_{\theta_k}}}{\min\cbrac{r_t(\theta; \theta_k) \hat{A}^t, \text{clip}\rbrac{r_t(\theta; \theta_k), 1-\varepsilon, 1+\varepsilon}\cdot\hat{A}^t}},
+\end{align*}
+where the clipping operator does the following:
+\begin{enumerate}
+  \item When $r_t \in [1 - \varepsilon, 1 + \varepsilon]$, we do nothing.
+  \item When $r_t$ goes beyond, we replace $r_t$ by the nearest boundary value.
+\end{enumerate}
+
+\paragraph{Entropy bonus.}
+If we only maximize rewards, the policy may collapse to a near-deterministic one (always picking the “best” action it has found so far).
+To counter this, we add an entropy bonus to the objective.
+\begin{align*}
+  \cH_{\pisub{\theta}{\cdot}{\ms}} = -\sum_{\ma} \pisub{\theta}{\ma}{\ms} \log \pisub{\theta}{\cdot}{\ms},
+\end{align*}
+if the policy is uniform then it is high.
+
+
+\paragraph{Full PPO loss.}
+The clipped surrogate is the policy gradient, but PPO also trains the critic and uses an entropy bonus.
+\begin{align*}
+  \cL^{\text{PPO}}(\theta, \psi; \theta_k) \eqdef \underbrace{\Exp{\cL^{\text{Clip}}(\theta; \theta_k)}}_{\text{actor}} - c_v \cdot \underbrace{\Exp{\rbrac{V_{\psi}(s_t) - \hat{G}_t}^2}}_{\text{critic}} + c_e \cdot \underbrace{\Exp{\cH\rbrac{\pisub{\theta}{\cdot}{\ms_t}}}}_{\text{exploration}},
+\end{align*}
+where 
+\begin{align*}
+  \Exp{\cH\rbrac{\pisub{\theta}{\cdot}{\ms_t}}} = \frac{1}{T}\sum_{t=0}^{T}\cH(\pisub{\theta}{\cdot}{\ms_t}).
+\end{align*}
+
+
+
+\paragraph{Practical hint.} 
+
+
+
+
 
 
 \end{document}
