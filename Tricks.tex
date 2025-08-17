@@ -1490,7 +1490,32 @@ we can see that the token level contribution is given by
   \text{KL}_t \rbrac{\mx, \my_{<t}, \my} = \log \frac{\pisub{\theta}{\my_t}{\mx, \my_{<t}}}{\pisub{\text{ref}}{\my_t}{\mx, \my_{<t}}}.
 \end{align*}
 If we think about it, this discourages the case that the probability of policy $\pisub{\theta}{\cdot}{\mx, \my_{<t}}$ generates $\my_t$ is smaller than that of policy $\pisub{\text{ref}}{\cdot}{\mx, \my_{<t}}$.
-In practiccal training, rollouts (states, actions) are sampled from the old policy in the current outer iteration $\theta_{\text{old}}$, which is the reason why the advantage-weighted likelihood ratio ($o_t(\theta; \theta_k)$ defined later) appears. 
+In practiccal training, rollouts (states, actions) are sampled from the old policy in the current outer iteration $\theta_{\text{old}}$, which is the reason why the advantage-weighted likelihood ratio ($o_t(\theta; \theta_k)$ defined later) appears.
+
+
+\textbf{About KL divergence:}
+Token level definition of KL divergence : at timestep $t$, the KL divergence between current policy $\pi_{\theta}$ and the reference $\pi_{\text{ref}}$ is 
+\begin{align*}
+  \klD{\pisub{\theta}{\cdot}{\mx, \my_{<t}}}{\pisub{\thetaref}{\cdot}{\mx, \my_{<t}}} = \sum_{\ma} \pisub{\theta}{\ma}{\mx, \my_{<t}} \cdot \log \rbrac{\frac{\pisub{\theta}{\ma}{\mx, \my_{<t}}}{\pisub{\thetaref}{\ma}{\mx, \my_{<t}}}},
+\end{align*}
+which is an expectation over all possible next tokens $\ma$.
+The previously defined log ratio $\text{KL}_t \rbrac{\mx, \my_{<t}, \my}$ is an estimate of this true $\klD{\pisub{\theta}{\cdot}{\mx, \my_{<t}}}{\pisub{\thetaref}{\cdot}{\mx, \my_{<t}}}$ based on the one token $\my_t$, which is a random variable. We have 
+\begin{align*}
+  \ExpSub{\my_t \sim \pi_{\theta}}{\text{KL}_t \rbrac{\mx, \my_{<t}, \my}} = \klD{\pisub{\theta}{\cdot}{\mx, \my_{<t}}}{\pisub{\thetaref}{\cdot}{\mx, \my_{<t}}}.
+\end{align*}
+
+Even if we view it at a squence level, notice that 
+\begin{align*}
+  \sum_{t=1}^{T}\text{KL}_t \rbrac{\mx, \my_{<t}, \my} = \sum_{t=1}^{T}\log \rbrac{\frac{\pisub{\theta}{\ma}{\mx, \my_{<t}}}{\pisub{\thetaref}{\ma}{\mx, \my_{<t}}}} \overset{(a)}{=} \log\rbrac{\frac{\pisub{\theta}{\my}{\mx}}{\pisub{\thetaref}{\my}{\mx}}},
+\end{align*}
+where $(a)$ is due to the chain rule. 
+This still is an estimate in the sense that 
+\begin{align*}
+  \ExpSub{\my \in \pisub{\theta}{\cdot}{\mx}}{\sum_{t=1}^{T}\text{KL}_t} = \klD{\pisub{\theta}{\cdot}{\mx}}{\pisub{\thetaref}{\cdot}{\mx}}.
+\end{align*}
+In practice, during rollouts we only compute the log-prob ratio for the tokens we sampled, because that gives us a Monte Carlo estimate of the KL penalty. 
+We don't compute the full expectation KL (that would require summing over the whole vocab).
+
 
 \paragraph{Sampling:} 
 We can apply certain \textbf{sampling strategies} for turning the model's per-token probability distribution into actual token choices during rollout.
@@ -1954,10 +1979,170 @@ Training reduces to a standard supervised loss on pairs of responses.
 
 We will train (finetune) on a preference dataset $\cD_{\text{pref}} = \cbrac{(\mx_j, \my_j^+, \my_j^-)}_{j=1}^M$ where $\mx$ is the prompt, $\my_j^+$ is the preferred output and $\my_j^-$ is the less preferred output, $M$ is the total number of pairs of preference pairs (just like RLHF PPO stage 2).
 The core idea is that we assume that there is an underlying reward function $r(\mx, \my)$ such that 
-\begin{align*}
-  \mathbb{P}\rbrac{\my^{+} \succ \my^{-} \mid x} = \sigma\rbrac{r(\mx, \my^{+}) - r(\mx, \my^{-})}, 
-\end{align*}
+\begin{align}
+  \mathbb{P}\rbrac{\my^{+} \succ \my^{-} \mid x} = \sigma\rbrac{r(\mx, \my^{+}) - r(\mx, \my^{-})}, \tag{Bradley-Terry} 
+\end{align}
 where $\sigma(z) = \frac{1}{1 + e^{-z}}$ is the sigmoid function.
+DPO avoids learning an explicit reward model by connecting rewards to log-probabilities under the learned policy vs. a reference model (typically the SFT model):
+\begin{align*}
+  r(\mx, \my) \propto \beta\rbrac{\log \pisub{\theta}{\my}{\mx} - \log \pisub{\thetaref}{\my}{\mx}},
+\end{align*}
+where $\beta > 0$ is the temperature that controls the regularization strength.
+
+If we plug in this into the Bradley-Terry model, we get 
+\begin{align*}
+  \mathbb{P}\rbrac{\my^{+} \succ \my^{-} \mid x} = \sigma\rbrac{\beta\rbrac{\log \frac{\pisub{\theta}{\my^+}{\mx}}{\pisub{\thetaref}{\my^+}{\mx}} - \log \frac{\pisub{\theta}{\my^-}{\mx}}{\pisub{\thetaref}{\my^-}{\mx}}}}.
+\end{align*}
+Thus we choose to maximize the likelyhood of observed preference, 
+\begin{align*}
+  \cL^{\text{DPO}}(\theta) = \ExpSub{(\mx, \my^+, \my-) \sim \cD_{\text{pref}}}{\log\rbrac{\beta\rbrac{\underbrace{\log \frac{\pisub{\theta}{\my^+}{\mx}}{\pisub{\thetaref}{\my^+}{\mx}}}_{\text{advantage of} \my^+} - \underbrace{\log \frac{\pisub{\theta}{\my^-}{\mx}}{\pisub{\thetaref}{\my^-}{\mx}}}_{\text{advantage of} \my^-}}}},
+\end{align*}
+which is just a binary logistic regression objective over pairs.
+The entire DPO algorithm can then be described as 
+\begin{enumerate}
+  \item We start with a supervised model both as $\pi_{\theta}$ and $\pi_{\text{ref}}$.
+  \item We take a minibatch of paris $\cbrac{\mx_b, \my^+_b, \my^-_b}_{b=1}^B$, and we compute the log probabilities from $\pi_\theta$ and $\pi_{\text{ref}}$.
+  \item We then compute the loss $\cL^{\text{DPO}}$ and backpropagate and update $\theta$.
+\end{enumerate}
+Notice that the $\pisub{\thetaref}{\cdot}{\mx}$ term is there to ensure that the model doesn't drift too far from the SFT model (similar to the KL penalty in PPO-RLHF).
+Its advantages include 
+\begin{enumerate}
+  \item It directly aligns the policy with preference data.
+  \item Simple, stable, and efficient: training is just supervised cross-entropy with a custom loss.
+\end{enumerate}
+
+\paragraph{Why do we assume $r$ follows the specific form?}
+Consider the per prompt optimization with reward and KL-regularization, 
+\begin{align*}
+  \max_{\pi_{\theta}} \cbrac{\ExpSub{\my \sim \pisub{\theta}{\cdot}{\mx}}{r(\mx, \my)} - \beta\cdot\klD{\pisub{\theta}{\cdot}{\mx}}{\pisub{\thetaref}{\cdot}{\mx}}}.
+\end{align*}
+The objective itself is strictly concave in $\pisub{\theta}{\cdot}{\mx}$ which is a probability distribution (a vector of probabilities) over all possible $\my$.
+Clearly for the first term, it is linear in $\pisub{\theta}{\cdot}{y}$, while for the second term, we have 
+\begin{align*}
+  -\beta\cdot\sum_{\my}\pisub{\theta}{\my}{\mx}\log\frac{\pisub{\theta}{\my}{\mx}}{\pisub{\thetaref}{\my}{\mx}},
+\end{align*} 
+which is also strictly concave in $\pisub{\theta}{\cdot}{\mx}$ (KL-divergence itself is convex in $\pisub{\theta}{\cdot}{\mx}$).
+If we write the write the Lagrangian with normalization muiltipler $\lambda(\mx)$:
+\begin{align*}
+  \cL(\pi_\theta, \lambda) = \sum_{\my}\pisub{\theta}{\my}{\mx}\cdot r(\mx, \my)  - \beta \sum_{\my}\pisub{\theta}{\my}{\mx}\cdot\log \frac{\pisub{\theta}{\my}{\mx}}{\pisub{\thetaref}{\my}{\mx}} + \lambda(\mx) \rbrac{\sum_{\my}\pisub{\theta}{\my}{\mx} - 1},
+\end{align*}
+whose optimal condition implies 
+\begin{align*}
+  r(\mx, \my) - \beta\rbrac{\log \pisub{\theta}{\my}{\mx} - \pisub{\thetaref}{\my}{\mx} + 1} + \lambda(\mx) = 0.
+\end{align*}
+Rearrange we obtain: 
+\begin{align*}
+  r(\mx, \my) = \beta\rbrac{\log\pi^\star(\my\mid\mx) - \log\pisub{\thetaref}{\my}{\mx}} + C(\mx).
+\end{align*}
+where $C(\mx) = \lambda(\mx) + \beta$.
+Since in the pariwise preference model the bias $C(\mx)$ cancels out, this justifies our choice. 
+In a word, the DPO choice of $r$ comes from the PPO + KL setup, but with simplifications such as implicit reward model and sequence level loss instead of per token.
+
+
+\subsection{GPRO (Generalized Preference Optimization)}
+GPRO generalizes DPO further, in the sense that it instead of relying only on binary preferences (preferred vs dispreferred), it allows training with arbitrary reward functions (scalar signals, multiple preferences, or mixtures).
+
+Consider the dataset $\cD_{\text{pref}} = \cbrac{(\mx_j, \my_j, r(\mx_j, \my_j))}_{j=1}^M$.
+We now define the log-ratio between policy and preference 
+\begin{align*}
+  z_\theta(\mx, \my) = \log \frac{\pisub{\theta}{\my}{\mx}}{\pisub{\thetaref}{\my}{\mx}}.
+\end{align*}
+The GPRO loss is given by 
+\begin{align*}
+  \cL^{\text{GPRO}}(\theta) = \ExpSub{\rbrac{\mx, \my} \sim \cD_{\text{pref}}}{\Omega^\star\rbrac{z_\theta(\mx, \my)} - r(\mx, \my)z_{\theta}(\mx, \my)},
+\end{align*}
+where $\Omega^\star$ is the convex conjugate of a link function $\Omega$.
+The training follows maximizing this objective.
+
+
+\paragraph{The intuition:} 
+Fix a prompt $\mx$, consider the standard KL-regularized objective 
+\begin{align*}
+  \max_{\pi} \cbrac{\ExpSub{\my \sim \pisub{}{\cdot}{\mx}}{r(\mx, \my)} - \beta\cdot\klD{\pisub{}{\cdot}{\mx}}{\pisub{\thetaref}{\cdot}{\mx}}}.
+\end{align*}
+We will reparameterize the policy via a density ratio.
+Let
+\begin{align*}
+  z(\my) = \log \frac{\pisub{}{\my}{\mx}}{\pisub{\thetaref}{\my}{\mx}}, \qquad u(\my) = \exp\rbrac{z(\my)} = \frac{\pisub{}{\my}{\mx}}{\pisub{\thetaref}{\my}{\mx}}.
+\end{align*}
+Then $\pisub{}{\my}{\mx} = \pisub{\thetaref}{\my}{\mx}u(\my)$ must normalize, i.e., 
+\begin{align*}
+  \sum_{\my}\pisub{\thetaref}{\my}{\mx}u(\my) = 1  \Leftrightarrow  \ExpSub{\my \sim \pisub{\thetaref}{\cdot}{\mx}}{u(\my)} = 1. 
+\end{align*}
+Moreover,
+\begin{align*}
+  \klD{\pisub{}{\cdot}{\mx}}{\pisub{\thetaref}{\cdot}{\mx}} = \ExpSub{\my \sim \pisub{}{\cdot}{\mx}}{z(\my)} 
+\end{align*}
+and
+\begin{align*}
+  \ExpSub{\my \sim \pisub{}{\cdot}{\mx}}{f(\my)} = \sum_{\my} \pisub{\thetaref}{\my}{\mx}u(\my)f(\my) =\ExpSub{\my \sim \pisub{\thetaref}{\cdot}{\mx}}{u(\my) f(\my)}.
+\end{align*}
+As a result, taking $f(\my) = r(\mx, \my)$, we can reform the original objective as 
+\begin{align*}
+  \max_{u \geq 0, \ExpSub{\pisub{\thetaref}{\cdot}{\mx}}{u(\my)}=1} \cbrac{\ExpSub{\my \sim \pisub{\thetaref}{\cdot}{\mx}}{u(\my)r(\mx, \my)} - \beta\ExpSub{\my \sim \pisub{\thetaref}{\cdot}{\mx}}{u(\my)z(\my)}}, \qquad z(\my) = \log u(\my).
+\end{align*}
+The same conclusion also holds in the continuous case.
+We form the Lagrangian for the fixed $\mx$,
+\begin{align*}
+  \cL\rbrac{u, \lambda} &= \ExpSub{\my \sim \pisub{\thetaref}{\cdot}{\mx}}{ur} - \beta  \ExpSub{\my \sim \pisub{\thetaref}{\cdot}{\mx}}{uz} - \lambda\rbrac{ \ExpSub{\my \sim \pisub{\thetaref}{\cdot}{\mx}}{u} - 1} \\
+  &=  \ExpSub{\my \sim \pisub{\thetaref}{\cdot}{\mx}}{-\rbrac{\beta uz - ur + \lambda u} } + \lambda.
+\end{align*}
+Differentiate pointwisely w.r.t. $u$, we get 
+\begin{align*}
+  r - \beta(\log u + 1) - \lambda = 0,
+\end{align*}
+which suggests 
+\begin{align*}
+  \log u(\my) = \frac{r(\mx, \my) - \lambda - \beta}{\beta} \Rightarrow u^\star(\my) = C\cdot \exp\rbrac{\frac{r(\mx, \my)}{\beta}}, \quad \text{where} \quad C \eqdef \exp\rbrac{-\frac{\lambda + \beta}{\beta}}.
+\end{align*}
+Enforcing the constraint $\ExpSub{\my \sim \pisub{\thetaref}{\cdot}{\mx}}{u} = 1$, we get 
+\begin{align*}
+  C\cdot\ExpSub{\my \sim \pisub{\thetaref}{\cdot}{\mx}}{\exp\rbrac{\frac{r}{\beta}}} = 1 \Rightarrow C = \frac{1}{\ExpSub{\my \sim \pisub{\thetaref}{\cdot}{\mx}}{\exp\rbrac{\frac{r}{\beta}}}}.
+\end{align*}
+Therefore 
+\begin{align*}
+  u^\star(\my) = \frac{\exp\rbrac{\frac{r(\mx, \my)}{\beta}}}{\ExpSub{\my \sim \pisub{\thetaref}{\cdot}{\mx}}{\exp\rbrac{\frac{r}{\beta}}}} \quad \text{and} \quad \pi^\star(\my \mid \mx) = \pisub{\thetaref}{\my}{\mx}u^\star(y) = \frac{\pisub{\thetaref}{\my}{\mx}\exp\rbrac{\frac{r(\mx, \my)}{\beta}}}{\ExpSub{\my \sim \pisub{\thetaref}{\cdot}{\mx}}{\exp\rbrac{\frac{r}{\beta}}}}.
+\end{align*}
+The optimal log ratio is given by 
+\begin{align*}
+  z^\star(\my) = \frac{r(\mx, \my)}{\beta} - \log \ExpSub{\my \sim \pisub{\thetaref}{\cdot}{\mx}}{\exp\rbrac{\frac{r}{\beta}}}.
+\end{align*}
+Since the elementwise objective is strictly concave for $u > 0$ and the constraint is affine, KKT conditions apply; complementary slackness gives an interior solution $u^\star(\my) > 0$, which makes the stationary point above a unique maximizer.
+Plug it back into the primal gives the optimal value 
+\begin{align*}
+  \beta \log \ExpSub{\my \sim \pisub{\thetaref}{\cdot}{\mx}}{\exp\rbrac{\frac{r}{\beta}}},
+\end{align*}
+which is of the classic Donsker-Varadhan form, consistent with the exponential-tilt solution.
+In principle, if we have explicit $r(\mx, \my)$ for all candidate responses $\my$ we could just set our policy equal to $\pi^\star$, but in practice, the reward is only given on the dataset, and even if the value is available, we need to compute 
+\begin{align*}
+  \ExpSub{\my \sim \pisub{\thetaref}{\cdot}{\mx}}{\exp\rbrac{\frac{r}{\beta}}},
+\end{align*}
+which is log-sum-exp (log-partition function) all possible completions $\my$, which is not computable.
+
+\paragraph{The insight of GPRO:}
+Instead of trying to match $\pi_{\theta}$ to the global closed form $\pi^\star$, we can design a tractable convex surrogate that drives the model's log-ratio 
+\begin{align*}
+  z_{\theta} = \log \rbrac{\frac{\pisub{\theta}{\my}{\mx}}{\pisub{\thetaref}{\my}{\mx}}},
+\end{align*}
+to behave as if it were the solution of that optimization.
+Now introducing the convex function 
+\begin{align*}
+  \Omega(u) = \beta\rbrac{u \log u - u + 1}, \qquad \text{for} \qquad u > 0,
+\end{align*}
+whose convex conjugate is 
+\begin{align*}
+  \Omega^\star(t) = \sup_{u \geq 0}\cbrac{ut - \Omega(u)} = \beta \rbrac{e^{t/\beta} - 1}.
+\end{align*}
+Now we use the Fenchel-Young inequality, 
+\begin{align*}
+  ut - \Omega(u) \leq \Omega^\star(t)
+\end{align*}
+with equality achieved if and only if $u = e^{\frac{t}{\beta}}$, which means that for any $\my$, we have 
+\begin{align*}
+  1
+\end{align*}
+
+
 
 
 \end{document}
