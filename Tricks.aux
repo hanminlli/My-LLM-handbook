@@ -67,8 +67,8 @@
 \@writefile{toc}{\contentsline {paragraph}{The all to all trick:}{22}{section*.21}\protected@file@percent }
 \@writefile{toc}{\contentsline {paragraph}{Processes and threads:}{22}{section*.22}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {8.9}Parallel Attention + FFN}{23}{subsection.8.9}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {9}Computing the Number of Parameters}{24}{section.9}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {10}Fintuning}{24}{section.10}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {9}Computing the Number of Parameters}{23}{section.9}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {10}Fintuning}{23}{section.10}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {10.1}Pretraining Loss (self-supervised)}{24}{subsection.10.1}\protected@file@percent }
 \newlabel{eq:CLM}{{{CLM}}{24}{Pretraining Loss (self-supervised)}{AMS.24}{}}
 \newlabel{eq:CLM@cref}{{[equation][2147483647][]{CLM}}{[1][24][]24}}
@@ -79,34 +79,35 @@
 \@writefile{toc}{\contentsline {subsection}{\numberline {10.4}Parameter-Efficient Fine-Tuning (PEFT)}{25}{subsection.10.4}\protected@file@percent }
 \@writefile{toc}{\contentsline {paragraph}{Adaptors}{25}{section*.29}\protected@file@percent }
 \@writefile{toc}{\contentsline {paragraph}{Low-Rank Adaptation of LLMs}{25}{section*.30}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {10.5}Reinforcement Learning from Human Feedback (RLHF)}{27}{subsection.10.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {10.5}Reinforcement Learning from Human Feedback (RLHF)}{26}{subsection.10.5}\protected@file@percent }
 \@writefile{toc}{\contentsline {paragraph}{Stage 1: Supervised Finetuning}{27}{section*.31}\protected@file@percent }
 \@writefile{toc}{\contentsline {paragraph}{Stage 2: Reward Modelling}{27}{section*.32}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Stage 3: RL fine-tuning with PPO (Proximal Policy Optimization)}{29}{section*.33}\protected@file@percent }
-\newlabel{eq-obj-RL}{{12}{29}{Stage 3: RL fine-tuning with PPO (Proximal Policy Optimization)}{equation.10.12}{}}
+\@writefile{toc}{\contentsline {paragraph}{Stage 3: RL fine-tuning using PPO (Proximal Policy Optimization) with KL regularization.}{29}{section*.33}\protected@file@percent }
+\newlabel{eq-obj-RL}{{12}{29}{Stage 3: RL fine-tuning using PPO (Proximal Policy Optimization) with KL regularization}{equation.10.12}{}}
 \newlabel{eq-obj-RL@cref}{{[equation][12][]12}{[1][29][]29}}
 \@writefile{toc}{\contentsline {paragraph}{Sampling:}{29}{section*.34}\protected@file@percent }
 \@writefile{toc}{\contentsline {paragraph}{Computation:}{30}{section*.35}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {10.6}The Bigger Picture in Reinforcement Learning}{30}{subsection.10.6}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Objective:}{31}{section*.36}\protected@file@percent }
-\newlabel{eq:J}{{13}{31}{Objective:}{equation.10.13}{}}
-\newlabel{eq:J@cref}{{[equation][13][]13}{[1][31][]31}}
-\@writefile{toc}{\contentsline {paragraph}{Policy Gradient:}{31}{section*.37}\protected@file@percent }
-\newlabel{eq:A}{{{A}}{32}{Policy Gradient:}{AMS.39}{}}
-\newlabel{eq:A@cref}{{[equation][2147483647][]{A}}{[1][31][]32}}
-\newlabel{eq:JG}{{14}{32}{Policy Gradient:}{equation.10.14}{}}
-\newlabel{eq:JG@cref}{{[equation][14][]14}{[1][32][]32}}
-\@writefile{toc}{\contentsline {paragraph}{From reward to policy update:}{33}{section*.40}\protected@file@percent }
-\newlabel{eq:GHAT}{{15}{34}{From reward to policy update:}{equation.10.15}{}}
-\newlabel{eq:GHAT@cref}{{[equation][15][]15}{[1][34][]34}}
-\newlabel{eq:policy-grad}{{{Policy Gradient}}{34}{From reward to policy update:}{AMS.42}{}}
-\newlabel{eq:policy-grad@cref}{{[equation][2147483647][]{Policy Gradient}}{[1][34][]34}}
-\@writefile{toc}{\contentsline {paragraph}{Importance sampling based on old policy data.}{35}{section*.43}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Clipping.}{35}{section*.44}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Entropy bonus.}{35}{section*.45}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Full PPO loss.}{35}{section*.46}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Practical hint.}{36}{section*.47}\protected@file@percent }
-\newlabel{LastPage}{{}{36}{}{page.36}{}}
-\xdef\lastpage@lastpage{36}
-\xdef\lastpage@lastpageHy{36}
-\gdef \@abspage@last{36}
+\@writefile{toc}{\contentsline {subsection}{\numberline {10.6}The Bigger Picture in Reinforcement Learning (PPO)}{32}{subsection.10.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Objective:}{32}{section*.36}\protected@file@percent }
+\newlabel{eq:J}{{13}{32}{Objective:}{equation.10.13}{}}
+\newlabel{eq:J@cref}{{[equation][13][]13}{[1][32][]32}}
+\@writefile{toc}{\contentsline {paragraph}{Policy Gradient:}{33}{section*.37}\protected@file@percent }
+\newlabel{eq:A}{{{A}}{33}{Policy Gradient:}{AMS.39}{}}
+\newlabel{eq:A@cref}{{[equation][2147483647][]{A}}{[1][33][]33}}
+\newlabel{eq:JG}{{14}{33}{Policy Gradient:}{equation.10.14}{}}
+\newlabel{eq:JG@cref}{{[equation][14][]14}{[1][33][]33}}
+\@writefile{toc}{\contentsline {paragraph}{From reward to policy update:}{35}{section*.40}\protected@file@percent }
+\newlabel{eq:GHAT}{{16}{36}{From reward to policy update:}{equation.10.16}{}}
+\newlabel{eq:GHAT@cref}{{[equation][16][]16}{[1][35][]36}}
+\newlabel{eq:policy-grad}{{{Policy Gradient}}{36}{From reward to policy update:}{AMS.42}{}}
+\newlabel{eq:policy-grad@cref}{{[equation][2147483647][]{Policy Gradient}}{[1][36][]36}}
+\@writefile{toc}{\contentsline {paragraph}{Importance sampling based on old policy data.}{36}{section*.43}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Clipping.}{36}{section*.44}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Entropy bonus.}{37}{section*.45}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Full PPO loss.}{37}{section*.46}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Practical hint.}{37}{section*.47}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {10.7}PPO-KL}{38}{subsection.10.7}\protected@file@percent }
+\newlabel{LastPage}{{}{38}{}{page.38}{}}
+\xdef\lastpage@lastpage{38}
+\xdef\lastpage@lastpageHy{38}
+\gdef \@abspage@last{38}

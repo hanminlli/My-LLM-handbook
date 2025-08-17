@@ -1223,6 +1223,8 @@ We can also control by careful weight initializations, or considering set a lear
 
 
 \section{Fintuning}
+Alignment: making the behavior of a large language model match human goals, values, or expectations.
+
 
 \subsection{Pretraining Loss (self-supervised)}
 As we know, in pretraining, we are basically doing a self-supervised learning task on predicting the next token.
@@ -1341,7 +1343,7 @@ Higher $r$ used in complex multi-task fine-tuning.
 Futher improving $r$ often gives negligible benefits.
 
 
-\textbullet \textbf{QLoRA}
+\textbullet~ \textbf{QLoRA}
 This actually refers to Quantized LoRA, which allows fine-tuning very large language models (e.g., 65B params) on a single GPU without running out of memory.
 It combines $4$-bit quantization for the frozen base model and LoRA.
 
@@ -1468,7 +1470,7 @@ We can choose to use the version with/without SFT, most pipelines use the one wi
 
 
 
-\paragraph{Stage 3: RL fine-tuning with PPO (Proximal Policy Optimization)} 
+\paragraph{Stage 3: RL fine-tuning using PPO (Proximal Policy Optimization) with KL regularization.} 
 We have the reference policy after SFT, which we denote as $\pi_{\text{SFT}} = \pi_{\text{ref}}$ and the reward model $\R_{\phi}$.
 Assume that now we have a prompt set $\cD_{\text{RL}}$ which are unlabeled instructions / prompt drawn from a prompt distribution (can be the same pool used in SFT, plus extra domains).
 
@@ -1488,6 +1490,7 @@ we can see that the token level contribution is given by
   \text{KL}_t \rbrac{\mx, \my_{<t}, \my} = \log \frac{\pisub{\theta}{\my_t}{\mx, \my_{<t}}}{\pisub{\text{ref}}{\my_t}{\mx, \my_{<t}}}.
 \end{align*}
 If we think about it, this discourages the case that the probability of policy $\pisub{\theta}{\cdot}{\mx, \my_{<t}}$ generates $\my_t$ is smaller than that of policy $\pisub{\text{ref}}{\cdot}{\mx, \my_{<t}}$.
+In practiccal training, rollouts (states, actions) are sampled from the old policy in the current outer iteration $\theta_{\text{old}}$, which is the reason why the advantage-weighted likelihood ratio ($o_t(\theta; \theta_k)$ defined later) appears. 
 
 \paragraph{Sampling:} 
 We can apply certain \textbf{sampling strategies} for turning the model's per-token probability distribution into actual token choices during rollout.
@@ -1521,24 +1524,88 @@ Its effect is to keep most probable tokens, while cut off the long tailed improb
 \textbullet~ We may use them in combination, such as temperature in $[0.7, 1]$, top $p \in [0.9, 0.95]$. 
 Note that they influence not only the KL divergence but also the reward model score and the learning signal diversity.
 
-\paragraph{Computation:} For each $t$, we compute $\pisub{\theta}{\my_t}{\mx, \my_{<t}}$ and $\pisub{\text{ref}}{\my_t}{\mx, \my_{<t}}$ and we store the corresponding 
-\begin{align*}
-  \text{KL}_t \rbrac{\mx, \my_{<t}, \my} = \log \pisub{\theta}{\my_t}{\mx, \my_{<t}} - \log \pisub{\text{ref}}{\my_t}{\mx, \my_{<t}},
-\end{align*}
-along the trajectory. 
-Notice that, we have $\beta$ controlling the strength of this shaping reward (penalty reward) $-\beta \cdot \text{KL}_t \rbrac{\mx, \my_{<t}, \my} \eqdef r_t^{\text{KL}}$.
-Often, large $\beta$ means strong pull toward the reference.
-Finally, when we approach $t = T$, we may also include the value of $R_{\phi}(\mx, \my)$. 
-The total reward per token is
-\begin{align*}
-  r_t = \begin{cases}
-    r_t^{\text{KL}}, \qquad t < T \\
-    r_t^{\text{KL}} + R_{\phi}(\mx, \my) \qquad t = T.    
-  \end{cases}
-\end{align*}
+\paragraph{Computation:} 
+Let us consider the $k$-th iteration for PPO and see what exactly we are going to do following the standard reinforcement learning road map.
+We denote the policy parameters at the start of iteration as $\theta_k$ and the critic parameter as $\psi_k$.
+\begin{enumerate}
+  \item \textbf{Rollout}: We freeze policy $\theta_{\text{old}} = \theta_k$, and we sample a minibatch of prompts $\cbrac{\mx^{(1)}, \mx^{(2)}, \hdots, \mx^{(B)}} \sim \cD_{\text{RL}}$, for each prompt $\mx^{(j)}$ we generate a completion $\my^{(j)} = \cbrac{\my_1^{(j)}, \hdots, \my_{T_j}^{(j)}}$ with $\theta_{\text{old}}$ (with potential temperature sampling and others).
+  For each token $t$ in each sequence, we form state $\ms_t^{(b)} = \rbrac{\mx^{(b)}, \my^{(b)}_{< t}}$, and we let action $\ma^{(b)}_t = \my_t^{(b)}$.
+  We record the old log probability under $\pi_{\theta_{\text{old}}}$, 
+  \begin{align*}
+    \log \pisub{\theta_{\text{old}}}{\ma^{(b)}_t}{\ms^{(b)}_{t}},
+  \end{align*}
+  and the log probability under the reference policy 
+  \begin{align*}
+    \log \pisub{\theta_{\text{ref}}}{\ma^{(b)}_t}{\ms^{(b)}_{t}},
+  \end{align*}
+  we also evaluate the critic value $V_{\psi_k}(\ms^{(b)}_t)$ at roll-out time.
+  
+  \item \textbf{Learning Signals (Inner):} We may take a minibatch $\cM$ (token-step minibatch) of token steps $\cbrac{b, t}$ (optionally with a padding mask $m^{(b)}_t \in \cbrac{0, 1}$ if sequences have different lengths.)\ , we initialize $\theta = \theta_{k, 0} = \theta_k$ and $\psi = \psi_{k, 0} = \psi_k$ where we plan to run $E$ steps of update (via SGD).
+  Since we have the current inner iteration policy as $\theta$, we can compute the log probability, 
+  \begin{align*}
+    \pisub{\theta}{\ma_t^{(b)}}{\ms_t^{(b)}},
+  \end{align*}
+  which allows us to compute token level KL to the reference 
+  \begin{align*}
+    \text{KL}_t^{(b)} = \log\pisub{\theta}{\ma_t^{(b)}}{\ms_t^{(b)}} - \log \pisub{\thetaref}{\ma_t^{(b)}}{\ms_t^{(b)}},
+  \end{align*}
+  and further the KL-shaping reward:
+  \begin{align*}
+    r_{t}^{\text{KL}, (b)} = -\beta \cdot \text{KL}_t^{(b)}.
+  \end{align*}
+  Then we get the per token reward 
+  \begin{align*}
+    r_t^{(b)}(\theta) \;=\; \begin{cases}
+      r_{t}^{\text{KL}, (b)}(\theta), & t < T_b, \\[6pt]
+      r_{t}^{\text{KL}, (b)}(\theta) + R_{\phi}\!\left(\mx^{(b)}, \my^{(b)}\right), & t = T_b.
+    \end{cases}
+  \end{align*}
+  We further obtain the discounted return as  
+  \begin{align*}
+    G_t^{(b)}(\theta) = \sum_{l=0}^{T_b-t}\gamma^l r_{t+l}^{(b)}(\theta), 
+  \end{align*}
+  and the TD residual 
+  \begin{align*}
+    \delta_t^{(b)} = r_{t}^{(b)}(\theta) + \gamma(1 - \text{done}^{(b)}_t)V_{\psi}(\ms^{(b)}_{t+1}) - V_{\psi}(\ms^{(b)}_t),
+  \end{align*}
+  as well as the GAE through backward recursion 
+  \begin{align*}
+    \hat{A}^{(b)}_t (\theta) = \delta_t^{(b)}(\theta) + \gamma\lambda(1 - \text{done}^{(b)}_t)\hat{A}^{(b)}_{t+1} (\theta), \qquad \hat{A}^{(b)}_{T_b} (\theta) = 0.
+  \end{align*}
+  Then we construct the value target 
+  \begin{align*}
+    \hat{G}^{(b)}_t (\theta) = \hat{A}^{(b)}_t (\theta) + V_{\psi}(\ms^{(b)}_t).
+  \end{align*}
+
+  \item \textbf{PPO losses (Inner):} We first compute the importance ratio 
+  \begin{align*}
+    o^{(b)}_t = \exp\rbrac{\log \pisub{\theta}{\ma_t^{(b)}}{\ms_t^{(b)}} -  \log \pisub{\thetaold}{\ma_t^{(b)}}{\ms_t^{(b)}}},
+  \end{align*}
+  and we compute the actor loss
+  \begin{align*}
+    \cL^{\text{actor}}(\theta) = \frac{1}{|\cM|} \sum_{(b,t)\in \cM}\min\!\Big(o_t^{(b)}(\theta)\,\hat{A}_t^{(b)}(\theta),\,\operatorname{Clip}\!\big(o_t^{(b)}(\theta),\,1-\epsilon,\,1+\epsilon\big)\,\hat{A}_t^{(b)}(\theta)\Big),
+  \end{align*}
+  and critic loss
+  \begin{align*}
+    \cL^{\text{critic}}(\psi) = \frac{1}{|\mathcal{M}|} \sum_{(b,t)\in\mathcal{M}}\big( V_{\psi}(\ms_t^{(b)}) - \hat{G}_t^{(b)}(\theta) \big)^2,
+  \end{align*}
+  as well as entropy 
+  \begin{align*}
+    \cL^{\text{entropy}}(\theta) = \frac{1}{|\mathcal{M}|} \sum_{(b,t)\in\mathcal{M}} \Bigg[ - \sum_{\ma} \pi_{\theta}(\ma \mid \ms_t^{(b)}) \cdot \log \pi_{\theta}(\ma \mid \ms_t^{(b)}) \Bigg].
+  \end{align*}
+  To this end, we may form the PPO loss 
+  \begin{align*}
+    L^{\text{PPO}}(\theta, \psi) = L^{\text{actor}}(\theta) - c_v \cdot L^{\text{critic}}(\psi) + c_e \cdot L^{\text{entropy}}(\theta),
+  \end{align*}
+  where we can do gradient descent on $-\cL^{\text{PPO}}$.
+  Note that we can also do an optional mask for padded tokens, if sequence are padded, we just multiplly each summand by a binary mask $m^{(b)}_t$ and divide by $\sum_{(b, t)\in \cM}m^{(t)}_b$ instead of $\abs \cM$ (Token-step minibatch convention does not need it.).
+\end{enumerate}
 
 
-\subsection{The Bigger Picture in Reinforcement Learning}
+
+
+
+\subsection{The Bigger Picture in Reinforcement Learning (PPO)}
 In RL theory, the formal setting is a Markov Decision Process (MDP):
 \begin{align*}
   \rbrac{\cS, \cA, P, r, \gamma},
@@ -1566,7 +1633,7 @@ where $J(\theta)$ is defined as
   J(\theta) \eqdef \ExpSub{\pi_\theta}{\sum_{t=0}^{T}\gamma^tr(s_t, a_t)}.
 \end{align}
 That is maximize expected total reward.
-Note that the expectation actually means that we are sampling episodes (tracjetories) using $\pi_{\theta}$ and for each trajectory, we compute the total discounted reward.
+Note that the expectation actually means that we are sampling episodes (trajectories) using $\pi_{\theta}$ and for each trajectory, we compute the total discounted reward.
 We average those totals over all possible trajectories, weighted by their probability of occurring under $\pi_\theta$.
 For example, assume $\tau$ is a trajectory:
 \begin{align*}
@@ -1581,7 +1648,7 @@ we can rewrite $J(\theta)$ as
   J(\theta) = \sum_{\tau} p_\theta(\tau)\cdot\sbrac{\sum_{t=0}^{T}\gamma^tr(s_t, a_t)}.
 \end{align*}
 Notice that we can of course think of using gradient ascent to solve this. 
-However, if we define $R(\tau) \eqdef \sum_{t=0}^{T}\gamma^tr(s_t, a_t)$, notice that $R$ the reward function given by the environment, and it is only implicitly dependent on $\theta$ in terms of the randomness of the trajectory and if we fix one trajectory, the dependence on $\theta$ is gone.
+However, if we define $R(\tau) \eqdef \sum_{t=0}^{T}\gamma^tr(s_t, a_t)$, notice that $R$ is the return (sum of rewards) by the environment, and it is only implicitly dependent on $\theta$ in terms of the randomness of the trajectory and if we fix one trajectory, the dependence on $\theta$ is gone.
 We cannot backpropagate through this function properly.
 
 
@@ -1611,6 +1678,7 @@ For the $t$-th term in the summation in \eqref{eq:A} and \eqref{eq:J}, notice th
   \label{eq:JG}
   \nabla_{\theta} J(\theta) = \ExpSub{\tau}{\sum_{t=0}^{T}\nabla_\theta \log \pisub{\theta}{\ma_t}{\ms_t} \cdot G_t}.
 \end{align}
+The vanilla Policy Gradient method is based on this and Monte Carlo, which is of high variance, no constraints on updates.
 Now defining the \textbf{action-value} function $Q^{\pi}(\ms, \ma)$,
 \begin{align*}
   Q^{\pi}(\ms, \ma) \eqdef \ExpSub{\pi}{G_t \mid \ms_t = \ms, \ma_t = \ma},
@@ -1649,16 +1717,16 @@ Now take $b(\ms_t) = V^{\pi_\theta}(\ms_t)$, we result in
   \nabla_{\theta} J(\theta) = \sum_{t=0}^{T}\ExpSub{\ms_t, \ma_t}{\nabla_{\theta}\log \pisub{\theta}{\ma_t}{\ms_t}\cdot A^{\pi_\theta}(\ms_t, \ma_t)}.
 \end{align*}
 This is called the \textbf{policy gradient theorem}.
-In practice, we still \textbf{cannot} compute $Q^{\pi_{\theta}}$ or $V^{\pi_\theta}$ exactly.
+In practice, we still \textbf{cannot} compute $Q^{\pi_{\theta}}$ or $V^{\pi_\theta}$ exactly. 
 So we train an auxiliary \textbf{value network} (Critic) to approximate $V^{\pi_\theta}$, and we estimate $\mA^{\pi_\theta}$ from the rollout data using methods like \textbf{Generalized Advantage Estimation} (GAE), which trades bias for variance reduction, which gives us an estimate $\hat{A}_t$.
-To do this, we relies on three basica building blocks:
+To do this, we relies on three basic building blocks:
 \begin{enumerate}
   \item \textbf{Monte Carlo (MC) return}: $G_t = \sum_{u=t}^{T}\gamma^{u - t}r_u$. 
   This is the unbiased estimate of the true return, which is very noisy and of high variance, especially if the horizon $T$ is long.
 
   \item \textbf{Critic (value function)}: $V_\psi \approx V^{\pi_\theta}(\ms_t) = \Exp{G_t \mid \ms_t}$, as $\theta$ is consistently changing, we need to train critic per iteration. 
   
-  \item \textbf{TD residual}: $\delta_t \eqdef r_t + \gamma V_{\psi}(\ms_{t+1}) - V_\psi(\ms_t)$, which is the one step error signal telling us how much better/worse things turned out compared to the critic's expectation\footnote{If the critic is perfect, we have $V_{\phi}(\ms_t) = \Exp{r_t + \gamma V^{\pi_\theta}(\ms_{t+1})}$, this is known as Bellman expectation equation which tells us what a critic would satisfy.}.
+  \item \textbf{TD residual}: $\delta_t \eqdef r_t + \gamma V_{\psi}(\ms_{t+1}) - V_\psi(\ms_t)$, which is the one step error signal telling us how much better/worse things turned out compared to the critic's expectation\footnote{If the critic is perfect, we have $V_{\psi}(\ms_t) = \Exp{r_t + \gamma V^{\pi_\theta}(\ms_{t+1})}$, this is known as Bellman expectation equation which tells us what a critic would satisfy.}.
   Notice that $\delta_t$ can be viewed as $1$-step estimate of the advantage function, since by definition (we get immediate reward + discounted value of next state)
   \begin{align*}
     Q^{\pi_\theta}(\ms_t, \ma_t) \simeq r_t + \gamma V_{\psi}(\ms_{t+1})
@@ -1670,7 +1738,7 @@ We are solving a standard episodic RL problem.
 
 \textbf{Step 1: Rollout with current policy.} 
 Assume we are in iteration $k$, and we collect our trajectories by following $\pi_{\theta_k}$, this gives us data $\rbrac{\ms_t, \ma_t, r_t}$\footnote{During training, we sample many such $\mx$ from $\cD_{\text{RL}}$ in parallel, and collect a batch of rollouts at once.},
-while we are collecting we also store the log probibility of each action $\log \pi_{\theta_k}(\ma_t \mid \ms_t)$.
+while we are collecting we also store the log probability of each action $\log \pi_{\theta_k}(\ma_t \mid \ms_t)$.
 
 \textbf{Step 2: Advantage estimation.}
 We would like to know whether each action was better or worse than average.
@@ -1683,8 +1751,14 @@ This result in an extra loss term based on MSE loss in the final PPO loss, which
 \textbf{Step 2.2: Temporal Difference (TD) residuals.}
 We use the trained critic to compute $1$-step errors 
 \begin{align*}
-  \delta_t = r_t + \gamma V_{\psi}(\ms_{t+1}) - V_\psi(\ms_t) = \big(\text{observed reward} + \text{predicted future value}\big) - \big(\text{predicted value at } s_t\big),
+  \delta_t = r_t + \gamma (1 - \text{done}_t)V_{\psi}(\ms_{t+1}) - V_\psi(\ms_t) = \big(\text{obs reward} + \text{pred future value}\big) - \big(\text{pred value at } s_t\big),
 \end{align*}
+where $\text{done}_t$ is a termination flag, $\text{done}_t = 1$ means the episode has terminated at step $t$ either because the agent reached a terminal state or a time limit was reached; $\text{done}_t = 0$ means the episode continues.
+When we reach the first termination iteration $T$, $1 - \text{done}_T = 0$, which means that $\delta_T = r_T - V_{\psi}(s_T)$\footnote{In RL, we use bootstrapping to denote estimating a return by combining the observed reward with the critic's estimate of the future, (instead of waiting until the very end of the episode to know the true return). Here $\gamma (1 - \text{done}_t)V_{\psi}(\ms_{t+1})$ is the bootstrap part.}. 
+One may wonder why we are setting the done flag, the reason is precisely that we are handling batched data, so episodes have variable length. 
+As a result, we need to pad them so that the batch is aligned, and the done flag lets us distinguish real continuation from padding or termination.
+In this way, advantage/return computation stops at the right place, even inside a large batch.
+
 If $\delta_t > 0$, the return is better than expected and the action was better than average, if $\delta_t < 0$, vice versa.
 To understand this intuitively, we only have to remember that $V_{\pi_k}$ is the expected total discounted reward you will get if you start from state $\ms$ then following policy $\pi_{\theta_k}$.
 
@@ -1694,19 +1768,24 @@ From an opposite point of view, if we use $G_t = r_t + \gamma r_{t+1} + \hdots$ 
 \begin{align*}
   \hat{A}_t = G_t - V_{\psi_k}(\ms_t).
 \end{align*} 
-Although this uses the full trajectory, it introduces bias if the critic is imperfect, and is also slow to compute since we need to wait until the episodes end.
+MC returns are unbiased but high variance. Using a learned critic baseline reduces variance but can introduce bias if the critic is imperfect. 
 
 So we just combine them which results in GAE (instead of picking one horizon, we take a weighted average of all horizons).
 Formally, 
 \begin{align*}
   \hat{A}_t = \delta_t + \gamma\lambda\delta_{t+1} + \rbrac{\gamma\lambda}^2\delta_{t+2} + \hdots,
 \end{align*}
-where $\gamma = 0.99$ and $\lambda = 0.95$ are commom.
+where $\gamma = 0.99$ and $\lambda = 0.95$ are common.
 Notice that $\gamma$ is the discounting factor and $\lambda$ controls how far we can look ahead.
-To compute is efficiently, we use backward recursion, and start with $\hat{A}_T = 0$ (by definition at the end of rollout), and 
+To compute is efficiently, we use backward recursion,
 \begin{align*}
   \hat{A}_t = \delta_t + \gamma\lambda\hat{A}_{t+1}.
 \end{align*}
+In practice, due to the padding used in batch, we set 
+\begin{align}
+  \hat{A}_t = \delta_t + \gamma\lambda(1 - \text{done}_t)\hat{A}_{t+1}, \qquad \hat{A}_T = 0
+\end{align}
+where we use a termination flag to control bootstrapping, $T$ is the index one past the last real step in the trajectory.
 From the estimate $\hat{A}_t$, we can reconstruct 
 \begin{align}
   \label{eq:GHAT}
@@ -1735,7 +1814,7 @@ Historically, we use \textbf{TRPO} (Trust Region Policy Optimization), where we 
 \end{align*}
 where $\rho_{\pi_{\theta_{k}}}$ denotes the (on-policy) state distribution under $\pi_{\theta_{k}}$ and 
 \begin{align*}
-  r_t(\theta; \theta_k) \eqdef \frac{\pisub{\theta}{\ma_t}{\ms_t}}{\pisub{\theta_{k}}{\ma_t}{\ms_t}},
+  o_t(\theta; \theta_k) \eqdef \frac{\pisub{\theta}{\ma_t}{\ms_t}}{\pisub{\theta_{k}}{\ma_t}{\ms_t}},
 \end{align*}
 is the ratio.
 The constraint can also be written equivalently as 
@@ -1748,13 +1827,13 @@ However, \textbf{TRPO} is too time consuming in the sense that it often requires
 
 \paragraph{Importance sampling based on old policy data.} \textbf{PPO} (Proximal Policy Optimization) uses a trick involved the ratio function, and first replaces the objective as 
 \begin{align*}
-  \widehat{\cL}^{\text{PG}}(\theta; \theta_k) = \ExpSub{ \substack{t \\ \ms_t \sim \rho_{\pi_{\theta_k}} \\ \ma_t \sim \pi_{\theta_k}}}{r_t(\theta; \theta_k) \hat{A}^t}.
+  \widehat{\cL}^{\text{PG}}(\theta; \theta_k) = \ExpSub{ \substack{t \\ \ms_t \sim \rho_{\pi_{\theta_k}} \\ \ma_t \sim \pi_{\theta_k}}}{o_t(\theta; \theta_k) \hat{A}^t}.
 \end{align*} 
 If we maximize this directly, the policy can change too aggressively, leading to instability.
 
 \paragraph{Clipping.} As a result, \textbf{PPO} in turn introduces a clipped surrogate,
 \begin{align*}
-  \cL^{\text{Clip}}(\theta; \theta_k) = \ExpSub{\substack{t \\ \ms_t \sim \rho_{\pi_{\theta_k}} \\ \ma_t \sim \pi_{\theta_k}}}{\min\cbrac{r_t(\theta; \theta_k) \hat{A}^t, \text{clip}\rbrac{r_t(\theta; \theta_k), 1-\varepsilon, 1+\varepsilon}\cdot\hat{A}^t}},
+  \cL^{\text{Clip}}(\theta; \theta_k) = \ExpSub{\substack{t \\ \ms_t \sim \rho_{\pi_{\theta_k}} \\ \ma_t \sim \pi_{\theta_k}}}{\min\cbrac{o_t(\theta; \theta_k) \hat{A}^t, \text{clip}\rbrac{o_t(\theta; \theta_k), 1-\varepsilon, 1+\varepsilon}\cdot\hat{A}^t}},
 \end{align*}
 where the clipping operator does the following:
 \begin{enumerate}
@@ -1766,7 +1845,7 @@ where the clipping operator does the following:
 If we only maximize rewards, the policy may collapse to a near-deterministic one (always picking the “best” action it has found so far).
 To counter this, we add an entropy bonus to the objective.
 \begin{align*}
-  \cH_{\pisub{\theta}{\cdot}{\ms}} = -\sum_{\ma} \pisub{\theta}{\ma}{\ms} \log \pisub{\theta}{\cdot}{\ms},
+  \cH_{\pisub{\theta}{\cdot}{\ms}} = -\sum_{\ma} \pisub{\theta}{\ma}{\ms} \log \pisub{\theta}{\ma}{\ms},
 \end{align*}
 if the policy is uniform then it is high.
 
@@ -1784,9 +1863,88 @@ where
 
 
 \paragraph{Practical hint.} 
+In practice, the training process goes very similarly like local training where there is a nested loop:
+
+In the $k$-th iteration, we do 
+\begin{enumerate}
+  \item \textbf{Rollout Phase}: We fix $\theta_{\text{old}} = \theta_{k}$ where $\theta_{\text{old}}$ denotes the frozen snapshot of the current policy.
+  \begin{itemize}
+    \item We use $\pi_{\theta_{\text{old}}}$ to interact with environment.
+    \item We collect a batch of trajectories: states $\ms_t$, actions $\ma_t$ and reward $r_t$, we then compute the log probabilities $\log \pisub{\theta_{\text{old}}}{\ma_t}{\ms_t}$, and the old values $V_{\psi_k}(\ms_t)$, and the done flags.
+  \end{itemize} 
+  Imagine that there are $T$ steps across $N$ parallel environments, eventually, we got 
+  \begin{align*}
+    \cB = \cbrac{(\ms_t, \ma_t, r_t, \log \pi_{\text{old}(\ma_t \mid \ms_t)}, V_{\psi_k}(\ms_t), \text{done}_t)_i}_{t \in [T], i \in [N]}
+  \end{align*}
+
+  \item \textbf{Advantage + Target Computation:} 
+  We compute learning signals: 
+  \begin{align*}
+    \delta_t = r_t + \gamma\rbrac{1 - \text{done}_t}V_{\psi_k}(\ms_{t+1}) - V_{\psi_k}(\ms_t),
+  \end{align*}
+  \begin{align*}
+    \hat{A}_t = \delta_t + \gamma\lambda\rbrac{1 - \text{done}_t}\hat{A}_{t+1}, \qquad \hat{A}_{T} = 0,
+  \end{align*}
+  where $T$ is the index one past the last real step in the trajectory, and the value target 
+  \begin{align*}
+    \hat{G}_t = \hat{A}_t + V_{\psi_k}(\ms_t).
+  \end{align*}
+
+  \item \textbf{Update Actor \& Critic:} We initialize trainable parameter $\theta = \theta_{k, 0} = \theta_{\text{old}}$ and $\psi = \psi_{k, 0} = \psi_k$, we loop over minibatches $\cM$ of $\cB$ for several epochs $E$. 
+  There are actually two types of minibatching, one is \textbf{episode level minibatching} and we are dividing based on episodes, but this can waste parallelism if episodes lengths vary a lot.
+  Fortunately, we can also choose to use the \textbf{token-step minibatching}, constructing $\cM$ using token steps from different episodes.
+  We use the later minibatching, and in this case $\abs \cM$ is just the total pairs of token-steps.
+  \begin{enumerate}
+    \item[(I)] Policy distribution under current $\theta$, 
+    \begin{align*}
+      \pisub{\theta}{\cdot}{\ms_t}, \quad \log\pisub{\theta}{\ma_t}{\ms_t}.
+    \end{align*} 
+    
+    \item[(II)] Importance ratio,
+    \begin{align*}
+      r_t(\theta; \theta_{\text{old}}) = \exp\rbrac{\log \pisub{\theta}{\ma_t}{\ms_t} - \log \pisub{\theta_{\text{old}}}{\ma_t}{\ms_t}}
+    \end{align*} 
+
+    \item[(III)] Actor loss (clipped surrogate)
+    \begin{align*}
+      L^{\text{actor}} &= \ExpSub{t}{\min\cbrac{o_t(\theta; \theta_k) \hat{A}^t, \text{clip}\rbrac{o_t(\theta; \theta_k), 1-\varepsilon, 1+\varepsilon}\cdot\hat{A}^t}} \\
+      &= \frac{1}{\abs \cM} \sum_{\rbrac{\ms_t, \ma_t} \in \cM} \min\cbrac{o_t(\theta; \theta_k) \hat{A}^t, \text{clip}\rbrac{o_t(\theta; \theta_k), 1-\varepsilon, 1+\varepsilon}\cdot\hat{A}^t}.
+    \end{align*}
+    Notice that we already do summation over time since $\abs \cM$ contains it. 
+
+    \item[(IV)] Critic loss 
+    \begin{align*}
+      L^{\text{critic}} &= \ExpSub{t}{\rbrac{V_{\psi}(\ms_t) - \hat{G}_t}^2} \\
+      &= \frac{1}{\abs \cM} \sum_{\ms_t \in \cM}\rbrac{V_{\psi}(\ms_t) - \hat{G}_t}^2.
+    \end{align*}
+
+    \item[(V)] Entropy bonus (exploration):
+    \begin{align*}
+      L^{\text{entropy}} &= \ExpSub{t}{-\sum_{\ma}\pi_\theta(\ma\mid\ms_t)\cdot\log\pi_\theta(\ma\mid\ms_t)} \\
+      &= \frac{1}{\abs \cM} \sum_{\ms_t \in \cM}\rbrac{-\sum_{\ma}\pi_\theta(\ma\mid\ms_t)\cdot\log\pi_\theta(\ma\mid\ms_t)}.
+    \end{align*}
+
+    \item[(VI)] Total PPO objective 
+    \begin{align*}
+      L^{\text{PPO}} = L^{\text{actor}} - c_v \cdot L^{\text{critic}} + c_e \cdot L^{\text{entropy}}.
+    \end{align*}
+
+    \item[(VII)] Take a gradient step, so that we obtain $\theta_{k, e + 1}, \psi_{k, e+1}$ from $\theta_{k, e}$ and $\psi_{k, e}$. 
+  \end{enumerate}
+
+  \item We let $\theta_{k+1} = \theta_{k, E}$ and $\psi_{k+1} = \psi_{k, E}$ using gradient ascent (or gradient descent to minus PPO loss), and prepare to enter the next iteration.
+\end{enumerate}
 
 
 
+
+\subsection{PPO-KL}
+If we are using raw PPO as an alignment method, we are just optimizing against the reward model $R_{\phi}$, which may render the policy dropping into unsafe, verbose, or unnatural completions.
+The solution to this is to add a KL-penalty that discourages moving too far from the reference policy (usually the SFT model).
+Essentially, PPO-KL just adds an extra KL penalty term 
+\begin{align*}
+  \cL^{\text{PPO-KL}}(\theta) = \cL^{\text{PPO}}(\theta) - \beta\cdot\ExpSub{t}{\klD{\pisub{\theta}{\cdot}{\ms_t}}{\pisub{\thetaref}{\cdot}{\ms_t}}}.
+\end{align*}
 
 
 
