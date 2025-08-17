@@ -1398,7 +1398,7 @@ Basically\footnote{Here we use $\rbrac{\cdot}_t$ to denote the $t$-the component
 Typically, we start with a base language model architecture (often the same type as the policy, e.g., Transformer decoder), and we rplace the usual LM head (which produces a distribution over next tokens) with a scalar regression head. 
 Without the language modeling head, the output is a hidden state for each $(\mx, \my)$
 \begin{align*}
-  \mh = \rbrac{\mx, \my}0 \in \R^{B \times (L_{\mx} + L_{\my}) \times \dmodel}
+  \mh = \rbrac{\mx, \my} \in \R^{B \times (L_{\mx} + L_{\my}) \times \dmodel}
 \end{align*}
 One may notice that for each pair of $\mx_i, \my_i$, the length $L_{\mx_i} + L_{\my_i}$ is not the same, so we must do padding in order to make it a batch \textbf{before} inputting them to the model.
 We may pad all sequences on the left/right to ensure that they are the same length $L_{\max}$ to form a batch (not the global maximum, otherwise too wasteful)\footnote{This is called dynamic padding and is standard in Hugging Face DataCollatorWithPadding}, and record a corresponding attention mask $\mm_i \in \cbrac{0, 1}^{B \times L_{\max}}$ ($1$ for real token).
