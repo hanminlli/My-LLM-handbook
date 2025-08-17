@@ -1433,7 +1433,7 @@ where we get a scalar value for each sequence.
 
 \textbf{Computing Loss:} We appear the pairwise Bradley-Terry loss: 
 \begin{align*}
-  \cL_{\text{BT}}(\phi) = -\frac{1}{B}\sum_{i=1}^{B}\log \sigma\rbrac{R_{\phi}\rbrac{\mx_i, \my_i^+} - \R_\phi\rbrac{\mx_i, \my_i^-}},
+  \cL_{\text{BT}}(\phi) = -\frac{1}{B}\sum_{i=1}^{B}\log \sigma\rbrac{R_{\phi}\rbrac{\mx_i, \my_i^+} - R_\phi\rbrac{\mx_i, \my_i^-}},
 \end{align*}
 The above loss encourages $R_{\phi}\rbrac{\mx_i, \my_i^+}$ to be much larger than $R_{\phi}\rbrac{\mx_i, \my_i^-}$.
 
@@ -1681,7 +1681,7 @@ For the $t$-th term in the summation in \eqref{eq:A} and \eqref{eq:J}, notice th
 The vanilla Policy Gradient method is based on this and Monte Carlo, which is of high variance, no constraints on updates.
 Now defining the \textbf{action-value} function $Q^{\pi}(\ms, \ma)$,
 \begin{align*}
-  Q^{\pi}(\ms, \ma) \eqdef \ExpSub{\pi}{G_t \mid \ms_t = \ms, \ma_t = \ma},
+  Q^{\pi}(\ms, \ma) \eqdef \Exp{G_t \mid \ms_t = \ms, \ma_t = \ma},
 \end{align*}
 which is the expected return if we are at $\ms$ state and take $\ma$ as action now, following policy $\pi$ thereafter.
 The expectation itself is over the random future trajectory.
@@ -1946,6 +1946,18 @@ Essentially, PPO-KL just adds an extra KL penalty term
   \cL^{\text{PPO-KL}}(\theta) = \cL^{\text{PPO}}(\theta) - \beta\cdot\ExpSub{t}{\klD{\pisub{\theta}{\cdot}{\ms_t}}{\pisub{\thetaref}{\cdot}{\ms_t}}}.
 \end{align*}
 
+
+\subsection{DPO (Direct Preference Optimization)}
+Instead of using PPO with a reward model, DPO directly optimizes the model's policy to match human preferences using a pairwise comparison dataset.
+We no longer need to train or sample from a reward model at each step and we do not need complex RL machinery (advantage estimation, rollout, etc.).
+Training reduces to a standard supervised loss on pairs of responses.
+
+We will train (finetune) on a preference dataset $\cD_{\text{pref}} = \cbrac{(\mx_j, \my_j^+, \my_j^-)}_{j=1}^M$ where $\mx$ is the prompt, $\my_j^+$ is the preferred output and $\my_j^-$ is the less preferred output, $M$ is the total number of pairs of preference pairs (just like RLHF PPO stage 2).
+The core idea is that we assume that there is an underlying reward function $r(\mx, \my)$ such that 
+\begin{align*}
+  \mathbb{P}\rbrac{\my^{+} \succ \my^{-} \mid x} = \sigma\rbrac{r(\mx, \my^{+}) - r(\mx, \my^{-})}, 
+\end{align*}
+where $\sigma(z) = \frac{1}{1 + e^{-z}}$ is the sigmoid function.
 
 
 \end{document}
