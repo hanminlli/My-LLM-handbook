@@ -2042,17 +2042,21 @@ In a word, the DPO choice of $r$ comes from the PPO + KL setup, but with simplif
 \subsection{GPRO (Generalized Preference Optimization)}
 GPRO generalizes DPO further, in the sense that it instead of relying only on binary preferences (preferred vs dispreferred), it allows training with arbitrary reward functions (scalar signals, multiple preferences, or mixtures).
 
-Consider the dataset $\cD_{\text{pref}} = \cbrac{(\mx_j, \my_j, r(\mx_j, \my_j))}_{j=1}^M$.
+Consider the dataset $\cD_{\text{pref}} = \cbrac{(\mx_j, \my_j, r(\mx_j, \my_j))}_{j=1}^M$ (Different $x_j$ could be the same.).
 We now define the log-ratio between policy and preference 
 \begin{align*}
   z_\theta(\mx, \my) = \log \frac{\pisub{\theta}{\my}{\mx}}{\pisub{\thetaref}{\my}{\mx}}.
 \end{align*}
 The GPRO loss is given by 
 \begin{align*}
-  \cL^{\text{GPRO}}(\theta) = \ExpSub{\rbrac{\mx, \my} \sim \cD_{\text{pref}}}{\Omega^\star\rbrac{z_\theta(\mx, \my)} - r(\mx, \my)z_{\theta}(\mx, \my)},
+  \cL^{\text{GPRO}}(\theta) = \ExpSub{\rbrac{\mx, \my} \sim \cD_{\text{pref}}}{\Omega^\star\rbrac{\beta z_\theta(\mx, \my)} - \beta r(\mx, \my)z_{\theta}(\mx, \my)},
 \end{align*}
-where $\Omega^\star$ is the convex conjugate of a link function $\Omega$.
-The training follows maximizing this objective.
+where $\Omega^\star$ is the convex conjugate of a link function $\Omega$,$\beta > 0$.
+The training follows maximizing this dual objective.
+In practice we use an equivalent form:
+\begin{align*}
+  \widehat{L}(\theta) = \sum_{x \in \cD_{\text{pref}}} \cL_{\mx}(\theta) = \sum_{\mx} \sum_{i=1}^{K_{\mx}} \omega_i(\mx)\log \pisub{\theta}{\my_i}{\mx},
+\end{align*}
 
 
 \paragraph{The intuition:} 
@@ -2074,9 +2078,10 @@ Moreover,
   \klD{\pisub{}{\cdot}{\mx}}{\pisub{\thetaref}{\cdot}{\mx}} = \ExpSub{\my \sim \pisub{}{\cdot}{\mx}}{z(\my)} 
 \end{align*}
 and
-\begin{align*}
+\begin{align}
+  \label{eq:change-measure}
   \ExpSub{\my \sim \pisub{}{\cdot}{\mx}}{f(\my)} = \sum_{\my} \pisub{\thetaref}{\my}{\mx}u(\my)f(\my) =\ExpSub{\my \sim \pisub{\thetaref}{\cdot}{\mx}}{u(\my) f(\my)}.
-\end{align*}
+\end{align}
 As a result, taking $f(\my) = r(\mx, \my)$, we can reform the original objective as 
 \begin{align*}
   \max_{u \geq 0, \ExpSub{\pisub{\thetaref}{\cdot}{\mx}}{u(\my)}=1} \cbrac{\ExpSub{\my \sim \pisub{\thetaref}{\cdot}{\mx}}{u(\my)r(\mx, \my)} - \beta\ExpSub{\my \sim \pisub{\thetaref}{\cdot}{\mx}}{u(\my)z(\my)}}, \qquad z(\my) = \log u(\my).
@@ -2101,11 +2106,12 @@ Enforcing the constraint $\ExpSub{\my \sim \pisub{\thetaref}{\cdot}{\mx}}{u} = 1
 \end{align*}
 Therefore 
 \begin{align*}
-  u^\star(\my) = \frac{\exp\rbrac{\frac{r(\mx, \my)}{\beta}}}{\ExpSub{\my \sim \pisub{\thetaref}{\cdot}{\mx}}{\exp\rbrac{\frac{r}{\beta}}}} \quad \text{and} \quad \pi^\star(\my \mid \mx) = \pisub{\thetaref}{\my}{\mx}u^\star(y) = \frac{\pisub{\thetaref}{\my}{\mx}\exp\rbrac{\frac{r(\mx, \my)}{\beta}}}{\ExpSub{\my \sim \pisub{\thetaref}{\cdot}{\mx}}{\exp\rbrac{\frac{r}{\beta}}}}.
+  u^\star(\my) = \frac{\exp\rbrac{\frac{r(\mx, \my)}{\beta}}}{\ExpSub{\my \sim \pisub{\thetaref}{\cdot}{\mx}}{\exp\rbrac{\frac{r}{\beta}}}} \quad \text{and} \quad \pi^\star(\my \mid \mx) = \pisub{\thetaref}{\my}{\mx}u^\star(y) = \frac{\pisub{\thetaref}{\my}{\mx}\exp\rbrac{\frac{r(\mx, \my)}{\beta}}}{\ExpSub{\my \sim \pisub{\thetaref}{\cdot}{\mx}}{\exp\rbrac{\frac{r(\mx,\my)}{\beta}}}}.
 \end{align*}
+The optimal policy is obtained by reweighting the reference distribution, so that outcomes with higher reward get exponentially more weight, this reweighting is what people called \textbf{exponential tilt}.
 The optimal log ratio is given by 
 \begin{align*}
-  z^\star(\my) = \frac{r(\mx, \my)}{\beta} - \log \ExpSub{\my \sim \pisub{\thetaref}{\cdot}{\mx}}{\exp\rbrac{\frac{r}{\beta}}}.
+  z^\star(\my) = \frac{r(\mx, \my)}{\beta} - \log \ExpSub{\my \sim \pisub{\thetaref}{\cdot}{\mx}}{\exp\rbrac{\frac{r(\mx, \my)}{\beta}}}.
 \end{align*}
 Since the elementwise objective is strictly concave for $u > 0$ and the constraint is affine, KKT conditions apply; complementary slackness gives an interior solution $u^\star(\my) > 0$, which makes the stationary point above a unique maximizer.
 Plug it back into the primal gives the optimal value 
@@ -2120,9 +2126,9 @@ In principle, if we have explicit $r(\mx, \my)$ for all candidate responses $\my
 which is log-sum-exp (log-partition function) all possible completions $\my$, which is not computable.
 
 \paragraph{The insight of GPRO:}
-Instead of trying to match $\pi_{\theta}$ to the global closed form $\pi^\star$, we can design a tractable convex surrogate that drives the model's log-ratio 
+Instead of trying to match $\pi_{\theta}$ to the global closed form $\pi^\star$, we can design a tractable convex surrogate that drives the model's log-ratio\footnote{The question is simply: how do we train a parameterized $\pi_\theta$ so that its log-ratio $z_{\theta}$ behaves like $z_\star$ without that partition function.} 
 \begin{align*}
-  z_{\theta} = \log \rbrac{\frac{\pisub{\theta}{\my}{\mx}}{\pisub{\thetaref}{\my}{\mx}}},
+  z_{\theta}(\my) = \log \rbrac{\frac{\pisub{\theta}{\my}{\mx}}{\pisub{\thetaref}{\my}{\mx}}},
 \end{align*}
 to behave as if it were the solution of that optimization.
 Now introducing the convex function 
@@ -2139,9 +2145,94 @@ Now we use the Fenchel-Young inequality,
 \end{align*}
 with equality achieved if and only if $u = e^{\frac{t}{\beta}}$, which means that for any $\my$, we have 
 \begin{align*}
-  1
+  u^\star(\my)\cdot\beta z_{\theta}(\my) - \Omega(u^\star(\my)) \leq \Omega^\star(\beta z_{\theta}(\my))
 \end{align*}
+Taking expectation under $\pisub{\thetaref}{\cdot}{\mx}$, we have 
+\begin{align}
+  \label{eq:org-1}
+  \ExpSub{\my \sim \pisub{\thetaref}{\cdot}{\mx}}{u^\star(\my)\cdot\beta z_{\theta}(\my)} - \ExpSub{\my \sim \pisub{\thetaref}{\cdot}{\mx}}{\Omega(u^\star(\my))} \leq \ExpSub{\my \sim \pisub{\thetaref}{\cdot}{\mx}}{\Omega^\star(\beta z_{\theta}(\my))}.
+\end{align}
+For the first term, using the change of measure in \eqref{eq:change-measure}, we have
+\begin{align*}
+  \ExpSub{\my \sim \pisub{\thetaref}{\cdot}{\mx}}{u^\star(\my)\cdot\beta z_{\theta}(\my)} = \beta \cdot \ExpSub{\my \sim \pi^\star(\cdot \mid \mx)}{z_{\theta}(\my)},
+\end{align*}
+while for the second term, we have
+\begin{align*}
+  \ExpSub{\my \sim \pisub{\thetaref}{\cdot}{\mx}}{\Omega(u^\star(\my))} &= \beta \rbrac{\ExpSub{\my \sim \pisub{\thetaref}{\cdot}{\mx}}{u^\star(\my)\log u^\star(\my)} - \ExpSub{\my \sim \pisub{\thetaref}{\cdot}{\mx}}{u^\star(\my)} + 1} \\
+  &= \beta\cdot\ExpSub{\pi^\star(\cdot\mid \mx)}{\log u^\star(\my)} \\
+  &= \beta\cdot \ExpSub{\pi^\star(\cdot\mid \mx)}{\frac{r(\mx, \my)}{\beta} +  C} \\
+  &= \beta\cdot \ExpSub{\pi^\star(\cdot\mid \mx)}{\frac{r(\mx, \my)}{\beta}} + \beta C.
+\end{align*}
+Plus this into the original inequality \eqref{eq:org-1}, we obtain 
+\begin{align*}
+  \beta \cdot \ExpSub{\my \sim \pi^\star(\cdot \mid \mx)}{z_{\theta}(\my)} - \rbrac{\beta\cdot \ExpSub{\pi^\star(\cdot\mid \mx)}{\frac{r(\mx, \my)}{\beta}} + \beta C} \leq \ExpSub{\my \sim \pisub{\thetaref}{\cdot}{\mx}}{\Omega^\star(\beta z_{\theta}(\my))},
+\end{align*} 
+which rearranges to 
+\begin{align*}
+  \beta \cdot \ExpSub{\my \sim \pi^\star(\cdot \mid \mx)}{z_{\theta}(\my)} - \ExpSub{\pi^\star(\cdot\mid \mx)}{{r(\mx, \my)}} &\leq \beta C + \ExpSub{\my \sim \pisub{\thetaref}{\cdot}{\mx}}{\Omega^\star(\beta z_{\theta}(\my))}, \\
+  &= \beta\ExpSub{\my \sim \pisub{\thetaref}{\cdot}{\mx}}{e^{z_{\theta}(\my)} - 1}
+\end{align*}
+where the inequality is tight when $\log z_{\theta}(\my) = u^\star(\my) = \log z^\star(\my)$. 
+This is essentially an convex upper bound that is tight when $z_{\theta}(\my) = z^\star(\my)$.
+Notice that we are trying to optimize towards $z$, so we can write the above inequality as 
+\begin{align*}
+  \ExpSub{\my \sim \pisub{\thetaref}{\cdot}{\mx}}{\Omega^\star(\beta z_{\theta}(\my))} - \beta \cdot \ExpSub{\my \sim \pi^\star(\cdot \mid \mx)}{z_{\theta}(\my)} \geq \text{constant}.
+\end{align*}
+We can define the following objective from Fenchel-Young,
+\begin{align*}
+  \cS_{\mx}(z_\theta) \eqdef \ExpSub{\my \sim \pisub{\thetaref}{\cdot}{\mx}}{\Omega^\star(\beta z_{\theta}(\my))} - \beta \cdot \ExpSub{\my \sim \pi^\star(\cdot \mid \mx)}{z_{\theta}(\my)} - \text{constant},
+\end{align*}
+where $\cS_{\mx}(z_\theta) \geq 0$, $\cS_{\mx}(z_\theta) = 0$ if and only if $z = z^\star$ and clearly it is convex.
+Notice that this surrogates resembles the original GPRO loss.
+This surrogate serves as a way to drive $z_\theta$ to what we want without ever computing the log partition.
+Notice that for the first term, we have 
+\begin{align*}
+  \ExpSub{\my \sim \pisub{\thetaref}{\cdot}{\mx}}{\Omega^\star(\beta z_{\theta}(\my))} = \beta \cdot \ExpSub{\my \sim \pisub{\thetaref}{\cdot}{\mx}}{e^{z_\theta}} - \beta,
+\end{align*}
+while 
+\begin{align*}
+  \ExpSub{\my \sim \pisub{\thetaref}{\cdot}{\mx}}{e^{z_\theta}} = \sum_{y \sim \pisub{\theta}{\cdot}{\mx}}\pisub{\thetaref}{\my}{\mx}\cdot\frac{\pisub{\theta}{\my}{\mx}}{\pisub{\thetaref}{\my}{\mx}} = 1.
+\end{align*}
+Thus we can further write 
+\begin{align*}
+  \cS_{\mx}(z_\theta) = - \beta \cdot \ExpSub{\my \sim \pi^\star(\cdot \mid \mx)}{z_{\theta}(\my)},
+\end{align*}
+leaving out the constant.
+Differentiate it w.r.t $\theta$, and notice that 
+\begin{align*}
+  \nabla_\theta z_\theta(\my) = \nabla_\theta \log \pisub{\theta}{\my}{\mx}. 
+\end{align*}
+Hence 
+\begin{align*}
+  \nabla_\theta \cS_{\mx}(z_\theta) = - \beta \cdot \ExpSub{\my \sim \pi^\star(\cdot\mid \mx)}{\nabla_{\theta} \log \pisub{\theta}{\my}{\mx}},
+\end{align*}
+which is the population gradient we want to estimate from data.
+Notice that we can not compute the term $\ExpSub{\my \sim \pi^\star(\cdot \mid \mx)}{f(\my)}$ directly because we do not know the distribution, however, we can estimate it, with rewards.
+We have 
+\begin{align*}
+  \ExpSub{\my \sim \pi^\star(\cdot \mid \mx)}{f(\my)} &= \sum_{\my \sim \pi^\star(\cdot \mid \mx)} \pi^\star(\my \mid \mx) \cdot f(\my) \\
+  &= \frac{\pisub{\thetaref}{\my}{\mx}\exp\rbrac{\frac{r(\mx, \my)}{\beta}} \cdot f(\my)}{\ExpSub{\my \sim \pisub{\thetaref}{\cdot}{\mx}}{\exp\rbrac{\frac{r(\mx,\my)}{\beta}}}} =  \frac{\ExpSub{\my \sim \pisub{\thetaref}{\cdot}{\mx}}{\exp\rbrac{\frac{r(\mx, \my)}{\beta}} \cdot f(\my)}}{\ExpSub{\my \sim \pisub{\thetaref}{\cdot}{\mx}}{\exp\rbrac{\frac{r(\mx,\my)}{\beta}}}}.
+\end{align*}
+Assume for prompt $\mx$, we have $K$ responses with rewards $\cbrac{\rbrac{\my_i, r_i}}_{i=1}^{K_{\mx}}$, then we can estimate the expectation using\footnote{This is the key, the expectation itself is easier to estimate than the distribution.} 
+\begin{align*}
+  \ExpSub{\my \sim \pi^\star(\cdot \mid \mx)}{f(\my)} \approx \frac{\frac{1}{K}\sum_{i=1}^{{K_{\mx}}}e^{\nicefrac{r_i}{\beta}} f(\my_i)}{\frac{1}{{K_{\mx}}}\sum_{i=1}^{{K_{\mx}}}e^{\nicefrac{r_i}{\beta}}} = \sum_{i=1}^{{K_{\mx}}} \omega_i(\mx) f(\my_i), \qquad \omega_i(\mx) \eqdef \frac{e^{\nicefrac{r_i}{\beta}}}{\sum_{i=1}^{{K_{\mx}}}e^{\nicefrac{r_i}{\beta}}},
+\end{align*}
+where the problematic 
+As a result, the estimated gradient is given by 
+\begin{align*}
+  \nabla_\theta \cS_{\mx}(z_\theta) \approx -\beta\cdot\sum_{i=1}^{{K_{\mx}}}\omega_i(\mx) \nabla_\theta \log \pisub{\pi_\theta}{\my_i}{\mx},
+\end{align*}
+which is a \textbf{weighted negative log-likelihood}. corresponding to 
+\begin{align*}
+  \widehat{\cL}_{\mx}(\theta) \eqdef -\beta \cdot \sum_{i=1}^{{K_{\mx}}}\omega_i(\mx) \log \pisub{\theta}{\my_i}{\mx},
+\end{align*}
+if we further aggregate over prompts 
+\begin{align*}
+  \widehat{L}(\theta) = \sum_{x \in \cD_{\text{pref}}} \cL_{\mx}(\theta) = \sum_{\mx} \sum_{i=1}^{K_{\mx}} \omega_i(\mx)\log \pisub{\theta}{\my_i}{\mx},
+\end{align*}
+which is clearly equivalent to the original GPRO dual loss, sincw it is our starting point (denoted as $\cS_{\mx}(z_\theta)$ here).
 
+\paragraph{Recovering DPO}
 
 
 
