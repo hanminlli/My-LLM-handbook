@@ -75,6 +75,8 @@
 % =============================
 \begin{document}
 
+\tableofcontents
+
 \section{Linear Algebra}
 
 
@@ -1262,6 +1264,8 @@ A quick implementation is that
 When adapting to downstream tasks or human preferences, loss functions differ.
 Typical approaches include Supervised Fine-Tuning (SFT), Parameter-Efficient Fine-Tuning (PEFT) (such as LoRA and QLoRA), Reinforcement Learning from Human Feedback (RLHF)\footnote{Reinforcement learning with a reward model.}, DPO / IPO, continual pretraining, domain adaptation.
 
+The reason for perform such finetuning is that without such adaptations, LLMs only predict next tokens, if we ask a question, they might continue the text in a way that doesn't look like an answer.
+
 
 \subsection{Supervised Fine-Tuning (SFT)}
 Our goal is to make the LLM output exactly match human-provided target completions given prompts.
@@ -1269,6 +1273,7 @@ Our loss is still cross-entropy loss, but computed \textbf{only} over the target
 
 Given a prompt $\mpp$ of length $L_{\mpp}$ and a target $\my$ of length $L_{\my}$, we compute 
 \begin{align}
+  \label{eq:lossSFT}
   \cL_{\text{SFT}} = -\frac{1}{L_{\my}} \sum_{t=1}^{L_{\my}} \log \rbrac{\probsub{\theta}{\my_t \mid \my_{< t}, \mpp}} = \frac{1}{L_{\my}}\sum_{t=1}^{L_{\my}}\sum_{v \in \cV}\rbrac{\my^\prime_t}_v\log\rbrac{\probsub{\theta}{v \mid \mpp, \my_{< t}}}, \tag{SFT}
 \end{align}
 where $\rbrac{\my^\prime_t}_v = \mathbf{1}\cbrac{v = \my_t} \in \R^{\abs{\cV}}$.
@@ -1277,6 +1282,23 @@ In practice we will just mask in the following way.
 \begin{align*}
   \underbrace{\text{<bos>  } \text{prompt\_tokens}}_{\text{Mask}} \text{ target\_tokens } \text{<eos>}. 
 \end{align*}
+
+
+\subsection{Instruction Tuning}
+As we have said, pretrained LLMs (like GPT, LLaMA, Falcon, etc.) are trained on massive text corpora with the next-token prediction objective.
+They learn a lot of knowledge and general linguistic ability, but they are not naturally aligned with human intent, if we ask for a list or code snippet, they may not format it correctly or if we ask a question, they might continue the text in a way that doesn't look like an answer.
+Instruction tuning is a way to bridge the gap: we explicitly train the model to respond to natural-language commands (prompts) in the way humans expect.
+Formally, instruction tuning $\iff$ SFT of a pretrained LLM on a dataset of \textbf{(instruction, response)} pairs.
+The dataset is some times called an instruction set $\cD_{\text{instr}}$.
+Let $\mx$ be instructions and $\my$ be a desired response, then 
+\begin{align*}
+  \cL^{\text{IT}} = - \sum_{(\mx, \my) \in \cD_{\text{instr}}} \log \pisub{\theta}{\my}{\mx},
+\end{align*}
+which is exactly the same as the standard language modelling loss used in finetuning \eqref{eq:lossSFT}.
+
+\paragraph{Common instruction datasets} 
+FLAN (Google): mixture of ~60 NLP tasks rephrased as natural language instructions; Alpaca: 52k instruction-response pairs generated from GPT-3;
+OpenAssistant, Dolly, UltraChat, ShareGPT, etc.
 
 
 
@@ -1395,7 +1417,7 @@ Basically\footnote{Here we use $\rbrac{\cdot}_t$ to denote the $t$-the component
 
 
 \textbf{Padding:} We define the reward model $R_{\phi}(\mx, \my)$ whose input is the (input prompt tokens, completion), i.e. $(\mx, \my)$ and outputs a scalar reward score.
-Typically, we start with a base language model architecture (often the same type as the policy, e.g., Transformer decoder), and we rplace the usual LM head (which produces a distribution over next tokens) with a scalar regression head. 
+Typically, we start with a base language model architecture (often the same type as the policy, e.g., Transformer decoder), and we replace the usual LM head (which produces a distribution over next tokens) with a scalar regression head. 
 Without the language modeling head, the output is a hidden state for each $(\mx, \my)$
 \begin{align*}
   \mh = \rbrac{\mx, \my} \in \R^{B \times (L_{\mx} + L_{\my}) \times \dmodel}
@@ -1706,7 +1728,7 @@ For the $t$-th term in the summation in \eqref{eq:A} and \eqref{eq:J}, notice th
 The vanilla Policy Gradient method is based on this and Monte Carlo, which is of high variance, no constraints on updates.
 Now defining the \textbf{action-value} function $Q^{\pi}(\ms, \ma)$,
 \begin{align*}
-  Q^{\pi}(\ms, \ma) \eqdef \Exp{G_t \mid \ms_t = \ms, \ma_t = \ma},
+  Q^{\pi}(\ms, \ma) \eqdef \ExpSub{\pi}{G_t \mid \ms_t = \ms, \ma_t = \ma},
 \end{align*}
 which is the expected return if we are at $\ms$ state and take $\ma$ as action now, following policy $\pi$ thereafter.
 The expectation itself is over the random future trajectory.
@@ -1717,7 +1739,7 @@ Using the tower property of expectation, we can further write
 \end{align*}
 Now, for variance reduction, we introduce the state-value function:
 \begin{align*}
-  V^{\pi}(s) \eqdef \ExpSub{\ma \sim \pisub{\theta}{\cdot}{\ms}}{Q^{\pi}(\ms, \ma)},
+  V^{\pi}(s) \eqdef \ExpSub{\ma \sim \pisub{}{\cdot}{\ms}}{Q^{\pi}(\ms, \ma)} = \ExpSub{\pi}{G_t \mid \ms_t = \ms},
 \end{align*}
 which is the expected return starting in state $\ms$ following $\pi$.
 The advantage function is then 
@@ -1830,7 +1852,7 @@ If we use the naive policy gradient then the policy might change too much in one
 It could also collapse (e.g., probability mass shifts to a single action, causing instability), so we need to regularize the update.
 Notice that the naive objective after policy gradient transform and approximations can be written as 
 \begin{align*}
-  \cL^{\text{PG}}(\theta) = \ExpSub{t, \ms_t, \ma_t}{\log \pisub{\theta}{\ma_t}{\ms_t}\cdot \hat{A}_t}.
+  J^{\text{PG}}(\theta) = \ExpSub{t, \ms_t, \ma_t}{\log \pisub{\theta}{\ma_t}{\ms_t}\cdot \hat{A}_t}.
 \end{align*}
 Historically, we use \textbf{TRPO} (Trust Region Policy Optimization), where we do 
 \begin{align*}
@@ -1852,13 +1874,13 @@ However, \textbf{TRPO} is too time consuming in the sense that it often requires
 
 \paragraph{Importance sampling based on old policy data.} \textbf{PPO} (Proximal Policy Optimization) uses a trick involved the ratio function, and first replaces the objective as 
 \begin{align*}
-  \widehat{\cL}^{\text{PG}}(\theta; \theta_k) = \ExpSub{ \substack{t \\ \ms_t \sim \rho_{\pi_{\theta_k}} \\ \ma_t \sim \pi_{\theta_k}}}{o_t(\theta; \theta_k) \hat{A}^t}.
+  \widehat{J}^{\text{PG}}(\theta; \theta_k) = \ExpSub{ \substack{t \\ \ms_t \sim \rho_{\pi_{\theta_k}} \\ \ma_t \sim \pi_{\theta_k}}}{o_t(\theta; \theta_k) \hat{A}^t}.
 \end{align*} 
 If we maximize this directly, the policy can change too aggressively, leading to instability.
 
 \paragraph{Clipping.} As a result, \textbf{PPO} in turn introduces a clipped surrogate,
 \begin{align*}
-  \cL^{\text{Clip}}(\theta; \theta_k) = \ExpSub{\substack{t \\ \ms_t \sim \rho_{\pi_{\theta_k}} \\ \ma_t \sim \pi_{\theta_k}}}{\min\cbrac{o_t(\theta; \theta_k) \hat{A}^t, \text{clip}\rbrac{o_t(\theta; \theta_k), 1-\varepsilon, 1+\varepsilon}\cdot\hat{A}^t}},
+  J^{\text{Clip}}(\theta; \theta_k) = \ExpSub{\substack{t \\ \ms_t \sim \rho_{\pi_{\theta_k}} \\ \ma_t \sim \pi_{\theta_k}}}{\min\cbrac{o_t(\theta; \theta_k) \hat{A}^t, \text{clip}\rbrac{o_t(\theta; \theta_k), 1-\varepsilon, 1+\varepsilon}\cdot\hat{A}^t}},
 \end{align*}
 where the clipping operator does the following:
 \begin{enumerate}
@@ -1878,7 +1900,7 @@ if the policy is uniform then it is high.
 \paragraph{Full PPO loss.}
 The clipped surrogate is the policy gradient, but PPO also trains the critic and uses an entropy bonus.
 \begin{align*}
-  \cL^{\text{PPO}}(\theta, \psi; \theta_k) \eqdef \underbrace{\Exp{\cL^{\text{Clip}}(\theta; \theta_k)}}_{\text{actor}} - c_v \cdot \underbrace{\Exp{\rbrac{V_{\psi}(s_t) - \hat{G}_t}^2}}_{\text{critic}} + c_e \cdot \underbrace{\Exp{\cH\rbrac{\pisub{\theta}{\cdot}{\ms_t}}}}_{\text{exploration}},
+  \cL^{\text{PPO}}(\theta, \psi; \theta_k) \eqdef -\underbrace{\Exp{\cL^{\text{Clip}}(\theta; \theta_k)}}_{\text{actor}} + c_v \cdot \underbrace{\Exp{\rbrac{V_{\psi}(s_t) - \hat{G}_t}^2}}_{\text{critic}} - c_e \cdot \underbrace{\Exp{\cH\rbrac{\pisub{\theta}{\cdot}{\ms_t}}}}_{\text{exploration}},
 \end{align*}
 where 
 \begin{align*}
@@ -1951,7 +1973,7 @@ In the $k$-th iteration, we do
 
     \item[(VI)] Total PPO objective 
     \begin{align*}
-      L^{\text{PPO}} = L^{\text{actor}} - c_v \cdot L^{\text{critic}} + c_e \cdot L^{\text{entropy}}.
+      L^{\text{PPO}} = - L^{\text{actor}} + c_v \cdot L^{\text{critic}} - c_e \cdot L^{\text{entropy}}.
     \end{align*}
 
     \item[(VII)] Take a gradient step, so that we obtain $\theta_{k, e + 1}, \psi_{k, e+1}$ from $\theta_{k, e}$ and $\psi_{k, e}$. 
@@ -1961,6 +1983,28 @@ In the $k$-th iteration, we do
 \end{enumerate}
 
 
+\paragraph{Regarding the meaning of concepts}
+\begin{itemize}
+  \item Reward $r_t$: decided by the environment, independent of the policy, indicates how much can one get at moment $t$. 
+  Normally, it depends on $\ma_t$ and $\ms_t$, i.e., $r_t = r_t(\ma_t, \ms_t)$.
+  The policy do affect the realized policy since it decides what $\ma_t$ and $\ms_t$ could be.
+  \item Return $G_t$: discounted cumulated future rewards, which is the total one to get from now on.
+  \item Discounted factor $\gamma$, which is a number in $[0, 1]$ controlling how much future rewards matter. 
+  $\gamma \approx 1$ means that we think in a long term fashion, and $\gamma$ close to $0$ suggests to live in the moment.
+  \item Value function $V^{\pi}(\ms) = \ExpSub{\pi}{G_t \mid \ms_t = \ms}$, which is the expected return in state $\ms$ following policy $\pi$.
+  \item Action-value function $Q^{\pi}(\ms, \ma) = \ExpSub{\pi}{G_t \mid \ms_t = \ms, \ma_t = \ma}$, which is the expected return starting in state $\ms$, taking action $\ma$.
+  \item Advantage $A^{\pi}(\ms, \ma) = Q^{\pi}(\ms, \ma) - V^{\pi}(\ms)$, which has the meaning that is this move better than my usual move? This term is the key for variance reduction.
+  \item Temporal difference $\delta_t = r_t + \gamma V(\ms_{t+1}) - V(\ms_t)$, where $V$ is the baseline prediction of cumulative reward. 
+  $\delta_t$ is the prediction error. 
+  The true value satisfies 
+  \begin{align*}
+    V^{\pi}(\ms_t) = \ExpSub{\pi}{r_t + \gamma V^{\pi}(\ms_{t+1})\mid \ms_t},
+  \end{align*}
+  which is the Bellman equation.
+  \item Optimal policy $\pi^\star$, policy that maximizes expected return from every state.
+\end{itemize}
+
+
 
 
 \subsection{PPO-KL}
@@ -1968,8 +2012,9 @@ If we are using raw PPO as an alignment method, we are just optimizing against t
 The solution to this is to add a KL-penalty that discourages moving too far from the reference policy (usually the SFT model).
 Essentially, PPO-KL just adds an extra KL penalty term 
 \begin{align*}
-  \cL^{\text{PPO-KL}}(\theta) = \cL^{\text{PPO}}(\theta) - \beta\cdot\ExpSub{t}{\klD{\pisub{\theta}{\cdot}{\ms_t}}{\pisub{\thetaref}{\cdot}{\ms_t}}}.
+  J^{\text{PPO-KL}}(\theta) = J^{\text{PPO}}(\theta) - \beta\cdot\ExpSub{t}{\klD{\pisub{\theta}{\cdot}{\ms_t}}{\pisub{\thetaref}{\cdot}{\ms_t}}}.
 \end{align*}
+Here we follow the convention and use $J$ as the objective to maximize while $\cL$ is reserved for objective to minimize.
 
 
 \subsection{DPO (Direct Preference Optimization)}
@@ -1995,9 +2040,19 @@ If we plug in this into the Bradley-Terry model, we get
 \end{align*}
 Thus we choose to maximize the likelyhood of observed preference, 
 \begin{align*}
-  \cL^{\text{DPO}}(\theta) = \ExpSub{(\mx, \my^+, \my-) \sim \cD_{\text{pref}}}{\log\rbrac{\beta\rbrac{\underbrace{\log \frac{\pisub{\theta}{\my^+}{\mx}}{\pisub{\thetaref}{\my^+}{\mx}}}_{\text{advantage of} \my^+} - \underbrace{\log \frac{\pisub{\theta}{\my^-}{\mx}}{\pisub{\thetaref}{\my^-}{\mx}}}_{\text{advantage of} \my^-}}}},
+  J^{\text{DPO}}(\theta)
+  &= \; \mathbb{E}_{(x, y^+, y^-) \sim \cD_{\text{pref}}}
+     \Bigg[
+        \log \sigma\!\Bigg(
+         \tfrac{1}{\beta}\Big(
+           \underbrace{\log \tfrac{\pi_\theta(y^+\mid x)}{\pi_{\mathrm{ref}}(y^+\mid x)}}_{\text{advantage of } y^+}
+           \;-\;
+           \underbrace{\log \tfrac{\pi_\theta(y^-\mid x)}{\pi_{\mathrm{ref}}(y^-\mid x)}}_{\text{advantage of } y^-}
+         \Big)
+       \Bigg)
+     \Bigg],
 \end{align*}
-which is just a binary logistic regression objective over pairs.
+which is just a binary logistic regression (here we maximize this likelihood) objective over pairs.
 The entire DPO algorithm can then be described as 
 \begin{enumerate}
   \item We start with a supervised model both as $\pi_{\theta}$ and $\pi_{\text{ref}}$.
@@ -2049,13 +2104,13 @@ We now define the log-ratio between policy and preference
 \end{align*}
 The GPRO loss is given by 
 \begin{align*}
-  \cL^{\text{GPRO}}(\theta) = \ExpSub{\rbrac{\mx, \my} \sim \cD_{\text{pref}}}{\Omega^\star\rbrac{\beta z_\theta(\mx, \my)} - \beta r(\mx, \my)z_{\theta}(\mx, \my)},
+  J^{\text{GPRO}}(\theta) = \ExpSub{\rbrac{\mx, \my} \sim \cD_{\text{pref}}}{\Omega^\star\rbrac{\beta z_\theta(\mx, \my)} - \beta r(\mx, \my)z_{\theta}(\mx, \my)},
 \end{align*}
 where $\Omega^\star$ is the convex conjugate of a link function $\Omega$,$\beta > 0$.
 The training follows maximizing this dual objective.
 In practice we use an equivalent form:
 \begin{align*}
-  \widehat{L}(\theta) = \sum_{x \in \cD_{\text{pref}}} \cL_{\mx}(\theta) = \sum_{\mx} \sum_{i=1}^{K_{\mx}} \omega_i(\mx)\log \pisub{\theta}{\my_i}{\mx},
+  \widehat{L}(\theta) = \sum_{x \in \cD_{\text{pref}}} \cL_{\mx}(\theta) = -\beta \sum_{\mx} \sum_{i=1}^{K_{\mx}} \omega_i(\mx)\log \pisub{\theta}{\my_i}{\mx}, \qquad \omega_i(\mx) = \frac{e^{\nicefrac{r_i(\my_i, \mx)}{\beta}}}{\sum_{j=1}^{K_{\mx}}e^{\nicefrac{r_i(\my_j, \mx)}{\beta}}}
 \end{align*}
 
 
@@ -2131,7 +2186,7 @@ Instead of trying to match $\pi_{\theta}$ to the global closed form $\pi^\star$,
   z_{\theta}(\my) = \log \rbrac{\frac{\pisub{\theta}{\my}{\mx}}{\pisub{\thetaref}{\my}{\mx}}},
 \end{align*}
 to behave as if it were the solution of that optimization.
-Now introducing the convex function 
+Now introducing the convex function (entropy link) 
 \begin{align*}
   \Omega(u) = \beta\rbrac{u \log u - u + 1}, \qquad \text{for} \qquad u > 0,
 \end{align*}
@@ -2228,11 +2283,45 @@ which is a \textbf{weighted negative log-likelihood}. corresponding to
 \end{align*}
 if we further aggregate over prompts 
 \begin{align*}
-  \widehat{L}(\theta) = \sum_{x \in \cD_{\text{pref}}} \cL_{\mx}(\theta) = \sum_{\mx} \sum_{i=1}^{K_{\mx}} \omega_i(\mx)\log \pisub{\theta}{\my_i}{\mx},
+  \widehat{L}(\theta) =  \sum_{x \in \cD_{\text{pref}}} \cL_{\mx}(\theta) = -\beta \sum_{\mx} \sum_{i=1}^{K_{\mx}} \omega_i(\mx)\log \pisub{\theta}{\my_i}{\mx},
 \end{align*}
-which is clearly equivalent to the original GPRO dual loss, sincw it is our starting point (denoted as $\cS_{\mx}(z_\theta)$ here).
+which is clearly equivalent to the original GPRO dual loss, since it is our starting point (denoted as $\cS_{\mx}(z_\theta)$ here). 
+Note that we are trying to minimize this loss as we are trying to minimizer $\cS_{\mx}$.
 
-\paragraph{Recovering DPO}
+\paragraph{Relation to DPO}
+DPO is related to GPRO, let a training item be a pair $(\mx, \my^+, \my^-)$ with the label $\my^+ \succ \my^-$.
+From the GPRO analysis, we have 
+\begin{align*}
+  z^\star(\mx, \my) = \frac{r(\mx, \my)}{\beta} - \log \ExpSub{\my \sim \pisub{\thetaref}{\cdot}{\mx}}{\exp\rbrac{\frac{r(\mx, \my)}{\beta}}},
+\end{align*}
+the second partition term is eliminated if we take 
+\begin{align*}
+  \Delta z^\star(\mx, \my^+, \my^-) = z^\star(\mx, \my^+) - z^\star(\mx, \my^-) = \frac{r(\mx, \my^+) - r(\mx, \my^-)}{\beta}.
+\end{align*}
+If preferences follow a Bradley-Terry (logistic) model with temperature, then, we have 
+\begin{align*}
+  \mathbb{P}(\my^+ \succ \my^- \mid \mx) = \sigma \rbrac{\frac{r(\mx, \my^+) - r(\mx, \my^-)}{\beta}} = \sigma \rbrac{\Delta z^\star(\mx, \my^+, \my^-)}.
+\end{align*}
+To make $z_{\theta}$ mimics $z_\star$, we apply a pairwise logistic surrogate to the margin, 
+\begin{align*}
+  m_{\theta}(\mx; \my^+, \my^-) &\eqdef \frac{1}{\beta}\rbrac{z_{\theta}(\mx, \my^+) - z_{\theta}(\mx, \my^-)} \\
+  &= \frac{1}{\beta}\rbrac{\log\pisub{\theta}{\my^+}{\mx} - \log\pisub{\theta}{\my^-}{\mx} - \log\pisub{\thetaref}{\my^+}{\mx} + \log\pisub{\thetaref}{\my^-}{\mx}}.
+\end{align*}
+The DPO loss is exactly the logistic loss that pushes $m^\theta$ to $\Delta z^\star$, i.e.,
+\begin{align*}
+  L^{\text{DPO}}(\theta) = -\ExpSub{(\mx,\my^+, \my^-)}{\log\sigma\rbrac{m_\theta(\mx; \my^+, \my^-)}}
+\end{align*}
+Note that this is something to minimize, and in the original introduction to DPO, we are writing the goal in terms of maximization.
+If we differentiate with respect to $\theta$, we get 
+\begin{align*}
+  \nabla_{\theta}\rbrac{ - \log \sigma (m_\theta)} &= -\sigma(-m_\theta) \cdot \nabla_\theta m_\theta \\
+  &= -\frac{\sigma(-m_\theta)}{\beta}\rbrac{\nabla_\theta \log\pisub{\theta}{\my^+}{\mx} - \nabla_\theta \log\pisub{\theta}{\my^-}{\mx}} \\
+  &= -\frac{1}{\beta}\rbrac{\sigma(-m_\theta)\nabla_\theta \log\pisub{\theta}{\my^+}{\mx} - \sigma(-m_\theta)\nabla_\theta \log\pisub{\theta}{\my^-}{\mx}}.
+\end{align*}
+As we can see, this is a weighted sum of the log-likelihood gradients, but the coefficient of the less preferred sample is negative, which means that one ``weight'' is negative. 
+It is not representable as a weighted Negative Log Likelihood (NLL) form, GPRO generalizes DPO in spirits.
+To be specific, DPO uses a pairwise logistic surrogate focuses only on to relative differences, which leads to negative coefficients for the dispreferred sample.
+
 
 
 
