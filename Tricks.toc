@@ -84,3 +84,5 @@
 \contentsline {paragraph}{The intuition:}{43}{section*.54}%
 \contentsline {paragraph}{The insight of GPRO:}{44}{section*.55}%
 \contentsline {paragraph}{Relation to DPO}{47}{section*.56}%
+\contentsline {subsection}{\numberline {10.11}On Policy and Off Policy}{47}{subsection.10.11}%
+\contentsline {paragraph}{The idea of Q-learning:}{48}{section*.57}%

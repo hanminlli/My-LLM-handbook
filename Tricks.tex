@@ -2323,6 +2323,61 @@ It is not representable as a weighted Negative Log Likelihood (NLL) form, GPRO g
 To be specific, DPO uses a pairwise logistic surrogate focuses only on to relative differences, which leads to negative coefficients for the dispreferred sample.
 
 
+\subsection{On Policy and Off Policy}
+This is one of the most fundamental distinctions in reinforcement learning
+
+\textbullet~ \textbf{On policy} refers to the case that the agent is learning about the same policy that it is currently following. 
+It gathers experience and then update that exact strategy.
+
+\textbullet~ \textbf{Off policy} refers to the case that the agent wants to learn about a different policy than the one it is using to act. 
+It might behave randomly or follow an old policy, but still update another (better) policy.
+
+The key difference is, in on policy, we learn from what we actually do and in off policy, we learn from what we (or the others) did, but update toward a different target strategy.
+
+Some examples include: 
+\begin{enumerate}
+  \item \textbf{PPO:} This is on policy, because PPO collects rollouts (trajectories) using the current policy $\pi_{\theta}$, and immediately uses them to update the same policy.
+  \item \textbf{DPO:} This is not really RL in the classical sense, DPO is usually described as offline preference-based fine-tuning. 
+  So in strict RL terms: it's neither on-policy nor off-policy, because it doesn't collect trajectories with a policy. (It behaves like an offline / off-policy method, since it learns from pre-collected data.)
+  \item \textbf{GPRO:} Same as DPO — not classical on-policy RL. 
+  It's trained on a static dataset of human preferencesm, so it's closer to off-policy / offline RLHF-style training.
+\end{enumerate}
+
+This is actually related to the broader range of reinforcement learning problem. 
+In reinfocrement learning, we usually have three types of methods:
+\begin{enumerate}
+  \item Value based methods: learn the value of states or actions (e.g. $Q$ function), and then derive a policy by picking the best action. 
+  Representive algorithms include Q-learning on small problems, and DQN (Deep-Q Networks) on large state spaces. 
+  They are usually off-policy.
+
+  \item Policy based methods: directly learn the policy $\pisub{\theta}{\ma}{\ms}$. 
+  Representive algorithms include: REINFORCE (vanilla policy gradient), Actor-Critic (has both a policy and a value function helper), PPO (Proximal Policy Optimization), TRPO (Trust Region Policy Optimization).
+  They are usually on policy. 
+  While they need fresh data each update, they work well with continuous or large action spaces.
+
+  \item Model based methods: learn a model of the dynamics of the environment (state transitions and rewards), then plan ahead inside that model.
+  Representative algorithms include: Dyna-Q (classic), MuZero (modern, combines deep learning + planning). 
+  Although they can be very sample-efficient if the model is accurate, it is hard to learn good models for complex environments.
+\end{enumerate}
+
+\paragraph{The idea of Q-learning:}
+Let us recall the utimate goal of reinforcement learning: 
+\begin{align*}
+  \pi^\star = \argmax_{\pi} \ExpSub{\pi}{\sum_{t=0}^{\infty}\gamma^t r_t},
+\end{align*}
+and the definition of a $Q$ function 
+\begin{align*}
+  Q^{\pi}(\ms, \ma) = \Exp{\text{future reward} \mid \text{start in }s \text{, take } a \text{, then follow }\pi} = \ExpSub{\pi}{\sum_{t=0}^{\infty}\gamma^tr_t \mid \ms_t = \ms, \ma_t = \ma}.
+\end{align*}
+The idea is that if we know 
+\begin{align*}
+  Q^\star(\ms, \ma) = \max_{\pi}Q^{\pi}(\ms, \ma), 
+\end{align*}
+then we can find the corresponding best policy 
+\begin{align*}
+  \pi^\star(\ms) = \argmax_{\ma} Q^\star(\ms, \ma).
+\end{align*}
+
 
 
 \end{document}
