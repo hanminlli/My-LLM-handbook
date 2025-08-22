@@ -1302,6 +1302,9 @@ OpenAssistant, Dolly, UltraChat, ShareGPT, etc.
 
 
 
+\subsection{Continued Pretraining}
+BOOKMARK
+
 
 \subsection{Parameter-Efficient Fine-Tuning (PEFT)}  Updating all parameters of a model is costly. 
 To resolve this, one way is to use the so called ``adaptors''.
@@ -2360,7 +2363,7 @@ In reinfocrement learning, we usually have three types of methods:
   Although they can be very sample-efficient if the model is accurate, it is hard to learn good models for complex environments.
 \end{enumerate}
 
-\paragraph{The idea of Q-learning:}
+\paragraph{Value based methods:}
 Let us recall the utimate goal of reinforcement learning: 
 \begin{align*}
   \pi^\star = \argmax_{\pi} \ExpSub{\pi}{\sum_{t=0}^{\infty}\gamma^t r_t},
@@ -2377,6 +2380,76 @@ then we can find the corresponding best policy
 \begin{align*}
   \pi^\star(\ms) = \argmax_{\ma} Q^\star(\ms, \ma).
 \end{align*}
+
+\paragraph{SARSA: State-Action-Reward-State-Action (On policy)}
+Update rule:
+\begin{align*}
+  Q(\ms_t, \ma_t) \leftarrow Q(\ms_t, \ma_t) + \alpha \sbrac{r_t + \gamma \cdot Q(\ms_{t+1}, \ma_{t+1}) - Q(\ms_t, \ma_t)},
+\end{align*}
+which means that when we are in state $\ms_t$ taking action $\ma_t$ from our policy, we observe the reward $r_t$ and land in the next state $\ms_{t+1}$, our policy tells us to take some next action $\ma_{t+1}$ in that state.
+In this case, the update rule can be intepreted as update our $Q(\ms_t, \ma_t)$ so that it is closer to reward now + discounted reward of the (next state, next action), $\alpha$ is like a step size controlling how fast we proceed.
+
+SARSA, as a result, is on policy and if our policy is $\epsilon$-greedy (sometimes exploring randomly instead of picking the action with the highest $Q$-value so far.), SARSA will learn the value of that $\epsilon$-greedy policy (SARSA converges to the value function of the behavior policy we actually follow), not necessarily the optimal greedy one.
+
+\paragraph{Q-learning (Off-policy)}
+Update rule:
+\begin{align*}
+  Q(\ms_t, \ma_t) \leftarrow Q(\ms_t, \ma_t) + \alpha\sbrac{r_t + \gamma\max_{\ma^\prime} Q(\ms_{t+1}, \ma^\prime) - Q(\ms_t, \ma_t)}.
+\end{align*}
+Instead of looking at the action we actually took next, we imagine what if we take the best possible action in $\ms_{t+1}$, which results in the term $\max_{\ma^\prime} Q(\ms_{t+1})$, and we are updating toward reward now + discounted value of the best possible next step. 
+
+As a result, Q-learning is off-policy: our behavior policy might explore randomly, but our updates always push you toward the optimal greedy policy. 
+That's why Q-learning converges (under conditions) to $Q^\star$.
+
+
+\subsection{Domain Adaption}
+In machine learning, we usually assume that training and test data come from the same distribution.
+But in practice, this often fails (for example: training a sentiment classifier on Amazon reviews and testing it on Twitter posts).
+This motivates domain adaptation (DA), a subfield of transfer learning.
+Formally, a domain is formally defined as a pair 
+\begin{align*}
+  \cD = \rbrac{\cX, P(X)},
+\end{align*}
+where $\cX$ is an input space (images, sentences), and $P(X)$ is a mariginal distribution over $\cX$ (we denote the original distribution as $P(\cX, \cY)$), and a task is defined as 
+\begin{align*}
+  \cT = \rbrac{\cY, f},
+\end{align*}
+where $\cY$ is the output (label) space, $f: \cX \mapsto \cY$ is the true labeling function.
+We consider source domain $\cD_{S} = \rbrac{\cX_{S}, P_S(X)}$ and target domain $\cD_{T} = \rbrac{\cX_{T}, P_T(X)}$, we assume 
+\begin{enumerate}
+  \item \textbf{Different distributions:} $P_{S}(X) \neq P_{T}(X)$, but typically, $\cX_S = \cX_T$ and $\cY_S = \cY_T$.
+  \item \textbf{Same task (most classical setting):} $f_S = f_T = f$, variants exist where tasks differ, but then we are in broader transfer learning.
+  \item \textbf{Label scarcity:} Often, the source domain has many labeled samples: $\cbrac{\rbrac{x_i^S, y_i^S}}_{i=1}^{n_S} \sim P_S(\cX, \cY)$ while target domain may have few or zero labeled samples: $\cbrac{x_j^T}_{j=1}^{n_T} \sim P_T(X)$.
+\end{enumerate}
+We want to learn a hypothesis (model) $h: \cX \mapsto \cY$ that minimizes target risk: 
+\begin{align*}
+  \epsilon_T(h) = \ExpSub{(x, y)\sim P_T(x, y)}{\cL(h(x), y)},
+\end{align*}
+given most supervision comes from $\cD_S$.
+
+Typical approaches to handle this problem includes: 
+\begin{enumerate}
+  \item \textbf{Instance based methods}: reweight the the source samples so that they look like they were drawn from the target distribution.
+  \begin{align*}
+    \epsilon_T(h) = \ExpSub{(x, y)\sim P_T(x, y)}{\frac{P_T(x)}{P_S(x)}\cL(h(x), y)},
+  \end{align*}
+  there is no need to change the struture of the model, but the ratios are hard to estimate especially in high dimensions.
+
+  \item \textbf{Feature based methods}: Learn a transformation $\Phi$, such that the source and target distributions are aligned in feature space $P_S(\Phi(X)) \approx P_T(\Phi(X))$, $\Phi$ can be viewed as a feature extractor (a mapping from the raw input space $\cX$ to some latent space $\cZ$), in practice, $\Phi$ is usually the encoder part of the model (e.g. the neural net before the final classifier head).
+  For a neural model $h_\theta$, we can think of 
+  \begin{align*}
+    h_\theta(x) = g_\theta(\Phi(x)).
+  \end{align*}
+  The introduction of the feature map $\Phi(\cdot)$ allows us to transform soucre and target into a feature space $\cZ$, where they will look very similar. 
+  For an exemplary pipeline: (i) an encoder $\Phi$ is trained so that features of source and target overlap.
+  (ii) Classifier $g_\theta$ then works equally well across domains.
+  
+  \item \textbf{Parameter based methods}: Assume the parameters of source and target models should share some structure, examples include shared encoder across domains, domain-specific classification heads.
+  Useful when domains are similar but not identical. 
+  For a example, we assume some shared parameters across source and target, and some domain-specific parameters, we finetune a subset of layers on target domain data.
+\end{enumerate}
+
+
 
 
 
