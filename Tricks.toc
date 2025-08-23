@@ -35,58 +35,59 @@
 \contentsline {paragraph}{Decoder}{16}{figure.caption.14}%
 \contentsline {paragraph}{The original seq2seq transformer:}{16}{section*.15}%
 \contentsline {subsection}{\numberline {8.1}Encoder only models}{17}{subsection.8.1}%
-\contentsline {subsection}{\numberline {8.2}Decoder only models}{17}{subsection.8.2}%
-\contentsline {subsection}{\numberline {8.3}Encoder-decoder models}{17}{subsection.8.3}%
-\contentsline {subsection}{\numberline {8.4}Prefix-decoder models}{17}{subsection.8.4}%
-\contentsline {subsection}{\numberline {8.5}Summary}{18}{subsection.8.5}%
-\contentsline {subsection}{\numberline {8.6}The Linear Layers}{19}{subsection.8.6}%
-\contentsline {paragraph}{Why do we put FFNs in the encoder/decoder blocks?}{19}{section*.16}%
-\contentsline {paragraph}{Design choices for FFNs:}{19}{section*.17}%
-\contentsline {subsection}{\numberline {8.7}Gated Linear Units}{20}{subsection.8.7}%
-\contentsline {paragraph}{SwiGLU:}{20}{section*.18}%
-\contentsline {paragraph}{GEGLU:}{20}{section*.19}%
-\contentsline {subsection}{\numberline {8.8}Mixture-of-Experts FFNs}{21}{subsection.8.8}%
-\contentsline {paragraph}{Capacity constraint:}{22}{section*.20}%
-\contentsline {paragraph}{Load balancing auxiliary loss:}{22}{section*.21}%
-\contentsline {paragraph}{The all to all trick:}{23}{section*.22}%
-\contentsline {paragraph}{Processes and threads:}{23}{section*.23}%
-\contentsline {subsection}{\numberline {8.9}Parallel Attention + FFN}{24}{subsection.8.9}%
-\contentsline {section}{\numberline {9}Computing the Number of Parameters}{24}{section.9}%
-\contentsline {section}{\numberline {10}Fintuning}{24}{section.10}%
-\contentsline {subsection}{\numberline {10.1}Pretraining Loss (self-supervised)}{25}{subsection.10.1}%
-\contentsline {subsection}{\numberline {10.2}Finetuning Loss}{25}{subsection.10.2}%
-\contentsline {subsection}{\numberline {10.3}Supervised Fine-Tuning (SFT)}{25}{subsection.10.3}%
-\contentsline {subsection}{\numberline {10.4}Instruction Tuning}{26}{subsection.10.4}%
-\contentsline {paragraph}{Common instruction datasets}{26}{section*.30}%
-\contentsline {subsection}{\numberline {10.5}Continued Pretraining}{26}{subsection.10.5}%
-\contentsline {subsection}{\numberline {10.6}Parameter-Efficient Fine-Tuning (PEFT)}{26}{subsection.10.6}%
-\contentsline {paragraph}{Adaptors}{26}{section*.31}%
-\contentsline {paragraph}{Low-Rank Adaptation of LLMs}{27}{section*.32}%
-\contentsline {subsection}{\numberline {10.7}Reinforcement Learning from Human Feedback (RLHF)}{28}{subsection.10.7}%
-\contentsline {paragraph}{Stage 1: Supervised Finetuning}{28}{section*.33}%
-\contentsline {paragraph}{Stage 2: Reward Modelling}{29}{section*.34}%
-\contentsline {paragraph}{Stage 3: RL fine-tuning using PPO (Proximal Policy Optimization) with KL regularization.}{30}{section*.35}%
-\contentsline {paragraph}{Sampling:}{31}{section*.36}%
-\contentsline {paragraph}{Computation:}{32}{section*.37}%
-\contentsline {subsection}{\numberline {10.8}The Bigger Picture in Reinforcement Learning (PPO)}{34}{subsection.10.8}%
-\contentsline {paragraph}{Objective:}{34}{section*.38}%
-\contentsline {paragraph}{Policy Gradient:}{35}{section*.39}%
-\contentsline {paragraph}{From reward to policy update:}{37}{section*.42}%
-\contentsline {paragraph}{Importance sampling based on old policy data.}{38}{section*.45}%
-\contentsline {paragraph}{Clipping.}{38}{section*.46}%
-\contentsline {paragraph}{Entropy bonus.}{39}{section*.47}%
-\contentsline {paragraph}{Full PPO loss.}{39}{section*.48}%
-\contentsline {paragraph}{Practical hint.}{39}{section*.49}%
-\contentsline {paragraph}{Regarding the meaning of concepts}{40}{section*.50}%
-\contentsline {subsection}{\numberline {10.9}PPO-KL}{41}{subsection.10.9}%
-\contentsline {subsection}{\numberline {10.10}DPO (Direct Preference Optimization)}{41}{subsection.10.10}%
-\contentsline {paragraph}{Why do we assume $r$ follows the specific form?}{42}{section*.53}%
-\contentsline {subsection}{\numberline {10.11}GPRO (Generalized Preference Optimization)}{43}{subsection.10.11}%
-\contentsline {paragraph}{The intuition:}{43}{section*.54}%
-\contentsline {paragraph}{The insight of GPRO:}{44}{section*.55}%
-\contentsline {paragraph}{Relation to DPO}{47}{section*.56}%
-\contentsline {subsection}{\numberline {10.12}On Policy and Off Policy}{47}{subsection.10.12}%
-\contentsline {paragraph}{Value based methods:}{48}{section*.57}%
-\contentsline {paragraph}{SARSA: State-Action-Reward-State-Action (On policy)}{48}{section*.58}%
-\contentsline {paragraph}{Q-learning (Off-policy)}{49}{section*.59}%
-\contentsline {subsection}{\numberline {10.13}Domain Adaption}{49}{subsection.10.13}%
+\contentsline {paragraph}{BERT pretraining in detail}{17}{section*.16}%
+\contentsline {subsection}{\numberline {8.2}Decoder only models}{18}{subsection.8.2}%
+\contentsline {subsection}{\numberline {8.3}Encoder-decoder models}{19}{subsection.8.3}%
+\contentsline {subsection}{\numberline {8.4}Prefix-decoder models}{19}{subsection.8.4}%
+\contentsline {subsection}{\numberline {8.5}Summary}{20}{subsection.8.5}%
+\contentsline {subsection}{\numberline {8.6}The Linear Layers}{20}{subsection.8.6}%
+\contentsline {paragraph}{Why do we put FFNs in the encoder/decoder blocks?}{21}{section*.17}%
+\contentsline {paragraph}{Design choices for FFNs:}{21}{section*.18}%
+\contentsline {subsection}{\numberline {8.7}Gated Linear Units}{22}{subsection.8.7}%
+\contentsline {paragraph}{SwiGLU:}{22}{section*.19}%
+\contentsline {paragraph}{GEGLU:}{22}{section*.20}%
+\contentsline {subsection}{\numberline {8.8}Mixture-of-Experts FFNs}{22}{subsection.8.8}%
+\contentsline {paragraph}{Capacity constraint:}{23}{section*.21}%
+\contentsline {paragraph}{Load balancing auxiliary loss:}{24}{section*.22}%
+\contentsline {paragraph}{The all to all trick:}{24}{section*.23}%
+\contentsline {paragraph}{Processes and threads:}{25}{section*.24}%
+\contentsline {subsection}{\numberline {8.9}Parallel Attention + FFN}{25}{subsection.8.9}%
+\contentsline {section}{\numberline {9}Computing the Number of Parameters}{26}{section.9}%
+\contentsline {section}{\numberline {10}Fintuning}{26}{section.10}%
+\contentsline {subsection}{\numberline {10.1}Pretraining Loss (self-supervised)}{26}{subsection.10.1}%
+\contentsline {subsection}{\numberline {10.2}Finetuning Loss}{27}{subsection.10.2}%
+\contentsline {subsection}{\numberline {10.3}Supervised Fine-Tuning (SFT)}{27}{subsection.10.3}%
+\contentsline {subsection}{\numberline {10.4}Instruction Tuning}{27}{subsection.10.4}%
+\contentsline {paragraph}{Common instruction datasets}{27}{section*.31}%
+\contentsline {subsection}{\numberline {10.5}Continued Pretraining}{28}{subsection.10.5}%
+\contentsline {subsection}{\numberline {10.6}Parameter-Efficient Fine-Tuning (PEFT)}{28}{subsection.10.6}%
+\contentsline {paragraph}{Adaptors}{28}{section*.32}%
+\contentsline {paragraph}{Low-Rank Adaptation of LLMs}{28}{section*.33}%
+\contentsline {subsection}{\numberline {10.7}Reinforcement Learning from Human Feedback (RLHF)}{30}{subsection.10.7}%
+\contentsline {paragraph}{Stage 1: Supervised Finetuning}{30}{section*.34}%
+\contentsline {paragraph}{Stage 2: Reward Modelling}{30}{section*.35}%
+\contentsline {paragraph}{Stage 3: RL fine-tuning using PPO (Proximal Policy Optimization) with KL regularization.}{32}{section*.36}%
+\contentsline {paragraph}{Sampling:}{33}{section*.37}%
+\contentsline {paragraph}{Computation:}{34}{section*.38}%
+\contentsline {subsection}{\numberline {10.8}The Bigger Picture in Reinforcement Learning (PPO)}{35}{subsection.10.8}%
+\contentsline {paragraph}{Objective:}{36}{section*.39}%
+\contentsline {paragraph}{Policy Gradient:}{36}{section*.40}%
+\contentsline {paragraph}{From reward to policy update:}{38}{section*.43}%
+\contentsline {paragraph}{Importance sampling based on old policy data.}{40}{section*.46}%
+\contentsline {paragraph}{Clipping.}{40}{section*.47}%
+\contentsline {paragraph}{Entropy bonus.}{40}{section*.48}%
+\contentsline {paragraph}{Full PPO loss.}{40}{section*.49}%
+\contentsline {paragraph}{Practical hint.}{41}{section*.50}%
+\contentsline {paragraph}{Regarding the meaning of concepts}{42}{section*.51}%
+\contentsline {subsection}{\numberline {10.9}PPO-KL}{42}{subsection.10.9}%
+\contentsline {subsection}{\numberline {10.10}DPO (Direct Preference Optimization)}{43}{subsection.10.10}%
+\contentsline {paragraph}{Why do we assume $r$ follows the specific form?}{44}{section*.54}%
+\contentsline {subsection}{\numberline {10.11}GPRO (Generalized Preference Optimization)}{44}{subsection.10.11}%
+\contentsline {paragraph}{The intuition:}{45}{section*.55}%
+\contentsline {paragraph}{The insight of GPRO:}{46}{section*.56}%
+\contentsline {paragraph}{Relation to DPO}{48}{section*.57}%
+\contentsline {subsection}{\numberline {10.12}On Policy and Off Policy}{49}{subsection.10.12}%
+\contentsline {paragraph}{Value based methods:}{50}{section*.58}%
+\contentsline {paragraph}{SARSA: State-Action-Reward-State-Action (On policy)}{50}{section*.59}%
+\contentsline {paragraph}{Q-learning (Off-policy)}{50}{section*.60}%
+\contentsline {subsection}{\numberline {10.13}Domain Adaption}{51}{subsection.10.13}%

@@ -848,6 +848,82 @@ Advantages:
   \item \textbf{Easier fine-tuning} for classification tasks: just take the [CLS] embedding\footnote{In BERT and similar models, we prepend a special token [CLS] (“classification”) to the start of every input sequence before feeding it to the encoder. [CLS] has its own trainable embedding vector in the model's vocabulary, just like any word. It is treated as position $0$ in the sequence and goes through all encoder layers along with the other tokens. After the final encoder layer, [CLS] has a contextualized vector $h \in \R^{d_{\text{model}}}$, which encodes information from the entire sequence (thanks to self-attention).}.
 \end{itemize}
 
+The goal of encoder-only models are to learn representations of the entire input sequence.
+Great for tasks like classification, NER, QA span extraction.
+
+\paragraph{BERT pretraining in detail}
+\begin{enumerate}
+  \item \textbf{Input Preparation:} 
+  \begin{itemize}
+    \item \textbf{Tokenization:} Sentences are tokenized into WordPiece subwords.
+    Special tokens are added such as [CLS] at the start (used for sequence level classification), [SEP] at the end to separate two sentences.
+
+    \item \textbf{Segment embeddings:} BERT was designed to handle pairs of sentences, this is to let the model know which tokens belong to which sentence, so we add a segment embedding on top of the token and positional embeddings. Sentence A tokens → segment embedding ${\bf 0}$ ((vector for ``sentence A'').). Sentence B tokens → segment embedding ${\bf 1}$ ((vector for ``sentence B'').).
+    
+    \item \textbf{Position embeddings:} Added to encode order of tokens.
+  \end{itemize}  
+
+  \item \textbf{Masked Language Modeling (MLM):}
+  \begin{itemize}
+    \item \textbf{Random masking:} We select 15\% of the input tokens for possible prediction. 
+    For each selected token, 80\% of the time we replace it with [MASK], 10\% of the time we replace it with a random word and 10\% of the time we keep it unchanged.
+    This trick prevents the model relies too heavily on [MASK] and improves robustness.
+
+    \item \textbf{Forward pass:} Feed the corrupted sentence into the encoder stack. 
+    For each masked position $t$, get hidden representation $\mh_t$. 
+    Then we apply softmax over the vocabulary 
+    \begin{align*}
+      p_{\theta}(\mx_t \mid \mx_{\backslash t}) = \text{softmax} \rbrac{\mW \mh_t},
+    \end{align*}
+    we then do cross-entropy only on masked positions 
+    \begin{align*}
+      \cL_{\text{MLM}}(\theta) = - \sum_{t \in \text{Masked}}\log p_\theta (\mx_t \mid \mx_{\backslash t}),
+    \end{align*}
+    where $\mx_{\backslash t}$ denotes the other positions than $t$.
+  \end{itemize}
+
+  \item \textbf{Next Sentence Prediction (NSP):}
+  \begin{itemize}
+    \item \textbf{Sentence pair construction:} 50\% of the time, we set sentence B follows sentence A in corpus (label = isNext), and the other 50\% of the time, sentence B is randomly sampled (label = notNext), we then construct them into the following format 
+    \begin{verbatim}
+      [CLS] Sentence A [SEP] Sentence B [SEP]
+    \end{verbatim}
+
+    \item \textbf{Classification head:} we take the [CLS] embedding $h_{\text{CLS}}$ from the final layers, and we pass through a classification layer
+    \begin{align*}
+      y = \text{softmax}(\mW_{\text{NSP}}\mh_{\text{CLS}}),
+    \end{align*}
+    where $y$ is the predicted probability output of the model, $y \in (0, 1)$, we will use $y^\star \in \cbrac{0, 1}$ to denote the true label.
+
+    \item \textbf{Loss:} we use the binary classification loss, 
+    \begin{align*}
+      \cL_{\text{NSP}}(\theta) = -y^\star \log y + (1 - y^\star) \log (1 - y), 
+    \end{align*} 
+    This is a classic binary cross entropy loss, which can be interpreted as follows, if the sentence is indeed in such a relation, then we maximize the log likelihood this is the case, otherwise if it is not in such a relation, then we maximize the log likelihood that this is not the case.
+  \end{itemize}
+
+  \item \textbf{Total Loss:} 
+  The two objectives are combined, 
+  \begin{align*}
+    \cL(\theta) = \cL_{\text{MLM}}(\theta) + \cL_{\text{NSP}}(\theta),
+  \end{align*}
+  and we continue to optimize it.
+  
+  \item \textbf{Extensions:} 
+  We may easily notice that BERT actually produces contextual embeddings for the entire sequence via [CLS] token or pooled output, so we can actually add a classification head to predict many kinds of relations. 
+  For examples: (i) Entailment / Contradiction (NLI) → [Premise] [SEP] [Hypothesis], (ii) Semantic similarity / Paraphrase → [Sentence1] [SEP] [Sentence2] (iii) Retrieval-style relevance → [Query] [SEP] [Document] (iv) Dialogue coherence → [Previous turn] [SEP] [Candidate response]
+
+  \item \textbf{Representations:}
+  We note that using the [CLS] token, we can easily get a representation of the sequence (sentence) we are working with. 
+  A natural question arises, which is how we obtain such a representation for a document.
+  In practice, if we are looking at short paragraphs ($< 512$ tokens: hard cap of vanilla BERT), the [CLS] token might be the right choice. 
+  For medium docs (2-3 pages), we may chunk it into 512 tokens and then using max/mean/attention pooling (learn weights to combine chunks).
+  For larger docs, we may consider using a hierarchical BERT (imagine here sentences are tokens) or a long-document transformer.
+\end{enumerate}
+
+
+
+
 \subsection{Decoder only models}
 
 GPT family (GPT-2, GPT-3, GPT-4, LLaMA, Mistral, Falcon, etc.); BLOOM, OPT, Pythia; Code generation models (CodeLLaMA, StarCoder)
@@ -866,8 +942,13 @@ Advantages:
   \item \textbf{Flexible prompts}: can condition on arbitrary text in-context.
 \end{itemize}
 
+The goal of decoder-only models is to autoregressively generate text, good for open-ended generation.
+
+
 \subsection{Encoder-decoder models}
-Often on seq2seq task, requires paired data\footnote{An example is that machine translation needs paired data: Source: "I like apples", Target: "J'aime les pommes".}.
+Often on seq2seq task, requires paired data\footnote{An example is that machine translation needs paired data: Source: "I like apples", Target: "J'aime les pommes".}. 
+Take an input sequence, encode it, then decode into an output (good for seq2seq tasks like translation, summarization).
+
 
 
 \subsection{Prefix-decoder models}
@@ -1303,7 +1384,17 @@ OpenAssistant, Dolly, UltraChat, ShareGPT, etc.
 
 
 \subsection{Continued Pretraining}
-BOOKMARK
+Continuted pretraining is the process of taking a large pretrained language model (LM) and further training it with the same pretraining objective (causal LM, masked LM, span corruption, etc.) but on a new corpus that represents the target domain, task data, or language.
+This is an unsupervised adaptation method: no labels or preference data are needed.
+The goal is to shift the model's distribution closer to the new data distribution without discarding general knowledge.
+
+For a formal definition, let us image that we have $\theta_0$, which is the pretrained parameters from the base model, denote $P_{\text{base}}$ as the distribution of the original pretraining data, and $P_{\text{target}}$ as the distribution of the new data corpus (domain/task/language).
+The continued pretraining then solves:
+\begin{align*}
+  \theta^\star = \argmin_{\theta} \ExpSub{\mx \sim P_{\text{target}}}{\cL\rbrac{\theta; x}}.
+\end{align*}
+which is identical on the original pretraining objective but with a shifted data distribution.
+
 
 
 \subsection{Parameter-Efficient Fine-Tuning (PEFT)}  Updating all parameters of a model is costly. 

@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.25 (MiKTeX 24.1) (preloaded format=pdflatex 2025.7.27)  22 AUG 2025 14:42
+This is pdfTeX, Version 3.141592653-2.6-1.40.25 (MiKTeX 24.1) (preloaded format=pdflatex 2025.7.27)  23 AUG 2025 16:06
 entering extended mode
  restricted \write18 enabled.
  file:line:error style messages enabled.
@@ -1603,6 +1603,13 @@ Package fancyhdr Warning: \headheight is too small (12.0pt):
 (fancyhdr)                \addtolength{\topmargin}{-1.59999pt}.
 
 [16]
+LaTeX Info: Symbol \textrightarrow not provided by
+            font family ptm in TS1 encoding.
+            Default family used instead on input line 861.
+LaTeX Info: Symbol \textrightarrow not provided by
+            font family ptm in TS1 encoding.
+            Default family used instead on input line 861.
+
 
 Package fancyhdr Warning: \headheight is too small (12.0pt): 
 (fancyhdr)                Make it at least 13.59999pt, for example:
@@ -1611,14 +1618,18 @@ Package fancyhdr Warning: \headheight is too small (12.0pt):
 (fancyhdr)                \addtolength{\topmargin}{-1.59999pt}.
 
 [17]
-Underfull \hbox (badness 1838) in paragraph at lines 932--933
-[]\TS1/ptm/m/n/10.95 (+20) ˆ \T1/ptm/m/n/10.95 (+20) Great for clas-si-fi-ca-tion, re-
- []
-
-
-Underfull \hbox (badness 1902) in paragraph at lines 948--949
-\T1/ptm/m/n/10.95 (+20) tasks (trans-la-tion, sum-ma-riza-
- []
+LaTeX Info: Symbol \textrightarrow not provided by
+            font family ptm in TS1 encoding.
+            Default family used instead on input line 914.
+LaTeX Info: Symbol \textrightarrow not provided by
+            font family ptm in TS1 encoding.
+            Default family used instead on input line 914.
+LaTeX Info: Symbol \textrightarrow not provided by
+            font family ptm in TS1 encoding.
+            Default family used instead on input line 914.
+LaTeX Info: Symbol \textrightarrow not provided by
+            font family ptm in TS1 encoding.
+            Default family used instead on input line 914.
 
 
 Package fancyhdr Warning: \headheight is too small (12.0pt): 
@@ -1636,6 +1647,15 @@ Package fancyhdr Warning: \headheight is too small (12.0pt):
 (fancyhdr)                \addtolength{\topmargin}{-1.59999pt}.
 
 [19]
+Underfull \hbox (badness 1838) in paragraph at lines 1013--1014
+[]\TS1/ptm/m/n/10.95 (+20) ˆ \T1/ptm/m/n/10.95 (+20) Great for clas-si-fi-ca-tion, re-
+ []
+
+
+Underfull \hbox (badness 1902) in paragraph at lines 1029--1030
+\T1/ptm/m/n/10.95 (+20) tasks (trans-la-tion, sum-ma-riza-
+ []
+
 
 Package fancyhdr Warning: \headheight is too small (12.0pt): 
 (fancyhdr)                Make it at least 13.59999pt, for example:
@@ -1660,13 +1680,6 @@ Package fancyhdr Warning: \headheight is too small (12.0pt):
 (fancyhdr)                \addtolength{\topmargin}{-1.59999pt}.
 
 [22]
-LaTeX Info: Symbol \textrightarrow not provided by
-            font family ptm in TS1 encoding.
-            Default family used instead on input line 1167.
-LaTeX Info: Symbol \textrightarrow not provided by
-            font family ptm in TS1 encoding.
-            Default family used instead on input line 1168.
-
 
 Package fancyhdr Warning: \headheight is too small (12.0pt): 
 (fancyhdr)                Make it at least 13.59999pt, for example:
@@ -1675,39 +1688,12 @@ Package fancyhdr Warning: \headheight is too small (12.0pt):
 (fancyhdr)                \addtolength{\topmargin}{-1.59999pt}.
 
 [23]
-LaTeX Info: Symbol \textuparrow not provided by
-            font family pcr in TS1 encoding.
-            Default family used instead on input line 1191.
 LaTeX Info: Symbol \textrightarrow not provided by
-            font family pcr in TS1 encoding.
-            Default family used instead on input line 1191.
+            font family ptm in TS1 encoding.
+            Default family used instead on input line 1248.
 LaTeX Info: Symbol \textrightarrow not provided by
-            font family pcr in TS1 encoding.
-            Default family used instead on input line 1191.
-LaTeX Info: Symbol \textdownarrow not provided by
-            font family pcr in TS1 encoding.
-            Default family used instead on input line 1191.
-LaTeX Info: Symbol \textrightarrow not provided by
-            font family pcr in TS1 encoding.
-            Default family used instead on input line 1192.
-LaTeX Info: Symbol \textrightarrow not provided by
-            font family pcr in TS1 encoding.
-            Default family used instead on input line 1192.
-LaTeX Info: Symbol \textrightarrow not provided by
-            font family pcr in TS1 encoding.
-            Default family used instead on input line 1192.
-LaTeX Info: Symbol \textdownarrow not provided by
-            font family pcr in TS1 encoding.
-            Default family used instead on input line 1193.
-LaTeX Info: Symbol \textrightarrow not provided by
-            font family pcr in TS1 encoding.
-            Default family used instead on input line 1193.
-LaTeX Info: Symbol \textrightarrow not provided by
-            font family pcr in TS1 encoding.
-            Default family used instead on input line 1193.
-LaTeX Info: Symbol \textuparrow not provided by
-            font family pcr in TS1 encoding.
-            Default family used instead on input line 1193.
+            font family ptm in TS1 encoding.
+            Default family used instead on input line 1249.
 
 
 Package fancyhdr Warning: \headheight is too small (12.0pt): 
@@ -1717,9 +1703,39 @@ Package fancyhdr Warning: \headheight is too small (12.0pt):
 (fancyhdr)                \addtolength{\topmargin}{-1.59999pt}.
 
 [24]
-Overfull \hbox (3.28441pt too wide) in paragraph at lines 1256--1256
-[]      \T1/pcr/m/n/10.95 logits[:, :-1, :].reshape(-1,  vocab_size), # (B, L, V) -> (BL, V)[] 
- []
+LaTeX Info: Symbol \textuparrow not provided by
+            font family pcr in TS1 encoding.
+            Default family used instead on input line 1272.
+LaTeX Info: Symbol \textrightarrow not provided by
+            font family pcr in TS1 encoding.
+            Default family used instead on input line 1272.
+LaTeX Info: Symbol \textrightarrow not provided by
+            font family pcr in TS1 encoding.
+            Default family used instead on input line 1272.
+LaTeX Info: Symbol \textdownarrow not provided by
+            font family pcr in TS1 encoding.
+            Default family used instead on input line 1272.
+LaTeX Info: Symbol \textrightarrow not provided by
+            font family pcr in TS1 encoding.
+            Default family used instead on input line 1273.
+LaTeX Info: Symbol \textrightarrow not provided by
+            font family pcr in TS1 encoding.
+            Default family used instead on input line 1273.
+LaTeX Info: Symbol \textrightarrow not provided by
+            font family pcr in TS1 encoding.
+            Default family used instead on input line 1273.
+LaTeX Info: Symbol \textdownarrow not provided by
+            font family pcr in TS1 encoding.
+            Default family used instead on input line 1274.
+LaTeX Info: Symbol \textrightarrow not provided by
+            font family pcr in TS1 encoding.
+            Default family used instead on input line 1274.
+LaTeX Info: Symbol \textrightarrow not provided by
+            font family pcr in TS1 encoding.
+            Default family used instead on input line 1274.
+LaTeX Info: Symbol \textuparrow not provided by
+            font family pcr in TS1 encoding.
+            Default family used instead on input line 1274.
 
 
 Package fancyhdr Warning: \headheight is too small (12.0pt): 
@@ -1729,12 +1745,9 @@ Package fancyhdr Warning: \headheight is too small (12.0pt):
 (fancyhdr)                \addtolength{\topmargin}{-1.59999pt}.
 
 [25]
-LaTeX Info: Symbol \textrightarrow not provided by
-            font family ptm in TS1 encoding.
-            Default family used instead on input line 1318.
-LaTeX Info: Symbol \textrightarrow not provided by
-            font family ptm in TS1 encoding.
-            Default family used instead on input line 1318.
+Overfull \hbox (3.28441pt too wide) in paragraph at lines 1337--1337
+[]      \T1/pcr/m/n/10.95 logits[:, :-1, :].reshape(-1,  vocab_size), # (B, L, V) -> (BL, V)[] 
+ []
 
 
 Package fancyhdr Warning: \headheight is too small (12.0pt): 
@@ -1752,6 +1765,13 @@ Package fancyhdr Warning: \headheight is too small (12.0pt):
 (fancyhdr)                \addtolength{\topmargin}{-1.59999pt}.
 
 [27]
+LaTeX Info: Symbol \textrightarrow not provided by
+            font family ptm in TS1 encoding.
+            Default family used instead on input line 1409.
+LaTeX Info: Symbol \textrightarrow not provided by
+            font family ptm in TS1 encoding.
+            Default family used instead on input line 1409.
+
 
 Package fancyhdr Warning: \headheight is too small (12.0pt): 
 (fancyhdr)                Make it at least 13.59999pt, for example:
@@ -1927,7 +1947,15 @@ Package fancyhdr Warning: \headheight is too small (12.0pt):
 (fancyhdr)                You might also make \topmargin smaller:
 (fancyhdr)                \addtolength{\topmargin}{-1.59999pt}.
 
-[49] 
+[49]
+
+Package fancyhdr Warning: \headheight is too small (12.0pt): 
+(fancyhdr)                Make it at least 13.59999pt, for example:
+(fancyhdr)                \setlength{\headheight}{13.59999pt}.
+(fancyhdr)                You might also make \topmargin smaller:
+(fancyhdr)                \addtolength{\topmargin}{-1.59999pt}.
+
+[50] 
 AED: lastpage setting LastPage
 
 Package fancyhdr Warning: \headheight is too small (12.0pt): 
@@ -1936,7 +1964,7 @@ Package fancyhdr Warning: \headheight is too small (12.0pt):
 (fancyhdr)                You might also make \topmargin smaller:
 (fancyhdr)                \addtolength{\topmargin}{-1.59999pt}.
 
-[50] (Tricks.aux)
+[51] (Tricks.aux)
  ***********
 LaTeX2e <2023-11-01> patch level 1
 L3 programming layer <2024-01-04>
@@ -1945,13 +1973,13 @@ Package rerunfilecheck Info: File `Tricks.out' has not changed.
 (rerunfilecheck)             Checksum: 229B175F6AC0D3298B05AA4C7DF24030;8131.
  ) 
 Here is how much of TeX's memory you used:
- 46868 strings out of 474486
- 982705 string characters out of 5743755
+ 46876 strings out of 474486
+ 982765 string characters out of 5743755
  1949542 words of memory out of 5000000
  67586 multiletter control sequences out of 15000+600000
  664479 words of font info for 367 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
- 101i,21n,120p,1063b,1388s stack positions out of 10000i,1000n,20000p,200000b,200000s
+ 101i,21n,120p,1063b,1402s stack positions out of 10000i,1000n,20000p,200000b,200000s
 
 pdfTeX warning (dest): name{Hfootnote.23} has been referenced but does not exist, replaced by a fixed one
 
@@ -2022,9 +2050,9 @@ pdfTeX warning (dest): name{Hfootnote.2} has been referenced but does not exist,
 pdfTeX warning (dest): name{Hfootnote.1} has been referenced but does not exist, replaced by a fixed one
 
  <C:\Users\19358\AppData\Local\MiKTeX\fonts/pk/ljfour/jknappen/ec/dpi657\tcrm1000.pk> <C:\Users\19358\AppData\Local\MiKTeX\fonts/pk/ljfour/jknappen/ec/dpi657\tctt1000.pk><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmbx10.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmbx6.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmbx8.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmbx9.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmex10.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmmi10.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmmi5.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmmi6.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmmi8.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmmi9.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmr10.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmr6.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmr8.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmr9.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmsy10.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmsy6.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmsy8.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmsy9.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfonts/symbols/msbm10.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/urw/courier/ucrr8a.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/urw/times/utmb8a.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/urw/times/utmr8a.pfb><C:/Users/19358/AppData/Local/Programs/MiKTeX/fonts/type1/urw/times/utmri8a.pfb>
-Output written on Tricks.pdf (50 pages, 644506 bytes).
+Output written on Tricks.pdf (51 pages, 651534 bytes).
 PDF statistics:
- 885 PDF objects out of 1000 (max. 8388607)
- 279 named destinations out of 1000 (max. 500000)
+ 897 PDF objects out of 1000 (max. 8388607)
+ 287 named destinations out of 1000 (max. 500000)
  63537 words of extra memory for PDF output out of 74296 (max. 10000000)
 
