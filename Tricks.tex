@@ -1339,6 +1339,32 @@ A quick implementation is that
     )
 \end{verbatim}
 
+\subsection{Perplexity}
+Perplexity is defined as the defined as the exponential of the average loss.
+For each token position, we have a prediction of the true next token $\my_t$, our model outputs a probability distribution and the loss is the corresponding negative log likelihood given by 
+\begin{align*}
+  - \log p_{\theta}(\my_t \mid \my_{< t}).
+\end{align*} 
+The perplexity is defined as 
+\begin{align*}
+  \exp (\Exp{- \log p_{\theta}(\my_t \mid \my_{< t})}),
+\end{align*}
+which is the exponential of the mean loss.
+The exponential transforms the original loss which is in the log space and brings it back to the original probability space.
+
+Intuitively, imagine reading a sentence word by word.
+At each step, the model has to choose from many possible next tokens. 
+If perplexity $=k$, it means the model is as ``confused'' as if it had to choose uniformly among $k$ equally likely options at each step.
+That's why ppl is often described as the model's average uncertainty.
+
+Some examples include, 
+\begin{enumerate}
+  \item \textbf{Perfect model} (always assigns probibility $1$ to the correct token): in this case loss $=0$, which leads to ppl $=1$.
+  \item \textbf{Random guessing model} loss $= \log(\text{vocab size})$, ppl $= \text{vocab size}$.
+\end{enumerate}
+From this point it is easy to understand the lower the perplexity is, the better predictive power the model has.
+
+
 
 
 \subsection{Finetuning Loss}
