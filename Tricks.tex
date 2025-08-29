@@ -1374,6 +1374,19 @@ Typical approaches include Supervised Fine-Tuning (SFT), Parameter-Efficient Fin
 The reason for perform such finetuning is that without such adaptations, LLMs only predict next tokens, if we ask a question, they might continue the text in a way that doesn't look like an answer.
 
 
+\subsubsection{Gradient Checkpointing}
+Normally, during backpropagation, PyTorch needs to store all intermediate activations so it can compute gradients later. 
+That eats a lot of GPU memory.
+Gradient checkpointing is the technique that 
+\begin{itemize}
+  \item Instead of storing every intermediate activation, the model discards most of them during the forward pass.
+  \item Later, during backward pass, it recomputes those activations on the fly.
+  \item Saves GPU memory, but uses extra compute time.
+\end{itemize}
+This technique is useful when fine-tuning very large models on limited GPU memory, often lets you increase batch size or sequence length at the cost of some speed.
+
+
+
 \subsection{Supervised Fine-Tuning (SFT)}
 Our goal is to make the LLM output exactly match human-provided target completions given prompts.
 Our loss is still cross-entropy loss, but computed \textbf{only} over the target part of the sequence.

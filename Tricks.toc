@@ -57,38 +57,39 @@
 \contentsline {subsection}{\numberline {10.1}Pretraining Loss (self-supervised)}{26}{subsection.10.1}%
 \contentsline {subsection}{\numberline {10.2}Perplexity}{27}{subsection.10.2}%
 \contentsline {subsection}{\numberline {10.3}Finetuning Loss}{27}{subsection.10.3}%
-\contentsline {subsection}{\numberline {10.4}Supervised Fine-Tuning (SFT)}{27}{subsection.10.4}%
+\contentsline {subsubsection}{\numberline {10.3.1}Gradient Checkpointing}{27}{subsubsection.10.3.1}%
+\contentsline {subsection}{\numberline {10.4}Supervised Fine-Tuning (SFT)}{28}{subsection.10.4}%
 \contentsline {subsection}{\numberline {10.5}Instruction Tuning}{28}{subsection.10.5}%
 \contentsline {paragraph}{Common instruction datasets}{28}{section*.31}%
 \contentsline {subsection}{\numberline {10.6}Continued Pretraining}{28}{subsection.10.6}%
-\contentsline {subsection}{\numberline {10.7}Parameter-Efficient Fine-Tuning (PEFT)}{28}{subsection.10.7}%
+\contentsline {subsection}{\numberline {10.7}Parameter-Efficient Fine-Tuning (PEFT)}{29}{subsection.10.7}%
 \contentsline {paragraph}{Adaptors}{29}{section*.32}%
 \contentsline {paragraph}{Low-Rank Adaptation of LLMs}{29}{section*.33}%
-\contentsline {subsection}{\numberline {10.8}Reinforcement Learning from Human Feedback (RLHF)}{30}{subsection.10.8}%
+\contentsline {subsection}{\numberline {10.8}Reinforcement Learning from Human Feedback (RLHF)}{31}{subsection.10.8}%
 \contentsline {paragraph}{Stage 1: Supervised Finetuning}{31}{section*.34}%
 \contentsline {paragraph}{Stage 2: Reward Modelling}{31}{section*.35}%
 \contentsline {paragraph}{Stage 3: RL fine-tuning using PPO (Proximal Policy Optimization) with KL regularization.}{33}{section*.36}%
 \contentsline {paragraph}{Sampling:}{34}{section*.37}%
-\contentsline {paragraph}{Computation:}{34}{section*.38}%
+\contentsline {paragraph}{Computation:}{35}{section*.38}%
 \contentsline {subsection}{\numberline {10.9}The Bigger Picture in Reinforcement Learning (PPO)}{36}{subsection.10.9}%
-\contentsline {paragraph}{Objective:}{36}{section*.39}%
+\contentsline {paragraph}{Objective:}{37}{section*.39}%
 \contentsline {paragraph}{Policy Gradient:}{37}{section*.40}%
 \contentsline {paragraph}{From reward to policy update:}{39}{section*.43}%
-\contentsline {paragraph}{Importance sampling based on old policy data.}{40}{section*.46}%
+\contentsline {paragraph}{Importance sampling based on old policy data.}{41}{section*.46}%
 \contentsline {paragraph}{Clipping.}{41}{section*.47}%
 \contentsline {paragraph}{Entropy bonus.}{41}{section*.48}%
 \contentsline {paragraph}{Full PPO loss.}{41}{section*.49}%
-\contentsline {paragraph}{Practical hint.}{41}{section*.50}%
+\contentsline {paragraph}{Practical hint.}{42}{section*.50}%
 \contentsline {paragraph}{Regarding the meaning of concepts}{43}{section*.51}%
 \contentsline {subsection}{\numberline {10.10}PPO-KL}{43}{subsection.10.10}%
-\contentsline {subsection}{\numberline {10.11}DPO (Direct Preference Optimization)}{43}{subsection.10.11}%
-\contentsline {paragraph}{Why do we assume $r$ follows the specific form?}{44}{section*.54}%
+\contentsline {subsection}{\numberline {10.11}DPO (Direct Preference Optimization)}{44}{subsection.10.11}%
+\contentsline {paragraph}{Why do we assume $r$ follows the specific form?}{45}{section*.54}%
 \contentsline {subsection}{\numberline {10.12}GPRO (Generalized Preference Optimization)}{45}{subsection.10.12}%
-\contentsline {paragraph}{The intuition:}{45}{section*.55}%
+\contentsline {paragraph}{The intuition:}{46}{section*.55}%
 \contentsline {paragraph}{The insight of GPRO:}{47}{section*.56}%
 \contentsline {paragraph}{Relation to DPO}{49}{section*.57}%
 \contentsline {subsection}{\numberline {10.13}On Policy and Off Policy}{50}{subsection.10.13}%
-\contentsline {paragraph}{Value based methods:}{50}{section*.58}%
+\contentsline {paragraph}{Value based methods:}{51}{section*.58}%
 \contentsline {paragraph}{SARSA: State-Action-Reward-State-Action (On policy)}{51}{section*.59}%
 \contentsline {paragraph}{Q-learning (Off-policy)}{51}{section*.60}%
-\contentsline {subsection}{\numberline {10.14}Domain Adaption}{51}{subsection.10.14}%
+\contentsline {subsection}{\numberline {10.14}Domain Adaption}{52}{subsection.10.14}%
