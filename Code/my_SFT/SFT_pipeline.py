@@ -35,6 +35,8 @@ import argparse
 import json
 import math
 import os
+import time
+import subprocess
 from dataclasses import dataclass
 from typing import Dict, List, Optional
 
@@ -48,7 +50,6 @@ from transformers import (
     set_seed,
 )
 from datasets import load_dataset
-
 
 # ----- Prompt/template utilities -----
 SYSTEM = (
@@ -110,7 +111,10 @@ class DataCollator:
             full = ft["prompt"] + ft["target"] + (self.tokenizer.eos_token or "")
 
             prompt_ids = self.tokenizer(
-                ft["prompt"], add_special_tokens=False
+                ft["prompt"], 
+                add_special_tokens=False, 
+                truncation=True, 
+                max_length=self.max_length,
             )["input_ids"]
             split_idxs.append(len(prompt_ids))
             input_texts.append(full)
@@ -229,6 +233,7 @@ def main():
         tokenizer.eos_token = tokenizer.pad_token
 
     model = AutoModelForCausalLM.from_pretrained(args.model_name_or_path)
+    model.config.loss_type = "ForCausalLMLoss"
     model.config.pad_token_id = tokenizer.pad_token_id
     # Disable KV caching during training (faster + required when using GC)
     model.config.use_cache = False
@@ -239,8 +244,11 @@ def main():
     model.resize_token_embeddings(len(tokenizer))
     model.to(device)
 
+    if torch.cuda.is_available():
+        torch.cuda.reset_peak_memory_stats(device)
+
     if args.compile and hasattr(torch, "compile"):
-        model = torch.compile(model)
+        model = torch.compile(model, backend="aot_eager")
 
     train_ds = JSONLSFTDataset(args.train_path)
     eval_ds = JSONLSFTDataset(args.eval_path) if args.eval_path else None
@@ -308,11 +316,12 @@ def main():
         if rank == 0:
             print(f"Resumed from {args.resume_from} at step {global_step}, epoch {start_epoch}")
 
-    scaler = torch.cuda.amp.GradScaler(enabled=args.fp16)
+    scaler = torch.amp.GradScaler(device="cuda", enabled=args.fp16)
     use_bf16 = args.bf16 and torch.cuda.is_available()
     use_fp16 = args.fp16 and torch.cuda.is_available()
 
     model.train()
+
 
     for epoch in range(start_epoch, args.epochs):
 
@@ -373,7 +382,10 @@ def main():
                 if rank == 0 and global_step % args.log_every == 0:
                     avg_accum_loss = tw_numer / max(1, tw_denom)  # token-weighted mean loss
                     lr = scheduler.get_last_lr()[0]
-                    print(f"epoch {epoch+1} step {global_step} | loss {avg_accum_loss:.4f} | lr {lr:.6e}")
+                    peak_mem = torch.cuda.max_memory_allocated(device) / (1024 ** 2)
+                    print(f"epoch {epoch+1} step {global_step} | loss {avg_accum_loss:.4f} "
+                            f"| lr {lr:.6e} | peak_mem {peak_mem:.1f} MB")
+                    torch.cuda.reset_peak_memory_stats(device)
 
                 # reset for the next accumulation window
                 tw_numer = 0.0
@@ -402,6 +414,7 @@ def main():
             model.save_pretrained(save_dir)
             tokenizer.save_pretrained(save_dir)
             print(f"Saved weights to {save_dir}")
+
 
     if rank == 0:
         print("Training complete.")
