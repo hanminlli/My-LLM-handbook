@@ -1386,6 +1386,12 @@ Gradient checkpointing is the technique that
 This technique is useful when fine-tuning very large models on limited GPU memory, often lets you increase batch size or sequence length at the cost of some speed.
 
 
+\subsubsection{Gradient Accumulation}
+Sometimes, when the GPU does not fit the full effective batch in memory.
+In this case, we split the large batch into $N$ micro-batches, and for each micro batch, we run (i) forward-backward and accumulate the gradient, but \textbf{do not} step (ii) scale the loss down by $\frac{1}{N}$ so that the accumulated gradient is correct.
+After $N$ steps, we do optimizer.step() once, in this way, we can simulate a large batch size while staying within memory limits.
+
+
 
 \subsection{Supervised Fine-Tuning (SFT)}
 Our goal is to make the LLM output exactly match human-provided target completions given prompts.

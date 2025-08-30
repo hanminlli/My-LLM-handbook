@@ -58,10 +58,11 @@
 \contentsline {subsection}{\numberline {10.2}Perplexity}{27}{subsection.10.2}%
 \contentsline {subsection}{\numberline {10.3}Finetuning Loss}{27}{subsection.10.3}%
 \contentsline {subsubsection}{\numberline {10.3.1}Gradient Checkpointing}{27}{subsubsection.10.3.1}%
+\contentsline {subsubsection}{\numberline {10.3.2}Gradient Accumulation}{28}{subsubsection.10.3.2}%
 \contentsline {subsection}{\numberline {10.4}Supervised Fine-Tuning (SFT)}{28}{subsection.10.4}%
 \contentsline {subsection}{\numberline {10.5}Instruction Tuning}{28}{subsection.10.5}%
 \contentsline {paragraph}{Common instruction datasets}{28}{section*.31}%
-\contentsline {subsection}{\numberline {10.6}Continued Pretraining}{28}{subsection.10.6}%
+\contentsline {subsection}{\numberline {10.6}Continued Pretraining}{29}{subsection.10.6}%
 \contentsline {subsection}{\numberline {10.7}Parameter-Efficient Fine-Tuning (PEFT)}{29}{subsection.10.7}%
 \contentsline {paragraph}{Adaptors}{29}{section*.32}%
 \contentsline {paragraph}{Low-Rank Adaptation of LLMs}{29}{section*.33}%
