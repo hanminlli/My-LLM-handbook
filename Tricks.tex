@@ -1410,6 +1410,66 @@ In practice we will just mask in the following way.
 \end{align*}
 
 
+
+\subsubsection{Parallelism}
+
+\paragraph{PyTorch DDP:}
+Currently, the baseline of finetuning models in parallel is to use raw PyTorch DDP (distributed data parallel), where we have $1$ GPU for each process.
+
+Gradients are averaged via ``torch.distributed.all\_reduce''.
+
+\paragraph{Pros:}
+
+\textbullet~ Native PyTorch, minimal dependencies, and we have full control over everything.
+
+\paragraph{Cons:}
+
+\textbullet~ We must handle everything, checkpointing, gradient accumulation, optimizer sharding and memory scaling, which makes it hard to handle for very large models (10B +)
+
+\paragraph{Hugging face accelerate:}
+This is pretty common nowadays, basically, we just use the PyTorch training loop and add decorators, now it would run on one or serveral GPUs, with optional DeepSeed/FSDP integration.
+
+Under the hood, it is still DDP, but we 
+\begin{itemize}
+  \item Handles GPU assignment, logging only on rank $0$, checkpoint saving.
+  \item Can automatically switch to DeepSpeed ZeRO or FSDP with a config file.
+  \item Hugely reduces boilerplate.
+\end{itemize}
+
+Common use cases include: SFT of 7B - 13B models across 4-8 A100 GPUs.
+
+\paragraph{DeepSpeed ZeRO}
+This enables massive models by sharding optimizer, gradients and parameters across GPUs.
+Its key idea is ZeRO which is zero redundancy optimizer, it includes stages:
+\begin{itemize}
+  \item Stage 1: shard optimizer states.
+  \item Stage 2: shard optimizer states + gradients.
+  \item Stage 3: shard everything (including parameters).
+\end{itemize}
+and extras such as CPU/NVMe offloading, activation checkpointing, communication optimizations.
+
+Use cases: Training 13B-70B models across 64-512 GPUs, needed when VRAM is limiting, even with 80GB A100s. 
+Often combined with LoRA/QLoRA for finetuning.
+
+
+\paragraph{PyTorch FSDP}
+This is basically a native PyTorch way to do what DeepSpeed ZeRO does.
+It works in a way that it (i) shards parameters and gradients across ranks, (ii) loads only parts of the model per GPU at a time. 
+This also supports activation checkpointing.
+
+
+\paragraph{HuggingFace Trainer}
+Where we do not write loop, just pass datasets + model + arguments.
+
+As a summary 
+\begin{itemize}
+  \item Small models ($\leq$ 13B), we do SFTTrainer + LoRA + Accelerate (4-8) GPUs.
+  \item Medium models (13B - 30B), we do Accelerate + DeepSpeed ZeRO-2/FSDP.
+  \item Large models ($\geq$ 65B), DeepSpeed ZeRO-3 or FSDP across hundreds of GPUs. HuggingFace Trainer or custom PyTorch loop orchestrated by Accelerate.. Always with mixed precision (bf16/FP8)
+\end{itemize}
+
+
+
 \subsection{Instruction Tuning}
 As we have said, pretrained LLMs (like GPT, LLaMA, Falcon, etc.) are trained on massive text corpora with the next-token prediction objective.
 They learn a lot of knowledge and general linguistic ability, but they are not naturally aligned with human intent, if we ask for a list or code snippet, they may not format it correctly or if we ask a question, they might continue the text in a way that doesn't look like an answer.

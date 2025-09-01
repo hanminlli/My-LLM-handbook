@@ -82,57 +82,65 @@
 \@writefile{toc}{\contentsline {subsection}{\numberline {10.4}Supervised Fine-Tuning (SFT)}{28}{subsection.10.4}\protected@file@percent }
 \newlabel{eq:lossSFT}{{{SFT}}{28}{Supervised Fine-Tuning (SFT)}{AMS.30}{}}
 \newlabel{eq:lossSFT@cref}{{[equation][2147483647][]{SFT}}{[1][28][]28}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {10.5}Instruction Tuning}{28}{subsection.10.5}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Common instruction datasets}{28}{section*.31}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {10.6}Continued Pretraining}{29}{subsection.10.6}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {10.7}Parameter-Efficient Fine-Tuning (PEFT)}{29}{subsection.10.7}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Adaptors}{29}{section*.32}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Low-Rank Adaptation of LLMs}{29}{section*.33}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {10.8}Reinforcement Learning from Human Feedback (RLHF)}{31}{subsection.10.8}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Stage 1: Supervised Finetuning}{31}{section*.34}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Stage 2: Reward Modelling}{31}{section*.35}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Stage 3: RL fine-tuning using PPO (Proximal Policy Optimization) with KL regularization.}{33}{section*.36}\protected@file@percent }
-\newlabel{eq-obj-RL}{{12}{33}{Stage 3: RL fine-tuning using PPO (Proximal Policy Optimization) with KL regularization}{equation.10.12}{}}
-\newlabel{eq-obj-RL@cref}{{[equation][12][]12}{[1][33][]33}}
-\@writefile{toc}{\contentsline {paragraph}{Sampling:}{34}{section*.37}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Computation:}{35}{section*.38}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {10.9}The Bigger Picture in Reinforcement Learning (PPO)}{36}{subsection.10.9}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Objective:}{37}{section*.39}\protected@file@percent }
-\newlabel{eq:J}{{13}{37}{Objective:}{equation.10.13}{}}
-\newlabel{eq:J@cref}{{[equation][13][]13}{[1][36][]37}}
-\@writefile{toc}{\contentsline {paragraph}{Policy Gradient:}{37}{section*.40}\protected@file@percent }
-\newlabel{eq:A}{{{A}}{37}{Policy Gradient:}{AMS.42}{}}
-\newlabel{eq:A@cref}{{[equation][2147483647][]{A}}{[1][37][]37}}
-\newlabel{eq:JG}{{14}{38}{Policy Gradient:}{equation.10.14}{}}
-\newlabel{eq:JG@cref}{{[equation][14][]14}{[1][38][]38}}
-\@writefile{toc}{\contentsline {paragraph}{From reward to policy update:}{39}{section*.43}\protected@file@percent }
-\newlabel{eq:GHAT}{{16}{40}{From reward to policy update:}{equation.10.16}{}}
-\newlabel{eq:GHAT@cref}{{[equation][16][]16}{[1][40][]40}}
-\newlabel{eq:policy-grad}{{{Policy Gradient}}{40}{From reward to policy update:}{AMS.45}{}}
-\newlabel{eq:policy-grad@cref}{{[equation][2147483647][]{Policy Gradient}}{[1][40][]40}}
-\@writefile{toc}{\contentsline {paragraph}{Importance sampling based on old policy data.}{41}{section*.46}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Clipping.}{41}{section*.47}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Entropy bonus.}{41}{section*.48}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Full PPO loss.}{41}{section*.49}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Practical hint.}{42}{section*.50}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Regarding the meaning of concepts}{43}{section*.51}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {10.10}PPO-KL}{43}{subsection.10.10}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {10.11}DPO (Direct Preference Optimization)}{44}{subsection.10.11}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Why do we assume $r$ follows the specific form?}{45}{section*.54}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {10.12}GPRO (Generalized Preference Optimization)}{45}{subsection.10.12}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{The intuition:}{46}{section*.55}\protected@file@percent }
-\newlabel{eq:change-measure}{{17}{46}{The intuition:}{equation.10.17}{}}
-\newlabel{eq:change-measure@cref}{{[equation][17][]17}{[1][46][]46}}
-\@writefile{toc}{\contentsline {paragraph}{The insight of GPRO:}{47}{section*.56}\protected@file@percent }
-\newlabel{eq:org-1}{{18}{47}{The insight of GPRO:}{equation.10.18}{}}
-\newlabel{eq:org-1@cref}{{[equation][18][]18}{[1][47][]47}}
-\@writefile{toc}{\contentsline {paragraph}{Relation to DPO}{49}{section*.57}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {10.13}On Policy and Off Policy}{50}{subsection.10.13}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Value based methods:}{51}{section*.58}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{SARSA: State-Action-Reward-State-Action (On policy)}{51}{section*.59}\protected@file@percent }
-\@writefile{toc}{\contentsline {paragraph}{Q-learning (Off-policy)}{51}{section*.60}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {10.14}Domain Adaption}{52}{subsection.10.14}\protected@file@percent }
-\newlabel{LastPage}{{}{52}{}{page.52}{}}
-\xdef\lastpage@lastpage{52}
-\xdef\lastpage@lastpageHy{52}
-\gdef \@abspage@last{52}
+\@writefile{toc}{\contentsline {subsubsection}{\numberline {10.4.1}Parallelism}{28}{subsubsection.10.4.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{PyTorch DDP:}{28}{section*.31}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Pros:}{28}{section*.32}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Cons:}{28}{section*.33}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Hugging face accelerate:}{28}{section*.34}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{DeepSpeed ZeRO}{29}{section*.35}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{PyTorch FSDP}{29}{section*.36}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{HuggingFace Trainer}{29}{section*.37}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {10.5}Instruction Tuning}{29}{subsection.10.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Common instruction datasets}{29}{section*.38}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {10.6}Continued Pretraining}{30}{subsection.10.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {10.7}Parameter-Efficient Fine-Tuning (PEFT)}{30}{subsection.10.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Adaptors}{30}{section*.39}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Low-Rank Adaptation of LLMs}{30}{section*.40}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {10.8}Reinforcement Learning from Human Feedback (RLHF)}{32}{subsection.10.8}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Stage 1: Supervised Finetuning}{32}{section*.41}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Stage 2: Reward Modelling}{32}{section*.42}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Stage 3: RL fine-tuning using PPO (Proximal Policy Optimization) with KL regularization.}{34}{section*.43}\protected@file@percent }
+\newlabel{eq-obj-RL}{{12}{34}{Stage 3: RL fine-tuning using PPO (Proximal Policy Optimization) with KL regularization}{equation.10.12}{}}
+\newlabel{eq-obj-RL@cref}{{[equation][12][]12}{[1][34][]34}}
+\@writefile{toc}{\contentsline {paragraph}{Sampling:}{35}{section*.44}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Computation:}{36}{section*.45}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {10.9}The Bigger Picture in Reinforcement Learning (PPO)}{37}{subsection.10.9}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Objective:}{38}{section*.46}\protected@file@percent }
+\newlabel{eq:J}{{13}{38}{Objective:}{equation.10.13}{}}
+\newlabel{eq:J@cref}{{[equation][13][]13}{[1][37][]38}}
+\@writefile{toc}{\contentsline {paragraph}{Policy Gradient:}{38}{section*.47}\protected@file@percent }
+\newlabel{eq:A}{{{A}}{38}{Policy Gradient:}{AMS.49}{}}
+\newlabel{eq:A@cref}{{[equation][2147483647][]{A}}{[1][38][]38}}
+\newlabel{eq:JG}{{14}{39}{Policy Gradient:}{equation.10.14}{}}
+\newlabel{eq:JG@cref}{{[equation][14][]14}{[1][39][]39}}
+\@writefile{toc}{\contentsline {paragraph}{From reward to policy update:}{40}{section*.50}\protected@file@percent }
+\newlabel{eq:GHAT}{{16}{41}{From reward to policy update:}{equation.10.16}{}}
+\newlabel{eq:GHAT@cref}{{[equation][16][]16}{[1][41][]41}}
+\newlabel{eq:policy-grad}{{{Policy Gradient}}{41}{From reward to policy update:}{AMS.52}{}}
+\newlabel{eq:policy-grad@cref}{{[equation][2147483647][]{Policy Gradient}}{[1][41][]41}}
+\@writefile{toc}{\contentsline {paragraph}{Importance sampling based on old policy data.}{42}{section*.53}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Clipping.}{42}{section*.54}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Entropy bonus.}{42}{section*.55}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Full PPO loss.}{42}{section*.56}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Practical hint.}{43}{section*.57}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Regarding the meaning of concepts}{44}{section*.58}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {10.10}PPO-KL}{44}{subsection.10.10}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {10.11}DPO (Direct Preference Optimization)}{45}{subsection.10.11}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Why do we assume $r$ follows the specific form?}{46}{section*.61}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {10.12}GPRO (Generalized Preference Optimization)}{46}{subsection.10.12}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{The intuition:}{47}{section*.62}\protected@file@percent }
+\newlabel{eq:change-measure}{{17}{47}{The intuition:}{equation.10.17}{}}
+\newlabel{eq:change-measure@cref}{{[equation][17][]17}{[1][47][]47}}
+\@writefile{toc}{\contentsline {paragraph}{The insight of GPRO:}{48}{section*.63}\protected@file@percent }
+\newlabel{eq:org-1}{{18}{48}{The insight of GPRO:}{equation.10.18}{}}
+\newlabel{eq:org-1@cref}{{[equation][18][]18}{[1][48][]48}}
+\@writefile{toc}{\contentsline {paragraph}{Relation to DPO}{50}{section*.64}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {10.13}On Policy and Off Policy}{51}{subsection.10.13}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Value based methods:}{52}{section*.65}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{SARSA: State-Action-Reward-State-Action (On policy)}{52}{section*.66}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Q-learning (Off-policy)}{52}{section*.67}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {10.14}Domain Adaption}{53}{subsection.10.14}\protected@file@percent }
+\newlabel{LastPage}{{}{53}{}{page.53}{}}
+\xdef\lastpage@lastpage{53}
+\xdef\lastpage@lastpageHy{53}
+\gdef \@abspage@last{53}
