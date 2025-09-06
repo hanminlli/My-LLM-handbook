@@ -17,15 +17,21 @@ conda activate real-SFT
 # --- put HF cache on scratch to avoid home quota ---
 export HF_HOME=/ibex/scratch/$USER/hf_cache
 export HF_HUB_CACHE=$HF_HOME/hub
-export TRANSFORMERS_CACHE=$HF_HOME/transformers
+export HF_DATASETS_CACHE=$HF_HOME/datasets
 export HF_HUB_ENABLE_XET=0
-mkdir -p "$HF_HUB_CACHE" "$TRANSFORMERS_CACHE"
+mkdir -p "$HF_HUB_CACHE" "$HF_DATASETS_CACHE"
 
 # --- sane defaults for multi-GPU jobs ---
 export TOKENIZERS_PARALLELISM=false
 export NCCL_P2P_DISABLE=0
 export NCCL_IB_DISABLE=0
 export NCCL_ASYNC_ERROR_HANDLING=1
+export OMP_NUM_THREADS=8
+ulimit -n 4096
+
+# --- rendezvous / ports (avoid collisions on shared login/compute nodes) ---
+export MASTER_ADDR=127.0.0.1
+export MASTER_PORT=29577
 
 # --- log cache path ---
 echo "Using Hugging Face cache at $HF_HOME"
@@ -45,10 +51,10 @@ accelerate launch \
   --num_processes 2 \
   --mixed_precision bf16 \
   --dynamo_backend no \
+  --main_process_port ${MASTER_PORT} \
   train_sft_qwen2_ultrachat.py \
   --model_name Qwen/Qwen2-7B \
   --bf16 \
-  --gradient_checkpointing \
   --per_device_train_batch_size 2 \
   --per_device_eval_batch_size 2 \
   --gradient_accumulation_steps 8 \

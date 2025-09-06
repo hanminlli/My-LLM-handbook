@@ -102,6 +102,7 @@ class FastResponseOnlyCollator:
     the dataset.
     """
     tokenizer: PreTrainedTokenizerBase
+    max_length: int = 4096
 
     def __call__(self, examples: Sequence[Dict]) -> Dict[str, torch.Tensor]:
         # Expect each example to have {"text": str, "prompt_len": int}
@@ -113,6 +114,7 @@ class FastResponseOnlyCollator:
             texts,
             padding=True,
             truncation=True,
+            max_length=self.max_length,
             return_tensors="pt",
         )
         labels = batch["input_ids"].clone()
@@ -126,6 +128,11 @@ class FastResponseOnlyCollator:
 
         batch["labels"] = labels
         return batch
+    
+
+def _formatting_func(batch):
+    # batch is a dict of lists; return a list[str]
+    return batch["text"]
 
 
 def build_argparser():
@@ -182,8 +189,7 @@ def main():
 
     model = AutoModelForCausalLM.from_pretrained(
         args.model_name,
-        torch_dtype="auto",
-        device_map=None,               # Accelerate decides on placement
+        dtype="auto",
         attn_implementation="sdpa",    # safe default on A100 with bf16
     )
 
@@ -191,11 +197,11 @@ def main():
     model.config.pad_token_id = tok.pad_token_id
     model.config.use_cache = False
 
-    if args.gradient_checkpointing and hasattr(model, "gradient_checkpointing_enable"):
-        try:
-            model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
-        except TypeError:
-            model.gradient_checkpointing_enable()
+    # if args.gradient_checkpointing and hasattr(model, "gradient_checkpointing_enable"):
+    #     try:
+    #         model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
+    #     except TypeError:
+    #         model.gradient_checkpointing_enable()
 
     # Only needed if we add new tokens.
     model.resize_token_embeddings(len(tok))
@@ -258,7 +264,7 @@ def main():
         ds_eval  = ds_eval.map(lambda r: {"text": r["text"] + tok.eos_token})
 
     # ----- Response-only masking -----
-    collator = FastResponseOnlyCollator(tokenizer=tok)
+    collator = FastResponseOnlyCollator(tokenizer=tok, max_length=args.max_seq_length)
 
     # ----- LoRA -----
     peft_cfg = None
@@ -277,45 +283,49 @@ def main():
 
     # ----- Trainer -----
     trainer = SFTTrainer(
-        model=model,
-        train_dataset=ds_train,
-        eval_dataset=ds_eval.select(range(min(2000, len(ds_eval)))),
-        data_collator=collator,
-        peft_config=peft_cfg,
-        processing_class=tok, 
+    model=model,
+    train_dataset=ds_train,
+    eval_dataset=ds_eval.select(range(min(2000, len(ds_eval)))),
 
-        # training args
-        args=SFTConfig(
-            dataset_text_field="text",
-            max_seq_length=args.max_seq_length,
-            packing=not args.no_packing,
+    data_collator=collator,
+    peft_config=peft_cfg,
+    processing_class=tok,
 
-            learning_rate=args.learning_rate,
-            lr_scheduler_type="cosine",
-            warmup_ratio=args.warmup_ratio,
-            weight_decay=args.weight_decay,
+    args=SFTConfig(
+        max_length=args.max_seq_length,
+        packing=False, 
 
-            per_device_train_batch_size=args.per_device_train_batch_size,
-            per_device_eval_batch_size=args.per_device_eval_batch_size,
-            gradient_accumulation_steps=args.gradient_accumulation_steps,
+        # don't let Trainer removed our text column before our collator saw it
+        remove_unused_columns=False,
+        ddp_find_unused_parameters=False,
 
-            bf16=args.bf16,
-            logging_steps=args.logging_steps,
-            save_steps=args.save_steps,
-            save_total_limit=args.save_total_limit,
-            evaluation_strategy="steps",
-            eval_steps=args.eval_steps,
+        learning_rate=args.learning_rate,
+        lr_scheduler_type="cosine",
+        warmup_ratio=args.warmup_ratio,
+        weight_decay=args.weight_decay,
 
-            num_train_epochs=None if args.max_steps > 0 else args.num_train_epochs,
-            max_steps=args.max_steps,
+        per_device_train_batch_size=args.per_device_train_batch_size,
+        per_device_eval_batch_size=args.per_device_eval_batch_size,
+        gradient_accumulation_steps=args.gradient_accumulation_steps,
 
-            output_dir=args.output_dir,
-            report_to=["wandb"],
-            run_name=args.run_name,
-            save_safetensors=True,
-        ),
-        callbacks=[PerplexityCallback()],
-    )
+        bf16=args.bf16,
+        logging_steps=args.logging_steps,
+        save_steps=args.save_steps,
+        save_total_limit=args.save_total_limit,
+        eval_strategy="steps",
+        eval_steps=args.eval_steps,
+
+        num_train_epochs=None if args.max_steps > 0 else args.num_train_epochs,
+        max_steps=args.max_steps,
+
+        output_dir=args.output_dir,
+        report_to=["wandb"],
+        run_name=args.run_name,
+        save_safetensors=True,
+    ),
+    callbacks=[PerplexityCallback()],
+)
+
 
     trainer.train()
     trainer.model.save_pretrained(args.output_dir)
