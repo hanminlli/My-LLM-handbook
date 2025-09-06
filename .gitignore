@@ -1,2 +1,10 @@
 *.jsonl
 Code/my_SFT/raw_DDP/sft-dolly-gpt2m
+*.log
+*.aux
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.gz
+*.toc
