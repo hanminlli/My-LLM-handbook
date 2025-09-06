@@ -14,6 +14,22 @@
 source ~/anaconda3/etc/profile.d/conda.sh
 conda activate real-SFT
 
+# --- put HF cache on scratch to avoid home quota ---
+export HF_HOME=/ibex/scratch/$USER/hf_cache
+export HF_HUB_CACHE=$HF_HOME/hub
+export TRANSFORMERS_CACHE=$HF_HOME/transformers
+export HF_HUB_ENABLE_XET=0
+mkdir -p "$HF_HUB_CACHE" "$TRANSFORMERS_CACHE"
+
+# --- sane defaults for multi-GPU jobs ---
+export TOKENIZERS_PARALLELISM=false
+export NCCL_P2P_DISABLE=0
+export NCCL_IB_DISABLE=0
+export NCCL_ASYNC_ERROR_HANDLING=1
+
+# --- log cache path ---
+echo "Using Hugging Face cache at $HF_HOME"
+
 # --- logs ---
 mkdir -p logs/exp_shell
 echo "[$(date)] starting ${SLURM_JOB_NAME}" | tee -a logs/exp_shell/start.log
@@ -23,7 +39,12 @@ export WANDB_PROJECT="sft-ultrachat-qwen2"
 export WANDB_WATCH="false"
 
 # --- training ---
-accelerate launch --multi_gpu --num_processes 2 \
+# Be explicit with accelerate to avoid warnings
+accelerate launch \
+  --num_machines 1 \
+  --num_processes 2 \
+  --mixed_precision bf16 \
+  --dynamo_backend no \
   train_sft_qwen2_ultrachat.py \
   --model_name Qwen/Qwen2-7B \
   --bf16 \

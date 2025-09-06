@@ -18,7 +18,7 @@ from transformers import (
     TrainerCallback,
     set_seed,
 )
-from trl import SFTTrainer
+from trl import SFTTrainer, SFTConfig
 from peft import LoraConfig, PeftModel
 
 SYSTEM = "You are a helpful, honest, and concise assistant.\n"
@@ -278,33 +278,42 @@ def main():
     # ----- Trainer -----
     trainer = SFTTrainer(
         model=model,
-        tokenizer=tok,
-        peft_config=peft_cfg,
         train_dataset=ds_train,
-        eval_dataset=ds_eval.select(range(min(2000, len(ds_eval)))),  # quick sanity eval
-        dataset_text_field="text",
-        max_seq_length=args.max_seq_length,
-        packing=not args.no_packing,
+        eval_dataset=ds_eval.select(range(min(2000, len(ds_eval)))),
         data_collator=collator,
-        learning_rate=args.learning_rate,
-        lr_scheduler_type="cosine",
-        warmup_ratio=args.warmup_ratio,
-        weight_decay=args.weight_decay,
-        per_device_train_batch_size=args.per_device_train_batch_size,
-        per_device_eval_batch_size=args.per_device_eval_batch_size,
-        gradient_accumulation_steps=args.gradient_accumulation_steps,
-        bf16=args.bf16,
-        logging_steps=args.logging_steps,
-        save_steps=args.save_steps,
-        save_total_limit=args.save_total_limit,
-        evaluation_strategy="steps",
-        eval_steps=args.eval_steps,
-        num_train_epochs=None if args.max_steps > 0 else args.num_train_epochs,
-        max_steps=args.max_steps,
-        output_dir=args.output_dir,
-        report_to=["wandb"],
-        run_name=args.run_name,
-        save_safetensors=True,
+        peft_config=peft_cfg,
+        processing_class=tok, 
+
+        # training args
+        args=SFTConfig(
+            dataset_text_field="text",
+            max_seq_length=args.max_seq_length,
+            packing=not args.no_packing,
+
+            learning_rate=args.learning_rate,
+            lr_scheduler_type="cosine",
+            warmup_ratio=args.warmup_ratio,
+            weight_decay=args.weight_decay,
+
+            per_device_train_batch_size=args.per_device_train_batch_size,
+            per_device_eval_batch_size=args.per_device_eval_batch_size,
+            gradient_accumulation_steps=args.gradient_accumulation_steps,
+
+            bf16=args.bf16,
+            logging_steps=args.logging_steps,
+            save_steps=args.save_steps,
+            save_total_limit=args.save_total_limit,
+            evaluation_strategy="steps",
+            eval_steps=args.eval_steps,
+
+            num_train_epochs=None if args.max_steps > 0 else args.num_train_epochs,
+            max_steps=args.max_steps,
+
+            output_dir=args.output_dir,
+            report_to=["wandb"],
+            run_name=args.run_name,
+            save_safetensors=True,
+        ),
         callbacks=[PerplexityCallback()],
     )
 
