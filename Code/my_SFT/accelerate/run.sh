@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=qwen2-ultra-sft-2g
+#SBATCH --job-name=qwen2-ultra-sft
 #SBATCH --output=logs/%x.%j.out
 #SBATCH --error=logs/%x.%j.err
 #SBATCH --nodes=1
@@ -11,7 +11,8 @@
 #SBATCH --mail-type=BEGIN,END,FAIL
 
 # --- environment ---
-source activate real_SFT
+source ~/anaconda3/etc/profile.d/conda.sh
+conda activate real-SFT
 
 # --- logs ---
 mkdir -p logs/exp_shell

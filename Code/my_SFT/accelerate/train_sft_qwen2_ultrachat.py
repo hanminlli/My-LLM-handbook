@@ -1,23 +1,24 @@
-# my_SFT/raw_DDP/train_sft_qwen2_ultrachat_wandb.py
-
+# my_SFT/raw_DDP/train_sft_qwen2_ultrachat.py
 """
-Qwen2-7B + UltraChat-200k SFT baseline with accelerate + W&B.
-
-Changes vs your original:
-- Uses a TrainerCallback to compute & log perplexity from eval_loss (compute_metrics isn't called with eval_loss).
-- Safer gradient checkpointing (use_reentrant=False when available).
-- Ensures model.config.pad_token_id matches tokenizer.
-- Drops extra dataset columns (keeps only "text").
-- Optional EOS append to targets.
-- W&B: supports --run_name and --wandb_project (or env WANDB_PROJECT).
+Qwen2-7B + UltraChat-200k SFT baseline with accelerate
 """
 
 import argparse
 import math
 import os
+from dataclasses import dataclass
+from typing import Dict, Sequence
+
+import torch
 from datasets import load_dataset
-from transformers import AutoTokenizer, AutoModelForCausalLM, set_seed, TrainerCallback
-from trl import SFTTrainer, DataCollatorForCompletionOnlyLM
+from transformers import (
+    AutoTokenizer,
+    AutoModelForCausalLM,
+    PreTrainedTokenizerBase,
+    TrainerCallback,
+    set_seed,
+)
+from trl import SFTTrainer
 from peft import LoraConfig, PeftModel
 
 SYSTEM = "You are a helpful, honest, and concise assistant.\n"
@@ -41,16 +42,30 @@ def build_prompt(instruction: str, input_text: str = "") -> str:
 
 def map_ultrachat_row(row):
     """
-    Extract the last user → assistant pair as a single-turn SFT example.
-    See original comments for rationale. Returns a dict with a single key "text".
+    Extract the last user, assistant pair as a single-turn SFT example.
+    Returns {"prompt": <prompt>, "response": <assistant_text>} or {"prompt": None, "response": None}.
+    We train using the last pair, because we intend to train the model to answer
+    the question instead of continue conversation, the early returns of assitant could 
+    be context-dependent, which requires remembering previous turns, and the prompt formatting
+    here does not include. Besides, early assiatant answers could be short, incomplete and 
+    hallucinated. Given the dataset is already huge, we keep it simple here.
+    Each row of UltraChat Datset looks like:
+    {
+        "messages": [
+            {"role": "user", "content": "Hello, how are you?"},
+            {"role": "assistant", "content": "I'm doing well, thanks!"},
+            {"role": "user", "content": "Can you write me a poem about cats?"},
+            {"role": "assistant", "content": "Sure! Here's a poem..."}
+        ]
+    }
     """
     if "messages" not in row or not row["messages"]:
-        return {"text": None}
+        return {"prompt": None, "response": None}
 
     msgs = row["messages"]
     last_a = max((i for i, m in enumerate(msgs) if m.get("role") == "assistant"), default=None)
     if last_a is None:
-        return {"text": None}
+        return {"prompt": None, "response": None}
 
     user_idx = None
     for i in range(last_a - 1, -1, -1):
@@ -58,25 +73,59 @@ def map_ultrachat_row(row):
             user_idx = i
             break
     if user_idx is None:
-        return {"text": None}
+        return {"prompt": None, "response": None}
 
     instr = (msgs[user_idx].get("content") or "").strip()
     out = (msgs[last_a].get("content") or "").strip()
     if not instr or not out:
-        return {"text": None}
+        return {"prompt": None, "response": None}
 
     prompt = build_prompt(instruction=instr, input_text="")
-    return {"text": prompt + out}
+    return {"prompt": prompt, "response": out}
 
 
 class PerplexityCallback(TrainerCallback):
     """Compute eval perplexity from eval_loss and inject into metrics & stdout."""
-
     def on_evaluate(self, args, state, control, metrics=None, **kwargs):
         if metrics and "eval_loss" in metrics:
             ppl = math.exp(metrics["eval_loss"]) if metrics["eval_loss"] < 20 else float("inf")
             metrics["eval_ppl"] = ppl
             print(f"[eval] step={state.global_step} loss={metrics['eval_loss']:.4f} ppl={ppl:.3f}")
+
+
+@dataclass
+class FastResponseOnlyCollator:
+    """
+    Masks everything before the response start so loss is computed only on the assistant completion.
+    We precompute prompt_len (prompt token length) per sample, so masking is O(1).
+    When the DataLoader asks for a batch, Hugging Face Datasets gives the collator a list of rows from
+    the dataset.
+    """
+    tokenizer: PreTrainedTokenizerBase
+
+    def __call__(self, examples: Sequence[Dict]) -> Dict[str, torch.Tensor]:
+        # Expect each example to have {"text": str, "prompt_len": int}
+        # examples are a list of dataset rows.
+        texts = [ex["text"] for ex in examples]
+        prompt_lens = torch.tensor([int(ex["prompt_len"]) for ex in examples], dtype=torch.long)
+
+        batch = self.tokenizer(
+            texts,
+            padding=True,
+            truncation=True,
+            return_tensors="pt",
+        )
+        labels = batch["input_ids"].clone()
+
+        # Mask tokens before the response start
+        seq_len = labels.size(1)
+        for i in range(labels.size(0)):
+            cut = min(prompt_lens[i].item(), seq_len)
+            if cut > 0:
+                labels[i, :cut] = -100
+
+        batch["labels"] = labels
+        return batch
 
 
 def build_argparser():
@@ -120,7 +169,7 @@ def main():
     args = build_argparser().parse_args()
     set_seed(args.seed)
 
-    # ----- W&B env (optional) -----
+    # ----- W&B env -----
     if args.wandb_project:
         os.environ.setdefault("WANDB_PROJECT", args.wandb_project)
     os.environ.setdefault("WANDB_WATCH", "false")  # avoid excessive logging of gradients/parameters
@@ -134,8 +183,8 @@ def main():
     model = AutoModelForCausalLM.from_pretrained(
         args.model_name,
         torch_dtype="auto",
-        device_map=None,  # Accelerate decides on placement
-        attn_implementation="sdpa",  # safe default on A100 with bf16
+        device_map=None,               # Accelerate decides on placement
+        attn_implementation="sdpa",    # safe default on A100 with bf16
     )
 
     # Ensure model config matches tokenizer for padding, and disable KV cache during FT
@@ -146,52 +195,77 @@ def main():
         try:
             model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
         except TypeError:
-            # older transformers fallback
             model.gradient_checkpointing_enable()
 
-    # Only needed if you add new tokens. With untouched vocab this is a no-op, but harmless.
+    # Only needed if we add new tokens.
     model.resize_token_embeddings(len(tok))
 
     # ----- datasets -----
     ds_train = load_dataset(args.dataset, split=args.train_split)
-    ds_eval = load_dataset(args.dataset, split=args.eval_split)
+    ds_eval  = load_dataset(args.dataset, split=args.eval_split)
 
+    # Map: messages -> (prompt, response) 
+    # Map only adds this two columns to dataset and not replacing anything
     ds_train = ds_train.map(
         map_ultrachat_row,
         remove_columns=[c for c in ds_train.column_names if c != "messages"],
         num_proc=8,
     )
-
     ds_eval = ds_eval.map(
         map_ultrachat_row,
         remove_columns=[c for c in ds_eval.column_names if c != "messages"],
         num_proc=8,
     )
 
-    ds_train = ds_train.filter(lambda r: r["text"] is not None and len(r["text"]) > 0)
-    ds_eval = ds_eval.filter(lambda r: r["text"] is not None and len(r["text"]) > 0)
+    # Filter invalid
+    ds_train = ds_train.filter(lambda r: r.get("prompt") and r.get("response"))
+    ds_eval  = ds_eval.filter(lambda r: r.get("prompt") and r.get("response"))
 
-    # keep only the training text column to save memory
-    ds_train = ds_train.remove_columns([c for c in ds_train.column_names if c != "text"])
-    ds_eval = ds_eval.remove_columns([c for c in ds_eval.column_names if c != "text"])
+    # Build "text" and precompute "prompt_len" (token length of the prompt)
+    def _build_text_and_prompt_len(batch):
+        '''
+        HF passes a batch of rows as a dict of lists
+        batch = {
+            "prompt": [
+                "### System:\n...\n### Instruction:\nTranslate 'Hello'\n### Response:\n",
+                "### System:\n...\n### Instruction:\nWhat is 2+2?\n### Response:\n"
+            ],
+            "response": [
+                "Bonjour",
+                "4"
+            ]
+        }
+        '''
+        prompts = batch["prompt"]
+        responses = batch["response"]
+        texts = [p + r for p, r in zip(prompts, responses)]
+        toks = tok(prompts, add_special_tokens=False)
+        prompt_lens = [len(ids) for ids in toks["input_ids"]]
+        return {"text": texts, "prompt_len": prompt_lens}
 
-    # (optional) append EOS so the model learns an explicit stopping token
+    # Map: (prompt, response) -> (text, prompt_len)
+    # Remember additive
+    ds_train = ds_train.map(_build_text_and_prompt_len, batched=True, num_proc=8)
+    ds_eval  = ds_eval.map(_build_text_and_prompt_len,  batched=True, num_proc=8)
+
+    # Keep only what Trainer/collator need, removing metadata
+    ds_train = ds_train.remove_columns([c for c in ds_train.column_names if c not in ("text", "prompt_len")])
+    ds_eval  = ds_eval.remove_columns([c for c in ds_eval.column_names if c not in ("text", "prompt_len")])
+
+    # EOS at the end of the targets
     if args.append_eos:
         ds_train = ds_train.map(lambda r: {"text": r["text"] + tok.eos_token})
-        ds_eval = ds_eval.map(lambda r: {"text": r["text"] + tok.eos_token})
+        ds_eval  = ds_eval.map(lambda r: {"text": r["text"] + tok.eos_token})
 
     # ----- Response-only masking -----
-    collator = DataCollatorForCompletionOnlyLM(
-        response_template="### Response:\n",
-        tokenizer=tok,
-    )
+    collator = FastResponseOnlyCollator(tokenizer=tok)
 
     # ----- LoRA -----
     peft_cfg = None
     if not args.no_lora:
         peft_cfg = LoraConfig(
             r=16,
-            lora_alpha=32,  # effective scale alpha/r = 2
+            lora_alpha=32,     # effective scale alpha/r = 2
             lora_dropout=0.05,
             bias="none",
             task_type="CAUSAL_LM",
@@ -207,7 +281,7 @@ def main():
         tokenizer=tok,
         peft_config=peft_cfg,
         train_dataset=ds_train,
-        eval_dataset=ds_eval.select(range(min(2000, len(ds_eval)))),  # fast sanity eval
+        eval_dataset=ds_eval.select(range(min(2000, len(ds_eval)))),  # quick sanity eval
         dataset_text_field="text",
         max_seq_length=args.max_seq_length,
         packing=not args.no_packing,
@@ -247,7 +321,6 @@ def main():
             if isinstance(model_for_save, PeftModel):
                 print("Merging LoRA adapters into base weights …")
                 model_for_save = model_for_save.merge_and_unload()
-            # If not a PEFT model (full FT), it's already dense
             model_for_save.save_pretrained(merged_dir, safe_serialization=True)
             tok.save_pretrained(merged_dir)
             print("Merged weights saved to:", merged_dir)
