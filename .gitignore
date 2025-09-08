@@ -5,5 +5,7 @@ Code/my_SFT/raw_DDP/sft-dolly-gpt2m
 *.fdb_latexmk
 *.fls
 *.out
-*.gz
+*.synctex.gz
 *.toc
+*.synctex(busy)
+*.gz
