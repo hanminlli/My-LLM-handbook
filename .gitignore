@@ -4,7 +4,6 @@ Code/my_SFT/raw_DDP/sft-dolly-gpt2m
 *.aux
 *.fdb_latexmk
 *.fls
-*.log
 *.out
 *.gz
 *.toc
