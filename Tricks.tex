@@ -508,6 +508,63 @@ After that $u$ is added to the original $x$, but the drift in $\mu_{y}$ will not
 
 \section{Positional Embedding}
 
+\subsection{RoPE (Rotary Position Embedding)}
+Let us denote $\mQ \in \R^{L \times \dmodel}$ and $\mK^{L \times \dmodel}$ as the query matrix and the key matrix.
+For each query vector 
+\begin{align}
+  \mq_l = \mQ[l, :] = \rbrac{\mq_{l,1}, \hdots, \mq_{l,\dmodel}} \in \R^{\dmodel}, 
+\end{align}
+we group the dimensions into pairs 
+\begin{align}
+  \rbrac{\mq_{l,1}, \mq_{l,2}}, \rbrac{\mq_{l,3}, \mq_{l,4}}, \hdots, \rbrac{\mq_{l,\dmodel - 1}, \mq_{l, \dmodel}},
+\end{align}
+assunimg $\dmodel$ is even.
+This gives $\frac{\dmodel}{2}$ pairs and the same for $\mK$.
+We now define angle frequencies 
+\begin{align*}
+  \theta_i = 10000^{-\frac{2(i - 1)}{\dmodel}}, \qquad \text{for } i = 1,2, \hdots \frac{\dmodel}{2}.
+\end{align*}
+We let each pair $\mq_i^{(l)} = (\mq_{l, 2i - 1}, \mq_{l, 2i})$ be rotated so that 
+\begin{align*}
+  \begin{pmatrix}
+    &\mq_{l, 2i-1}^\prime \\
+    &\mq_{l, 2i}^\prime
+  \end{pmatrix}
+  = \begin{pmatrix}
+    \cos(l\theta_i), & -\sin(l\theta_i) \\
+    \sin(l\theta_i), & \cos(l\theta_i)
+  \end{pmatrix}
+  \begin{pmatrix}
+    &\mq_{l, 2i-1} \\
+    &\mq_{l, 2i}
+  \end{pmatrix}.
+\end{align*}
+Notice that 
+\begin{align*}
+  \begin{pmatrix}
+    \cos(s\theta_i), & -\sin(s\theta_i) \\
+    \sin(s\theta_i), & \cos(s\theta_i)
+  \end{pmatrix}^{\top} \cdot \begin{pmatrix}
+    \cos(t\theta_i), & -\sin(t\theta_i) \\
+    \sin(t\theta_i), & \cos(t\theta_i)
+  \end{pmatrix} = \begin{pmatrix}
+    \cos((t-s)\theta_i), & -\sin((t-s)\theta_i) \\
+    \sin((t-s)\theta_i), & \cos((t-s)\theta_i)
+  \end{pmatrix}
+\end{align*}
+Now define the rotated vector: 
+\begin{align}
+  \tilde{\mq}_l = \tilde{\mQ}[l, :] = \mR(l)\mQ[l, :], \qquad \tilde{\mk}_l = \tilde{\mK}[l, :] = \mR(l)\mK[l, :],
+\end{align}
+where $\mR(l)$ is a block diagonal rotation matrix built from $\nicefrac{\dmodel}{2}$ rotation blocks.
+
+\paragraph{Key result:}
+When computing attention, the score between query at position $s$ and key at position $t$ is 
+\begin{align}
+  \tilde{\mQ}[s, :]^{\top}\tilde{\mK}[t, :] = \sum_{i=1}^{\nicefrac{\dmodel}{2}} \rbrac{\tilde{\mq}_i^{(s)}}^{\top} \cdot \tilde{\mk}_i
+\end{align}
+
+
 
 
 
