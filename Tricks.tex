@@ -1537,6 +1537,7 @@ where $\mA \in \R^{r \times \din}$, $\mB \in \R^{\dout \times r}$, $r$ is the lo
   \item Rank $r$ and scaling $\alpha$ are hyperparams.
 \end{enumerate}
 
+
 Its advantage includes: 
 \begin{enumerate}
   \item Drastic parameters savings.
@@ -1563,6 +1564,15 @@ Empirically, $r = 4$ to $16$ common for LLaMA, GPT-J, BLOOM, etc.
 Higher $r$ used in complex multi-task fine-tuning.
 Futher improving $r$ often gives negligible benefits.
 
+Usually, we initialize the matrix $\mA$ with normal initialization like kaiming\_uniform\_, but we initialize $\mB$ as all zeros.
+The reason is that we need to prevent the activations we get from $\mA$ from collapsing and we also need to make sure that initially the LoRA adaptor contributed nothing to the pretrained language model, by initializing $\mB$ as all zero.
+\begin{verbatim}
+  self.lora_A = nn.Parameter(torch.zeros(r, d_in))
+  self.lora_B = nn.Parameter(torch.zeros(d_out, r))
+  nn.init.kaiming_uniform_(self.lora_A, a=math.sqrt(5))
+  nn.init.zeros_(self.lora_B)
+\end{verbatim}
+
 
 \textbullet~ \textbf{QLoRA}
 This actually refers to Quantized LoRA, which allows fine-tuning very large language models (e.g., 65B params) on a single GPU without running out of memory.
@@ -1580,7 +1590,7 @@ It combines $4$-bit quantization for the frozen base model and LoRA.
 
 Note that there are double quantization effective in QLoRA, 
 \begin{enumerate}
-  \item \textbf{First quantization:} The original pretrained weight tensor $\mW_0$ is quantized is quantized from FP16/BF16 to $4$-bit NF4 values plus per-block scaling factors (distribution-aware mapping, so it preserves more accuracy than uniform int4).
+  \item \textbf{First quantization:} The original pretrained weight tensor $\mW_0$ is quantized from FP16/BF16 to $4$-bit NF4 values plus per-block scaling factors (distribution-aware mapping, so it preserves more accuracy than uniform int4).
   \begin{align*}
     \mW_0 = s \cdot \mW_0^{\text{quantized}}. 
   \end{align*}
