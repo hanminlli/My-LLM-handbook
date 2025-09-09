@@ -509,11 +509,25 @@ After that $u$ is added to the original $x$, but the drift in $\mu_{y}$ will not
 \section{Positional Embedding}
 
 
-\subsection{Sinusoidal Embedding}
+\subsection{Sinusoidal Positional Embedding}
+We just add the postion matrix $\mP \in \R^{L \times \dmodel}$ to the input embedding $\mX \in \R^{B \times L \times \dmodel}$, where $L$ is the maximum sequence length.
+To be specific, we construct $\mP$ as follows:
+\begin{align*}
+  \mP[l, 2i] = \sin\rbrac{\frac{l}{10000^{\frac{2i}{\dmodel}}}}, \quad \mP[l, 2i + 1] = \cos\rbrac{\frac{l}{10000^{\frac{2i}{\dmodel}}}},
+\end{align*}
+where $l \in [0, L - 1]$ and $i \in [0, \frac{\dmodel}{2} - 1]$.
+This way, each dimension of the positional encoding corresponds to a sinusoid of different frequency.
+The wavelengths form a geometric progression.
+We just perform 
+\begin{align*}
+  \mX^\prime = \mX + \mP,
+\end{align*}
+after constructing $\mP$.
 
 
 
-\subsection{RoPE (Rotary Position Embedding)}
+\subsection{RoPE (Rotary Positional Embedding)}
+RoPE, instead, directly encodes relative position information into the attention mechanism by \textbf{rotating the query and key vectors} based on their positions.
 Let us denote $\mQ \in \R^{L \times \dmodel}$ and $\mK^{L \times \dmodel}$ as the query matrix and the key matrix.
 For each query vector 
 \begin{align}
@@ -575,6 +589,25 @@ Notice also that we are essentially spreading the frequencies by varying $\theta
 The Fourier encoding of positions with exponentially decreasing frequencies means the set of basis functions spans a huge range, covering both short-term periodicity and long-range uniqueness, which is why the maximum context length of sinusoidal/RoPE embeddings is effectively determined by the lowest frequency (largest wavelength).
 This is similar to the sinusoidal positional embedding, but here we are directly applying it to the query and key vector.
 
+
+\paragraph{Dynamic position range:}
+One drawback of learned absolute positional embeddings is that they are fixed to the maximum sequence length used during training, and extrapolation to longer sequences is poor.
+RoPE, like sinusoidal embeddings, can generalize to longer sequences because the rotation matrices can be computed for any position index.
+However, the choice of base frequency (10000 in the original paper) determines the effective range of relative positions that can be represented before the rotations start to repeat.
+
+To be clear, at position $p$, for the $i$-th pair, the angle is $p\theta_i = p \cdot 10000^{-\frac{2(i - 1)}{\dmodel}} = p \cdot \omega_i$, we say $\omega_i$ is the frequency and $\lambda_i = \frac{2\pi}{\omega_i}$ is the wavelength, $\omega_i$ decreases exponentially with $i$, while $\lambda_i$ increases exponentially with $i$.
+For those pairs with small $i$, they have high frequency (small wavelength), which means they can only represent small relative positions before the rotations start to repeat, this is typically a few thousands tokens with base 10000, which is the reason why naive extrapolation beyond the trained length often fails.
+
+In practice, there are several strategies to adjust to the desired context length
+\begin{itemize}
+  \item \textbf{Position interpolation (NTK(Neural Tangent Kernel)-aware scaling).} Scale positions before feeding them to RoPE, let $p^\prime$ be the new position, and $p$ be the original index, we have $p^\prime = \frac{p}{L_{\text{new}}} \cdot L_{\text{train}}$.
+  
+  \item \textbf{Change base frequency.} Instead of 10000, use a larger base to spread out the frequencies more. Larger bases = slower frequencies = longer usable context, but worse local resolution.
+  
+  \item \textbf{Exponential extrapolation (YaRN, etc.)} Instead of letting the angle grow linearly with $p$, modulate it smoothly so the growth is slower and more controlled at large positions. An example of YaRN is to rescale the base frequencies non-uniformly across dimensions.
+  
+  \item \textbf{Hybrid interpolation + fine-tuning.} \textbf{NOT FINISHED!!!}
+\end{itemize}
 
 
 
