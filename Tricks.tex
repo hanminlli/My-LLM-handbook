@@ -508,6 +508,11 @@ After that $u$ is added to the original $x$, but the drift in $\mu_{y}$ will not
 
 \section{Positional Embedding}
 
+
+\subsection{Sinusoidal Embedding}
+
+
+
 \subsection{RoPE (Rotary Position Embedding)}
 Let us denote $\mQ \in \R^{L \times \dmodel}$ and $\mK^{L \times \dmodel}$ as the query matrix and the key matrix.
 For each query vector 
@@ -537,7 +542,7 @@ We let each pair $\mq_i^{(l)} = (\mq_{l, 2i - 1}, \mq_{l, 2i})$ be rotated so th
   \begin{pmatrix}
     &\mq_{l, 2i-1} \\
     &\mq_{l, 2i}
-  \end{pmatrix}.
+  \end{pmatrix} = \mR_i(l) \mq_i^{(l)}.
 \end{align*}
 Notice that 
 \begin{align*}
@@ -556,14 +561,19 @@ Now define the rotated vector:
 \begin{align}
   \tilde{\mq}_l = \tilde{\mQ}[l, :] = \mR(l)\mQ[l, :], \qquad \tilde{\mk}_l = \tilde{\mK}[l, :] = \mR(l)\mK[l, :],
 \end{align}
-where $\mR(l)$ is a block diagonal rotation matrix built from $\nicefrac{\dmodel}{2}$ rotation blocks.
+where $\mR(l)$ is a block diagonal rotation matrix built from $\nicefrac{\dmodel}{2}$ rotation blocks, this can be intepreted as if we rotate clockwisely for angle $t$ and counter-clockwisely for angle $s$, the combination of the result is to rotate clockwisely for angle $t-s$.
 
 \paragraph{Key result:}
 When computing attention, the score between query at position $s$ and key at position $t$ is 
 \begin{align}
-  \tilde{\mQ}[s, :]^{\top}\tilde{\mK}[t, :] = \sum_{i=1}^{\nicefrac{\dmodel}{2}} \rbrac{\tilde{\mq}_i^{(s)}}^{\top} \cdot \tilde{\mk}_i
+  \tilde{\mQ}[s, :]^{\top}\tilde{\mK}[t, :] = \sum_{i=1}^{\nicefrac{\dmodel}{2}} \rbrac{\tilde{\mq}_i^{(s)}}^{\top} \cdot \tilde{\mk}_i^{(t)} &= \sum_{i=1}^{\nicefrac{\dmodel}{2}} \rbrac{\mq_i^{(s)}}^{\top} \mR_i(s)^{\top}\mR_i(t) \mk_i^{(t)}\notag \\
+  &= \sum_{i=1}^{\nicefrac{\dmodel}{2}} \rbrac{\mq_i^{(s)}}^{\top}\mR_i(t - s) \mk_i^{(t)}.
 \end{align}
+As one can see, the attention score only depends on the relative position $t - s$, this suggests that the attention mechanism in this case is dependent on relative position only, which is a desirable property.\footnote{If $\dmodel$ is odd, then there is no one pairing with the last dimension, we can simply leave it unchanged.}
 
+Notice also that we are essentially spreading the frequencies by varying $\theta_i$, lower index pairs have high-frequency oscillations which allows them to capture small relative displacements, while higher index pairs have low-frequency oscillations, which allows them to capture large relative displacements.
+The Fourier encoding of positions with exponentially decreasing frequencies means the set of basis functions spans a huge range, covering both short-term periodicity and long-range uniqueness, which is why the maximum context length of sinusoidal/RoPE embeddings is effectively determined by the lowest frequency (largest wavelength).
+This is similar to the sinusoidal positional embedding, but here we are directly applying it to the query and key vector.
 
 
 
