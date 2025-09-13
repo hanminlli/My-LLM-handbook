@@ -1513,6 +1513,29 @@ In practice we will just mask in the following way.
 
 \subsubsection{Parallelism}
 
+There are different types of parallelism, such as 
+\begin{itemize}
+  \item \textbf{Data Parallelism (DP):} Each GPU has a full copy of the model, different GPUs process different data batches, need to synchronize gradients so all model copies stay in sync.
+  Examples incldue raw DDP, ZeRO-1/2/3, which is memory efficient.
+  This is always used, and is the foundation.
+
+  \item \textbf{Tensor Parallelism (TP):} Split the tensor inside a layer across GPUs, such as a giant weigt matrix $\mW \in \R^{d \times d}$ can be row-sharded and column-sharded. Each forward/backward involves collective ops (all-reduce, all-gather).
+  Examples include Megatron-LM tensor parallelism and Nvidia's Megatron-Deepspeed hybrid.
+  This is needed when individual layers are too big for a single GPU.
+
+  \item \textbf{Pipeline Parallelism (PP):} Split the model layers across GPUs (like an assembly line), each GPU owns a block of layers, passes activations to the next stage.
+  There are techniques exist such as microbatching that keeps the pipeline busy.
+  Examples include GPipe, PipeDream and DeepSpeed pipeline parallelism.
+  This is used when the model is too deep to fit on a single GPU's memory.
+
+  \item  \textbf{Sequence Parallelism:} Split the sequence length dimension across GPUs.Each GPU processes a slice of the tokens. Reduces memory by distributing activations along the time axis.
+  Examples: Megatron-LM introduced sequence parallelism for attention/MLP layers.
+  This is used when very long context windows are present.
+
+  \item \textbf{Expert / Mixture-of-Experts (MoE) Parallelism:} Explained before.
+\end{itemize}
+
+
 \paragraph{PyTorch DDP:}
 Currently, the baseline of finetuning models in parallel is to use raw PyTorch DDP (distributed data parallel), where we have $1$ GPU for each process.
 
@@ -1542,9 +1565,11 @@ Common use cases include: SFT of 7B - 13B models across 4-8 A100 GPUs.
 This enables massive models by sharding optimizer, gradients and parameters across GPUs.
 Its key idea is ZeRO which is zero redundancy optimizer, it includes stages:
 \begin{itemize}
-  \item Stage 1: shard optimizer states.
-  \item Stage 2: shard optimizer states + gradients.
-  \item Stage 3: shard everything (including parameters).
+  \item Stage 1: shard optimizer states. 
+  \item Stage 2 (ZeRO2): shard optimizer states + gradients. (Splits gradients and optimizer states accross GPUs, each GPU still holds a full copy of the model parameter.)
+  \item Stage 3 (ZeRO3 with offload): shard everything. (including parameters) (Splits parameters, gradients and optimizer states across GPUs, no single GPU holds the full model, which makes train very large models even with limited GPUs possible.)
+  
+  \item \textbf{Offload}: Store some of the states in CPU RAM (or NVMe SSD) and bring them in when needed. 
 \end{itemize}
 and extras such as CPU/NVMe offloading, activation checkpointing, communication optimizations.
 
@@ -1568,6 +1593,69 @@ As a summary
   \item Large models ($\geq$ 65B), DeepSpeed ZeRO-3 or FSDP across hundreds of GPUs. HuggingFace Trainer or custom PyTorch loop orchestrated by Accelerate.. Always with mixed precision (bf16/FP8)
 \end{itemize}
 
+
+\subsubsection{Examples}
+Let us consider the following cases:
+
+\paragraph{Case 1: How raw DDP works.}
+\begin{itemize}
+  \item \textbf{No ZeRO (normal DDP):} In this case, each GPU keeps a full copy of all $N$ parameters, during training, each GPU does forward backward on its minibatch and gradients are averaged (all-reduce).
+  The memory cost should be: each GPU stores $N$ parameters + all optimizer states.
+  The problem this that this does not scale to very large models, because each GPU must hold the entire model.
+\end{itemize}
+
+\paragraph{Case 2: How ZeRO2 works.}
+\begin{itemize}
+  \item \textbf{ZeRO2:} In this case, each GPU still has a full copy of the $N$ parameters, but optimizer states, such as Adam's momentum $m$ and second momentum $v$ are sharded across GPUs.
+  The memory cost would be the $N$ parameters + only a slice of the optimizer states and grads, we save memory, but the full model still sits on every GPU.
+\end{itemize}
+Assuming there are $2$ GPUs with $N$ parameters and each GPU is proceeding with a microbatch of size $1$ with gradient accumulation step $4$.
+\begin{enumerate}
+  \item Forward + backward on GPU 0, 1 with micro-batch=$1$, computing all gradients, then we do reduce scatter\footnote{Sharded after all reduce (averaging).} (instead of all reduce in plain DDP), and each GPU holds a shard of gradients of size $\frac{N}{2}$, the shard is accumulated and later used to update the (second order) momentum.
+  
+  \item We repeat the process so that the gradients shards gets accumulated.
+  
+  \item At each optimizer step, every GPU only updates its shard of parameters using its shards of grads.
+  
+  \item After the update, the parameters are all gathered, so all GPUs gets the fully freshed model for the next forward.
+\end{enumerate} 
+Basically, we are asking each GPU to be responsible for less parameters because some of them are just simply redundant, the final result is mathematically equivalent:
+\begin{align}
+  \theta_{\text{DDP}}^{t+1} = \theta^{t+1}_{\text{ZeRO-}2}.
+\end{align}
+
+
+\paragraph{Case 3: How ZeRO3 works.}
+\begin{itemize}
+  \item Now we also shard the parameters themselves, with Adam, we only need about $\nicefrac{1}{3}$ of the memory on $1$ GPU compared to that of DDP, instead of $\nicefrac{2}{3}$ in ZeRO-2.
+\end{itemize}
+
+Assume we are in the same setting as before.
+\begin{enumerate}
+  \item Forward passes: since now each GPU does not hold all params for a certain layer $L$ (tensor parallelism) anymore, we need to call all gather for each GPU and they will temporarily assemble the full weight matrix for that layer, and the forward for layer $L$ is computed locally on each GPU.
+  After this layer is done, those gathered weights can be released (kept only in CPU/NVMe if offloading).
+
+  \item Backward passes: Before computing the grads for layer $L$, weights are all gathered and gradients are computed after that.
+  
+  \item Reduce-Scatter: Instead of all reduce, gradients are reduce-scattered, so each GPU only keeps its shard.
+  
+  \item Optimizer Step: Each GPU only updates its shard of optimizer state and parameters, no one ever touches the other shard. 
+\end{enumerate}
+Baically ZeRO-3 saves GPU memory but does more communication.
+
+
+\paragraph{Case 4: How ZeRO-3 + CPU/NVMe offload works.}
+The same sharding applies, but now we decide where the shards live when they're not in active use.
+
+Assuming we are in the same setting as before.
+\begin{enumerate}
+  \item \textbf{Parameter Offload:} Sharded params that are not immediately needed for the current layer can be moved to CPU RAM (or NVMe if RAM is still too small).\footnote{Originally, each GPU has to carry it otherwise it is gone. Now we store them in CPU and only load back the layer used. At each time, GPU memory only holds the weights for the current layer but not the whole shards.}
+  Before a layer executes, ZeRO all-gathers the shards back onto GPU(s). After use, they can be evicted back to CPU.
+
+  \item \textbf{Optimizer State Offload:} Adam's momentum states are big (2x param size), offloading lets each GPU keep only its shard in CPU RAM/NVMe, when optimizer step happens, that shard is pulled onto GPU, updated, and can be offloaded again. (This saves a huge amount of persistent GPU memory.)
+  
+  \item \textbf{Gradient Offload:} Typically not offloaded explicitly but can be done, since grads are transient. They live in GPU memory just long enough to accumulate (over gradient accumulation steps).
+\end{enumerate}
 
 
 \subsection{Instruction Tuning}

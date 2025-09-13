@@ -56,16 +56,16 @@ DEEPSPEED_CONFIG = "ds_zero3_offload.json"
 
 SEED = 1337
 
-MAX_STEPS = 1000
+MAX_STEPS = 20
 PER_DEVICE_TRAIN_BATCH_SIZE = 1
 GRAD_ACCUM_STEPS = 16
 LR = 1e-5
 WARMUP_RATIO = 0.03
 WEIGHT_DECAY = 0.0
 
-SAVE_STEPS = 200
-LOGGING_STEPS = 10
-EVAL_STEPS = 200
+SAVE_STEPS = 10
+LOGGING_STEPS = 2
+EVAL_STEPS = 10
 EVAL_RATIO = 0.01
 
 BF16 = True
@@ -112,7 +112,7 @@ def main():
         model.gradient_checkpointing_enable()
         model.config.use_cache = False
 
-    full = load_dataset(DATASET_NAME, split=DATASET_SPLIT)
+    full = load_dataset(DATASET_NAME, split=DATASET_SPLIT).select(range(2000))
     eval_size = max(100, int(len(full) * EVAL_RATIO))
     ds_train = full.select(range(len(full) - eval_size))
     ds_eval = full.select(range(len(full) - eval_size, len(full)))
