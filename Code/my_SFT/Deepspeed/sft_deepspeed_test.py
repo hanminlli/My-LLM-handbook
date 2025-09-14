@@ -119,7 +119,7 @@ def main():
 
     trainer = SFTTrainer(
         model=model,
-        processing_class=tok,
+        tokenizer=tok,
         train_dataset=ds_train,
         eval_dataset=ds_eval,
         args=SFTConfig(
@@ -137,7 +137,6 @@ def main():
             eval_steps=EVAL_STEPS,
             max_steps=MAX_STEPS,
             max_seq_length=MAX_SEQ_LENGTH,
-            packing=PACKING,
             output_dir=OUTPUT_DIR,
             report_to=["wandb"],
         )
