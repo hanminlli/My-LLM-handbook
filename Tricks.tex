@@ -1520,13 +1520,20 @@ There are different types of parallelism, such as
   This is always used, and is the foundation.
 
   \item \textbf{Tensor Parallelism (TP):} Split the tensor (maths) inside a layer across GPUs, such as a giant weigt matrix $\mW \in \R^{d \times d}$ can be row-sharded and column-sharded. Each forward/backward involves collective ops (all-reduce, all-gather).
-  An example would be splitting a large weight matrix so that each GPU only holds a part of it, and they work together to do the full matrix multiplication.
-  Examples include Megatron-LM tensor parallelism and Nvidia's Megatron-Deepspeed hybrid.
+  An example would be splitting a large weight matrix so that each GPU only holds a part of it, and they work together to do the full matrix multiplication (Each GPU only handles a fraction of the FLOPs.).
+  Activations are then synced (e.g. via all-reduce or all-gather) to assemble the layer's output.
+  However, this comes at the price of extra communication overhead.
+  This is more about \textbf{mathematical parallelism} within layers.
+  Example implementations include Megatron-LM tensor parallelism and Nvidia's Megatron-Deepspeed hybrid.
   This is needed when individual layers are too big for a single GPU.
 
   \item \textbf{Fully Sharded Data Parallelism (FSDP):} Shards all parameters, gradients, and optimizer states across devices.
   It works in a way that during forward pass: just before we need a layer's weights, they're gathered from all shards into full form, and after the forward/backward, they're sharded back.
   So, at any instant, only one layer's full weights need to live on a GPU, which brings memory usage down, but this comes at a price of lots of all-gather and reduce-scatter around each layer.
+
+  \item \textbf{Hybrid:} One may think of combining TP + FSDP. 
+  Refer to the next subsection for an example of TP, FSDP and TP + FSDP.
+  On top of this, we can also add DP, where an example of dimension $2$ would be to divide $8$ GPUs into $4$ groups of $2$ GPUs each, each group does TP + FSDP, and across groups we do DP.
 
   \item \textbf{Pipeline Parallelism (PP):} Split the model layers across GPUs (like an assembly line), each GPU owns a block of layers, passes activations to the next stage.
   There are techniques exist such as microbatching that keeps the pipeline busy.
@@ -1541,6 +1548,62 @@ There are different types of parallelism, such as
 \end{itemize}
 
 
+\subsubsection{An example of TP, FSDP and TP + FSDP:}
+We will use a simple linear layer $\mY = \mX\mW$, $\mX \in \R^{B \times \din}, \mW \in \R^{\din \times \dout}$ and $\mY \in \R^{B \times \dout}$ to illustrate how TP, FSDP and TP + FSDP works, and consider the case of $2$ GPUs.
+
+\paragraph{FSDP only:}
+\begin{itemize}
+  \item We let GPU $0$ holds $\mW_{0:} = \mW[0:\frac{\din}{2}, :] \in \R^{\frac{\din}{2} \times \dout}$ and GPU $1$ holds $\mW_{1:} = \mW[\frac{\din}{2}:\din, :] \in \R^{\frac{\din}{2} \times \dout}$.
+  \item When computing:
+  \begin{enumerate}
+    \item We all-gather $\mW$, which lets both GPUs have the full $\mW$.
+    \item Each GPU then compute $\mY = \mW\mX$ locally.
+    \item Backward pass is similar, we compute local gradients, then reduce-scatter to shard the gradients back to $\mW_{0:}$ and $\mW_{1:}$.
+  \end{enumerate}
+
+  \item Clearly this is memory efficient since no GPU holds full $\mW$ permanently, but each GPU still does the full FLOPs.
+\end{itemize}
+
+
+\paragraph{TP only:}
+\begin{itemize}
+  \item We let GPU $0$ holds $\mW_{:0} = \mW[:, 0: \frac{\dout}{2}] \in \R^{\din \times \frac{\dout}{2}}$ and GPU $1$ holds $\mW_{:1} = \mW[:, \frac{\dout}{2} : \dout] \in \R^{\din \times \frac{\dout}{2}}$.
+
+  \item During forward:
+  \begin{enumerate}
+    \item Rank $0$ computes $\mY_0 = \mX\mW_{:0} \in \R^{B \times \frac{\dout}{2}}$.
+    \item Rank $1$ computes $\mY_1 = \mX\mW_{:1} \in \R^{B \times \frac{\dout}{2}}$.
+    \item We all-gather activations to concatenate $\mY = [\mY_0, \mY_1] \in \R^{B \times \dout}$.
+  \end{enumerate}
+
+  \item During backward:
+  \begin{enumerate}
+    \item The upstream gradient $\nabla \mY \in \R^{B \times \dout}$ is split consistently as $\nabla \mY = [\nabla \mY_{:0}, \nabla \mY_{:1}]$, where each rank receives only its local slice.
+    \item Each rank computes its local weight gradient:
+    \[ \nabla \mW_{:j} = \mX^\top \nabla \mY_{:j} \in \R^{\din \times \frac{\dout}{2}}, \quad j \in \{0,1\}. \](No communication required.)
+
+    \item Each rank computes its partial input gradient: 
+    \[ \nabla \mX_j = \nabla \mY_{:j} \mW_{:j}^\top \in \R^{B \times \din}. \]
+
+    \item We all-reduce (sum) these partials across ranks to obtain the full input gradient:
+    \[
+        \nabla \mX = \nabla \mX_0 + \nabla \mX_1.
+    \]
+    This is due to the formula based on chain rule: 
+    \[
+      \nabla \mX = \nabla \mY \mW^\top = \nabla \mY_{:0} \mW_{:0}^\top + \nabla \mY_{:1} \mW_{:1}^\top.
+    \]
+  \end{enumerate}
+  The formulas are easy to derive if we write out the sums explicitly\footnote{A simple way of derivation would be to focus directly on the dimensions.}.
+
+  \item FLOPs are halved per GPU, Each GPU stores only its slice of $\mW$, and we need synchronization for every layer's forward and backward.
+\end{itemize}
+
+
+\paragraph{TP + FSDP:}
+
+
+\subsubsection{Common Distributed Training Frameworks}
 \paragraph{PyTorch DDP:}
 Currently, the baseline of finetuning models in parallel is to use raw PyTorch DDP (distributed data parallel), where we have $1$ GPU for each process.
 
