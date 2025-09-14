@@ -94,7 +94,7 @@ def main():
     model = AutoModelForCausalLM.from_pretrained(
         MODEL_NAME,
         torch_dtype=torch.bfloat16 if BF16 else torch.float16,
-        device_map=None,  # DeepSpeed will handle placement
+        device_map={"": "cpu"},  # DeepSpeed will handle placement
     )
 
     # TRL, adjust tokenizer and model to handle chat-style finetuning
