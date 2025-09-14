@@ -1612,6 +1612,51 @@ Assume now we are in a little bit more complicated setting where we have $4$ GPU
   \[
     \mW_{:j} = \sbrac{\mW_{0j}, \mW_{1j}}, \quad \mW_{0j} \in \R^{\frac{\din}{2} \times \frac{\dout}{2}}, \mW_{1j} \in \R^{\frac{\din}{2} \times \frac{\dout}{2}}.
   \]
+
+  \item In the forward path:
+  \begin{enumerate}
+    \item For the $j$-th TP block, we all-gather rows on the two GPU we have for FSDP, on each GPU, we reconstruct $\mW_{:j} \in \R^{\din \times \frac{\dout}{2}}$.
+    \item We do local matmul and obtain 
+    \[
+      \mY_{:j} = \mX\mW_{:j} \in \R^{B \times \frac{\dout}{2}}
+    \]
+    \item Then we do TP all-gather activations, which allows us to obtain
+    \[
+      \mY = [\mY_{:0}, \mY_{:1}] \in \R^{B \times \dout}
+    \]
+
+    \item Then we do FSDP reshard, each GPU only keeps $\mW_{ij}$, free the temporary all-gathered parameter.
+  \end{enumerate}
+
+  \item In the backward path:
+  \begin{enumerate}
+    \item We are given the upstream gradient 
+    \[
+      \nabla \mY = [\nabla \mY_{:0}, \nabla \mY_{:1}], \qquad \nabla \mY_{:j} \in \R^{B \times \frac{\dout}{2}}.
+    \]
+
+    \item FSDP all gather rows of each $\mW_{:j}$ again.
+    \item Local weight gradient, then reduce scatter back into shards,
+    \[
+      \nabla \mW_{:j} = \mX^{\top}\nabla\mY_{:j} \in \R^{\din \times \frac{\dout}{2}}.
+    \]
+    and each rank $(i, j)$ keeps $\nabla \mW_{ij} \in \R^{\frac{\din}{2} \times \frac{\dout}{2}}$.
+    \item Input gradient, 
+    \[ 
+      \nabla \mX_j = \nabla\mY_{:j}\mW_{:j}^{\top} \in \R^{B \times \din}
+    \]
+    and then all reduce to 
+    \[
+      \nabla \mX = \nabla \mX_0 + \nabla \mX_1.
+    \]
+  \end{enumerate}
+
+  \item The memory cost now becomes $\frac{\din \dout}{4}$ parameters per rank, this is easy to understand, because parameters, optimizer states and gradients all correspond to the $\frac{\din\dout}{4}$ matrix.
+  
+  \item The computational baseline ($\mX\mW$) costs $2B\din\dout$ FLOPs ($1$ addition plus $1$ multiplication).
+  While if we do TP only, then each rank needs $2B\din \frac{\dout}{2} = B\din\dout$ FLOPs which is half of baseline, thats why TP reduced computation per rank.
+  In the case of TP + FSDP, within each TP group, each rank still need $2B\din \frac{\dout}{2} = B\din\dout$ because of internal FSDP, so the computation per rank is still halved.
+  Notice that in this case, the total FLOPs is doubled, compared to the baseline, which is $4B\din\dout$, per rank is halved is only possible because we have $4$ GPUs.
 \end{itemize}
 
 
