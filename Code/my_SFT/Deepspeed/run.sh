@@ -5,7 +5,7 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --gres=gpu:a100:4
-#SBATCH --mem-per-gpu=80G
+#SBATCH --mem=512G
 #SBATCH --time=24:00:00
 #SBATCH --mail-user=hanmin.li@kaust.edu.sa
 #SBATCH --mail-type=BEGIN,END,FAIL
