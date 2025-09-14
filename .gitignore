@@ -9,3 +9,4 @@ Code/my_SFT/raw_DDP/sft-dolly-gpt2m
 *.toc
 *.synctex(busy)
 *.gz
+.DS_Store

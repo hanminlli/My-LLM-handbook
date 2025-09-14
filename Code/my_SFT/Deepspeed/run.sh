@@ -12,9 +12,15 @@
 
 # --- environment ---
 source ~/anaconda3/etc/profile.d/conda.sh
-conda activate ds-sft
+conda activate ds-sft-cu121
 
-# Hugging Face cache
+# load CUDA toolkit (12.1 to match PyTorch build)
+module load cuda/12.1
+export CUDA_HOME=${CUDA_HOME:-/usr/local/cuda-12.1}
+export PATH=$CUDA_HOME/bin:$PATH
+export LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
+
+# Hugging Face cache on scratch
 export HF_HOME=/ibex/scratch/$USER/hf_cache
 export HF_HUB_CACHE=$HF_HOME/hub
 export HF_DATASETS_CACHE=$HF_HOME/datasets
@@ -35,6 +41,6 @@ export MASTER_PORT=29577
 export WANDB_PROJECT="ds-sft"
 export WANDB_WATCH="false"
 
-# training
+# training (real run, 4 GPUs, 24h)
 deepspeed --num_gpus 4 sft_deepspeed.py \
   --deepspeed ds_zero3_offload.json
