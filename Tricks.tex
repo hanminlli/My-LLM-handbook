@@ -1519,9 +1519,14 @@ There are different types of parallelism, such as
   Examples incldue raw DDP, ZeRO-1/2/3, which is memory efficient.
   This is always used, and is the foundation.
 
-  \item \textbf{Tensor Parallelism (TP):} Split the tensor inside a layer across GPUs, such as a giant weigt matrix $\mW \in \R^{d \times d}$ can be row-sharded and column-sharded. Each forward/backward involves collective ops (all-reduce, all-gather).
+  \item \textbf{Tensor Parallelism (TP):} Split the tensor (maths) inside a layer across GPUs, such as a giant weigt matrix $\mW \in \R^{d \times d}$ can be row-sharded and column-sharded. Each forward/backward involves collective ops (all-reduce, all-gather).
+  An example would be splitting a large weight matrix so that each GPU only holds a part of it, and they work together to do the full matrix multiplication.
   Examples include Megatron-LM tensor parallelism and Nvidia's Megatron-Deepspeed hybrid.
   This is needed when individual layers are too big for a single GPU.
+
+  \item \textbf{Fully Sharded Data Parallelism (FSDP):} Shards all parameters, gradients, and optimizer states across devices.
+  It works in a way that during forward pass: just before we need a layer's weights, they're gathered from all shards into full form, and after the forward/backward, they're sharded back.
+  So, at any instant, only one layer's full weights need to live on a GPU, which brings memory usage down, but this comes at a price of lots of all-gather and reduce-scatter around each layer.
 
   \item \textbf{Pipeline Parallelism (PP):} Split the model layers across GPUs (like an assembly line), each GPU owns a block of layers, passes activations to the next stage.
   There are techniques exist such as microbatching that keeps the pipeline busy.
