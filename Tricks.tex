@@ -1601,6 +1601,19 @@ We will use a simple linear layer $\mY = \mX\mW$, $\mX \in \R^{B \times \din}, \
 
 
 \paragraph{TP + FSDP:}
+Assume now we are in a little bit more complicated setting where we have $4$ GPUs, and we want to do TP + FSDP with $2$ GPUs for each.
+\begin{itemize}
+  \item We will use index $i \in \cbrac{0, 1}$ for FSDP shard and $j \in \cbrac{0, 1}$ for TP shard.
+  \item We first do TP splitting, where we have 2 GPUs in each TP group: 
+  \[
+    \mW = \sbrac{\mW_{:0}, \mW_{:1}}, \quad \mW_{:0} \in \R^{\din \times \frac{\dout}{2}}, \mW_{:1} \in \R^{\din \times \frac{\dout}{2}}.
+  \]
+  Then we do FSDP splitting within each TP shard:
+  \[
+    \mW_{:j} = \sbrac{\mW_{0j}, \mW_{1j}}, \quad \mW_{0j} \in \R^{\frac{\din}{2} \times \frac{\dout}{2}}, \mW_{1j} \in \R^{\frac{\din}{2} \times \frac{\dout}{2}}.
+  \]
+\end{itemize}
+
 
 
 \subsubsection{Common Distributed Training Frameworks}
