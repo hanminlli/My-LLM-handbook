@@ -528,20 +528,20 @@ after constructing $\mP$.
 
 \subsection{RoPE (Rotary Positional Embedding)}
 RoPE, instead, directly encodes relative position information into the attention mechanism by \textbf{rotating the query and key vectors} based on their positions.
-Let us denote $\mQ \in \R^{L \times \dmodel}$ and $\mK^{L \times \dmodel}$ as the query matrix and the key matrix.
+Let us denote $\mQ \in \R^{L \times \dhead}$ and $\mK^{L \times \dhead}$ as the query matrix and the key matrix (We temporarily hide the $B, H$ dimensions.).
 For each query vector 
 \begin{align}
-  \mq_l = \mQ[l, :] = \rbrac{\mq_{l,1}, \hdots, \mq_{l,\dmodel}} \in \R^{\dmodel}, 
+  \mq_l = \mQ[l, :] = \rbrac{\mq_{l,1}, \hdots, \mq_{l,\dhead}} \in \R^{\dhead}, 
 \end{align}
 we group the dimensions into pairs 
 \begin{align}
-  \rbrac{\mq_{l,1}, \mq_{l,2}}, \rbrac{\mq_{l,3}, \mq_{l,4}}, \hdots, \rbrac{\mq_{l,\dmodel - 1}, \mq_{l, \dmodel}},
+  \rbrac{\mq_{l,1}, \mq_{l,2}}, \rbrac{\mq_{l,3}, \mq_{l,4}}, \hdots, \rbrac{\mq_{l,\dhead - 1}, \mq_{l, \dhead}},
 \end{align}
-assunimg $\dmodel$ is even.
-This gives $\frac{\dmodel}{2}$ pairs and the same for $\mK$.
+assunimg $\dhead$ is even.
+This gives $\frac{\dhead}{2}$ pairs and the same for $\mK$.
 We now define angle frequencies 
 \begin{align*}
-  \theta_i = 10000^{-\frac{2(i - 1)}{\dmodel}}, \qquad \text{for } i = 1,2, \hdots \frac{\dmodel}{2}.
+  \theta_i = 10000^{-\frac{2(i - 1)}{\dhead}}, \qquad \text{for } i = 1,2, \hdots \frac{\dhead}{2}.
 \end{align*}
 We let each pair $\mq_i^{(l)} = (\mq_{l, 2i - 1}, \mq_{l, 2i})$ be rotated so that 
 \begin{align*}
@@ -575,15 +575,15 @@ Now define the rotated vector:
 \begin{align}
   \tilde{\mq}_l = \tilde{\mQ}[l, :] = \mR(l)\mQ[l, :], \qquad \tilde{\mk}_l = \tilde{\mK}[l, :] = \mR(l)\mK[l, :],
 \end{align}
-where $\mR(l)$ is a block diagonal rotation matrix built from $\nicefrac{\dmodel}{2}$ rotation blocks, this can be intepreted as if we rotate clockwisely for angle $t$ and counter-clockwisely for angle $s$, the combination of the result is to rotate clockwisely for angle $t-s$.
+where $\mR(l)$ is a block diagonal rotation matrix built from $\nicefrac{\dhead}{2}$ rotation blocks, this can be intepreted as if we rotate clockwisely for angle $t$ and counter-clockwisely for angle $s$, the combination of the result is to rotate clockwisely for angle $t-s$.
 
 \paragraph{Key result:}
 When computing attention, the score between query at position $s$ and key at position $t$ is 
 \begin{align}
-  \tilde{\mQ}[s, :]^{\top}\tilde{\mK}[t, :] = \sum_{i=1}^{\nicefrac{\dmodel}{2}} \rbrac{\tilde{\mq}_i^{(s)}}^{\top} \cdot \tilde{\mk}_i^{(t)} &= \sum_{i=1}^{\nicefrac{\dmodel}{2}} \rbrac{\mq_i^{(s)}}^{\top} \mR_i(s)^{\top}\mR_i(t) \mk_i^{(t)}\notag \\
-  &= \sum_{i=1}^{\nicefrac{\dmodel}{2}} \rbrac{\mq_i^{(s)}}^{\top}\mR_i(t - s) \mk_i^{(t)}.
+  \tilde{\mQ}[s, :]^{\top}\tilde{\mK}[t, :] = \sum_{i=1}^{\nicefrac{\dhead}{2}} \rbrac{\tilde{\mq}_i^{(s)}}^{\top} \cdot \tilde{\mk}_i^{(t)} &= \sum_{i=1}^{\nicefrac{\dhead}{2}} \rbrac{\mq_i^{(s)}}^{\top} \mR_i(s)^{\top}\mR_i(t) \mk_i^{(t)}\notag \\
+  &= \sum_{i=1}^{\nicefrac{\dhead}{2}} \rbrac{\mq_i^{(s)}}^{\top}\mR_i(t - s) \mk_i^{(t)}.
 \end{align}
-As one can see, the attention score only depends on the relative position $t - s$, this suggests that the attention mechanism in this case is dependent on relative position only, which is a desirable property.\footnote{If $\dmodel$ is odd, then there is no one pairing with the last dimension, we can simply leave it unchanged.}
+As one can see, the attention score only depends on the relative position $t - s$, this suggests that the attention mechanism in this case is dependent on relative position only, which is a desirable property.\footnote{If $\dhead$ is odd, then there is no one pairing with the last dimension, we can simply leave it unchanged.}
 
 Notice also that we are essentially spreading the frequencies by varying $\theta_i$, lower index pairs have high-frequency oscillations which allows them to capture small relative displacements, while higher index pairs have low-frequency oscillations, which allows them to capture large relative displacements.
 The Fourier encoding of positions with exponentially decreasing frequencies means the set of basis functions spans a huge range, covering both short-term periodicity and long-range uniqueness, which is why the maximum context length of sinusoidal/RoPE embeddings is effectively determined by the lowest frequency (largest wavelength).
@@ -595,7 +595,7 @@ One drawback of learned absolute positional embeddings is that they are fixed to
 RoPE, like sinusoidal embeddings, can generalize to longer sequences because the rotation matrices can be computed for any position index.
 However, the choice of base frequency (10000 in the original paper) determines the effective range of relative positions that can be represented before the rotations start to repeat.
 
-To be clear, at position $p$, for the $i$-th pair, the angle is $p\theta_i = p \cdot 10000^{-\frac{2(i - 1)}{\dmodel}} = p \cdot \omega_i$, we say $\omega_i$ is the frequency and $\lambda_i = \frac{2\pi}{\omega_i}$ is the wavelength, $\omega_i$ decreases exponentially with $i$, while $\lambda_i$ increases exponentially with $i$.
+To be clear, at position $p$, for the $i$-th pair, the angle is $p\theta_i = p \cdot 10000^{-\frac{2(i - 1)}{\dhead}} = p \cdot \omega_i$, we say $\omega_i$ is the frequency and $\lambda_i = \frac{2\pi}{\omega_i}$ is the wavelength, $\omega_i$ decreases exponentially with $i$, while $\lambda_i$ increases exponentially with $i$.
 For those pairs with small $i$, they have high frequency (small wavelength), which means they can only represent small relative positions before the rotations start to repeat, this is typically a few thousands tokens with base 10000, which is the reason why naive extrapolation beyond the trained length often fails.
 
 In practice, there are several strategies to adjust to the desired context length

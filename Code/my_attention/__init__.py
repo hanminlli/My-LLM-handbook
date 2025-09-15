@@ -7,10 +7,12 @@ from .multi_query_self_attention import MultiQuerySelfAttention
 from .parallel_attention import ParallelTransformerBlock
 from .decoder import PrefixDecoderBlock, DecoderBlock
 from .linear_attention import LinearAttention, CausalLinearAttention
+from .positional_embedding import SinusoidalPositionalEncoding, RotaryEmbedding
 
 __all__ = [
     "MoEConfig", "MoEFFN", "ExpertFFN", "MLP", "GatedMLP", "GroupedQueryAttention",
     "LatentTransformer", "LatentTransformerBlock", "MultiHeadAttention_QKV", "MultiHeadLatentAttention",
     "MultiHeadSelfAttention", "MultiQuerySelfAttention", "ParallelTransformerBlock", 
-    "PrefixDecoderBlock", "DecoderBlock", "CausalLinearAttention", "LinearAttention"
+    "PrefixDecoderBlock", "DecoderBlock", "CausalLinearAttention", "LinearAttention",
+    "SinusoidalPositionalEncoding", "RotaryEmbedding",
 ]
