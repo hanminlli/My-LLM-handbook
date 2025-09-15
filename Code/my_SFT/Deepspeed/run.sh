@@ -14,7 +14,7 @@
 source ~/anaconda3/etc/profile.d/conda.sh
 conda activate ds-sft-cu121
 
-# load CUDA toolkit (12.1 to match PyTorch build)
+# CUDA toolkit (12.1 to match PyTorch build)
 module load cuda/12.1
 export CUDA_HOME=${CUDA_HOME:-/usr/local/cuda-12.1}
 export PATH=$CUDA_HOME/bin:$PATH
@@ -29,18 +29,20 @@ mkdir -p "$HF_HUB_CACHE" "$HF_DATASETS_CACHE"
 
 # NCCL / threading
 export TOKENIZERS_PARALLELISM=false
-export NCCL_ASYNC_ERROR_HANDLING=1
+export TORCH_NCCL_ASYNC_ERROR_HANDLING=1
 export OMP_NUM_THREADS=8
 ulimit -n 4096
 
-# rendezvous
+# Rendezvous (DeepSpeed/torchrun will read these)
 export MASTER_ADDR=127.0.0.1
 export MASTER_PORT=29577
 
-# wandb
+# Force DeepSpeed to use NCCL (avoid mpi4py path)
+export DEEPSPEED_COMM_BACKEND=nccl
+
+# Weights & Biases
 export WANDB_PROJECT="ds-sft"
 export WANDB_WATCH="false"
 
-# training (real run, 4 GPUs, 24h)
-deepspeed --num_gpus 4 sft_deepspeed.py \
-  --deepspeed ds_zero3_offload.json
+deepspeed --num_gpus 4 sft_deepspeed.py --deepspeed ds_zero3_offload.json
+

@@ -12,12 +12,12 @@ pip install \
   evaluate==0.4.1
 """
 
+import os
 import torch
 import wandb
 from datasets import load_dataset
 from transformers import AutoTokenizer, AutoModelForCausalLM, set_seed
 from trl import SFTTrainer, SFTConfig, setup_chat_format
-
 
 # Settings 
 MODEL_NAME = "EleutherAI/gpt-neox-20b"
@@ -28,31 +28,23 @@ DEEPSPEED_CONFIG = "ds_zero3_offload.json"
 '''
 {
   "train_micro_batch_size_per_gpu": 1, # Each GPU processes 1 sample per forward/backward pass
-  "gradient_accumulation_steps": 16, # Gradients are accumulated for 16 steps
-  "bf16": { "enabled": true }, 
+  "gradient_accumulation_steps": 16,   # Accumulate grads for larger effective batch
+  "bf16": { "enabled": true },
   "zero_optimization": {
-    "stage": 3, # ZeRO3 partitions optimizer states, gradients and parameters accross GPUs
-    "contiguous_gradients": true, # Keep gradient memory contiguous, avoids fragmentation
-    "overlap_comm": true, # overlap communication (all-reduce) with computation.
-    "reduce_scatter": true, # use reduce-scatter instead of all-reduce for efficiency
-    "stage3_max_live_parameters": 1000000000, # internal heuristics for memory management: unlimited
-    "stage3_max_reuse_distance": 1000000000, # unlimited
-    "stage3_gather_16bit_weights_on_model_save": true, 
-    # when saving checkpoints, gather model weights into FP16 (instead of sharded pieces).
-    "offload_param": {
-      "device": "cpu",
-      "pin_memory": true
-    }, # parameters not in active use are offloaded to CPU memory (with pinned memory for speed)
-    "offload_optimizer": {
-      "device": "cpu",
-      "pin_memory": true
-    } # optimizer states (Adam moments, etc.) stored on CPU, not GPU.
+    "stage": 3,
+    "contiguous_gradients": true,
+    "overlap_comm": true,
+    "reduce_scatter": true,
+    "stage3_max_live_parameters": 1000000000,
+    "stage3_max_reuse_distance": 1000000000,
+    "stage3_gather_16bit_weights_on_model_save": true,
+    "offload_param": { "device": "cpu", "pin_memory": true },
+    "offload_optimizer": { "device": "cpu", "pin_memory": true }
   },
-  "gradient_clipping": 1.0, # Clips gradient norm at 1.0 to avoid exploding gradients.
+  "gradient_clipping": "auto",
   "wall_clock_breakdown": true
 }
 '''
-
 
 SEED = 1337
 
@@ -76,42 +68,39 @@ MAX_SEQ_LENGTH = 2048
 WANDB_PROJECT = "ds-sft"
 WANDB_RUN_NAME = "neox20b-ultrachat"
 
-
 def main():
     set_seed(SEED)
     torch.backends.cuda.matmul.allow_tf32 = True
-    # only affects torch.matmul and operations built on it
-    # torch.backends.cudnn.allow_tf32: affects cuDNN kernels 
-    # mainly convolutions (nn.Conv2d, CNNs, some attention kernels using cuDNN).
 
-    wandb.init(project=WANDB_PROJECT, name=WANDB_RUN_NAME)
+    # Only rank 0 initializes a W&B run to avoid duplicates
+    rank = int(os.environ.get("RANK", "0"))
+    if rank == 0:
+        wandb.init(project=WANDB_PROJECT, name=WANDB_RUN_NAME)
+    else:
+        # Disable wandb on non-zero ranks
+        os.environ["WANDB_DISABLED"] = "true"
 
     # Tokenizer and model
-    tok = AutoTokenizer.from_pretrained(MODEL_NAME, use_fast=True) # rust version
+    tok = AutoTokenizer.from_pretrained(MODEL_NAME, use_fast=True)
     if tok.pad_token is None:
         tok.pad_token = tok.eos_token
 
+    # Load full model; DeepSpeed/Accelerate will shard/partition
     model = AutoModelForCausalLM.from_pretrained(
         MODEL_NAME,
         torch_dtype=torch.bfloat16 if BF16 else torch.float16,
-        device_map=None,  # DeepSpeed will handle placement
+        low_cpu_mem_usage=True,  # important when loading 20B
+        device_map=None          # let DeepSpeed/Accelerate handle placement
     )
 
-    # TRL, adjust tokenizer and model to handle chat-style finetuning
-    # Tokenizer side:
-    #   Make sure the tokenizer has special tokens for chat interactions 
-    #   (<|user|>, <|assistant|>, <|system|>, EOS token, etc., depending on the model).
-    #   If those tokens don’t exist in the tokenizer vocabulary, add them.
-    #   Updates the padding/truncation side to match chat datasets.
-    # Model side:
-    #   Resizes the model's embedding matrix so it matches the updated tokenizer vocabulary size.
-    #   Ensures that the model recognizes and can generate using the added special tokens.
+    # Chat-format adjustments (resizes embeddings if special tokens are added)
     model, tok = setup_chat_format(model, tok)
 
     if GRADIENT_CHECKPOINTING:
         model.gradient_checkpointing_enable()
         model.config.use_cache = False
 
+    # Dataset split
     full = load_dataset(DATASET_NAME, split=DATASET_SPLIT)
     eval_size = max(100, int(len(full) * EVAL_RATIO))
     ds_train = full.select(range(len(full) - eval_size))
@@ -144,8 +133,9 @@ def main():
 
     trainer.train()
     trainer.save_model(OUTPUT_DIR)
-    wandb.finish()
+
+    if rank == 0:
+        wandb.finish()
 
 if __name__ == "__main__":
     main()
-    
