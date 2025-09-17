@@ -1,14 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=neox20b-sft-2gpu
-#SBATCH --output=logs/%x.%j.out
-#SBATCH --error=logs/%x.%j.err
-#SBATCH --nodes=1
-#SBATCH --ntasks=1
-#SBATCH --gres=gpu:a100:2
-#SBATCH --mem=512G
-#SBATCH --time=2:00:00
-#SBATCH --mail-user=hanmin.li@kaust.edu.sa
-#SBATCH --mail-type=BEGIN,END,FAIL
+# Debug script: run locally on a node with 2x A100 GPUs (no Slurm scheduler)
 
 # --- environment ---
 source ~/anaconda3/etc/profile.d/conda.sh
@@ -39,11 +30,19 @@ export DEEPSPEED_COMM_BACKEND=nccl
 export WANDB_PROJECT="ds-sft"
 export WANDB_WATCH="false"
 
-# launch with torchrun for 2 GPUs
+# dynamic master port (avoids collisions)
 export MASTER_PORT=$((10000 + RANDOM % 50000))
+
+# create logs directory
+mkdir -p logs
+LOGFILE="logs/local_2gpu_$(date +%Y%m%d_%H%M%S).log"
+
+# launch with torchrun for 2 GPUs, redirect output to logfile
+echo "Logging to $LOGFILE"
 torchrun \
   --nnodes=1 \
   --nproc_per_node=2 \
   --master_port=$MASTER_PORT \
   sft_deepspeed_test.py \
-  --deepspeed ds_zero3_offload_test.json
+  --deepspeed ds_zero3_offload_test.json \
+  >"$LOGFILE" 2>&1

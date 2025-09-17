@@ -33,9 +33,9 @@ export TORCH_NCCL_ASYNC_ERROR_HANDLING=1
 export OMP_NUM_THREADS=8
 ulimit -n 4096
 
-# Rendezvous (DeepSpeed/torchrun will read these)
+# Rendezvous: if Slurm reserved a port, use it; else random free one
 export MASTER_ADDR=127.0.0.1
-export MASTER_PORT=29577
+export MASTER_PORT=${SLURM_STEP_RESV_PORTS:-$((10000 + RANDOM % 50000))}
 
 # Force DeepSpeed to use NCCL (avoid mpi4py path)
 export DEEPSPEED_COMM_BACKEND=nccl
@@ -44,5 +44,14 @@ export DEEPSPEED_COMM_BACKEND=nccl
 export WANDB_PROJECT="ds-sft"
 export WANDB_WATCH="false"
 
-deepspeed --num_gpus 4 sft_deepspeed.py --deepspeed ds_zero3_offload.json
+# create logs directory
+mkdir -p logs
 
+# Launch with torchrun on 4 GPUs
+torchrun \
+  --nnodes=1 \
+  --nproc_per_node=4 \
+  --master_addr=$MASTER_ADDR \
+  --master_port=$MASTER_PORT \
+  sft_deepspeed.py \
+  --deepspeed ds_zero3_offload.json

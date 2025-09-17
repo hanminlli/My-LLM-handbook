@@ -2225,7 +2225,7 @@ We cannot backpropagate through this function properly.
 \paragraph{Policy Gradient:}
 Differentiate $J(\theta)$, we get 
 \begin{align*}
-  \nabla_{\theta} J(\theta) &= \int \nabla p_\theta(\tau) R(\tau) \quad d\tau \\
+  \nabla_{\theta} J(\theta) &= \int \nabla_\theta p_\theta(\tau) R(\tau) \quad d\tau \\
   &= \int p_\theta(\tau) \nabla_{\theta} \log p_{\theta}(\tau) \cdot R(\tau) \quad d\tau \\
   &= \ExpSub{\tau \sim p_\theta}{\nabla_\theta\log p_{\theta}(\tau)\cdot R(\tau)}.
 \end{align*}
@@ -2262,7 +2262,7 @@ Using the tower property of expectation, we can further write
 \end{align*}
 Now, for variance reduction, we introduce the state-value function:
 \begin{align*}
-  V^{\pi}(s) \eqdef \ExpSub{\ma \sim \pisub{}{\cdot}{\ms}}{Q^{\pi}(\ms, \ma)} = \ExpSub{\pi}{G_t \mid \ms_t = \ms},
+  V^{\pi}(\ms) \eqdef \ExpSub{\ma \sim \pisub{}{\cdot}{\ms}}{Q^{\pi}(\ms, \ma)} = \ExpSub{\pi}{G_t \mid \ms_t = \ms},
 \end{align*}
 which is the expected return starting in state $\ms$ following $\pi$.
 The advantage function is then 
@@ -2432,7 +2432,7 @@ if the policy is uniform then it is high.
 \paragraph{Full PPO loss.}
 The clipped surrogate is the policy gradient, but PPO also trains the critic and uses an entropy bonus.
 \begin{align*}
-  \cL^{\text{PPO}}(\theta, \psi; \theta_k) \eqdef -\underbrace{\Exp{\cL^{\text{Clip}}(\theta; \theta_k)}}_{\text{actor}} + c_v \cdot \underbrace{\Exp{\rbrac{V_{\psi}(s_t) - \hat{G}_t}^2}}_{\text{critic}} - c_e \cdot \underbrace{\Exp{\cH\rbrac{\pisub{\theta}{\cdot}{\ms_t}}}}_{\text{exploration}},
+  \cL^{\text{PPO}}(\theta, \psi; \theta_k) \eqdef -\underbrace{\Exp{\cJ^{\text{Clip}}(\theta; \theta_k)}}_{\text{actor}} + c_v \cdot \underbrace{\Exp{\rbrac{V_{\psi}(s_t) - \hat{G}_t}^2}}_{\text{critic}} - c_e \cdot \underbrace{\Exp{\cH\rbrac{\pisub{\theta}{\cdot}{\ms_t}}}}_{\text{exploration}},
 \end{align*}
 where 
 \begin{align*}
