@@ -23,6 +23,6 @@
     "cpu_checkpointing": false
   },
 
-  "gradient_clipping": 1.0,
+  "gradient_clipping": "auto",
   "wall_clock_breakdown": true
 }

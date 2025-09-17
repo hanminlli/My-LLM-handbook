@@ -1,26 +1,16 @@
 #!/bin/bash
-#SBATCH --job-name=neox20b-ultra-sft
-#SBATCH --output=logs/%x.%j.out
-#SBATCH --error=logs/%x.%j.err
-#SBATCH --nodes=1
-#SBATCH --ntasks=1
-#SBATCH --gres=gpu:a100:4
-#SBATCH --mem=512G
-#SBATCH --time=24:00:00
-#SBATCH --mail-user=hanmin.li@kaust.edu.sa
-#SBATCH --mail-type=BEGIN,END,FAIL
+# Debug script: run locally on a node with 2x A100 GPUs (no Slurm scheduler)
 
 # --- environment ---
 source ~/anaconda3/etc/profile.d/conda.sh
 conda activate ds-sft-cu121
 
-# CUDA toolkit (12.1 to match PyTorch build)
 module load cuda/12.1
 export CUDA_HOME=${CUDA_HOME:-/usr/local/cuda-12.1}
 export PATH=$CUDA_HOME/bin:$PATH
 export LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
 
-# Hugging Face cache on scratch
+# Hugging Face cache
 export HF_HOME=/ibex/scratch/$USER/hf_cache
 export HF_HUB_CACHE=$HF_HOME/hub
 export HF_DATASETS_CACHE=$HF_HOME/datasets
@@ -33,25 +23,26 @@ export TORCH_NCCL_ASYNC_ERROR_HANDLING=1
 export OMP_NUM_THREADS=8
 ulimit -n 4096
 
-# Rendezvous: if Slurm reserved a port, use it; else random free one
-export MASTER_ADDR=127.0.0.1
-export MASTER_PORT=${SLURM_STEP_RESV_PORTS:-$((10000 + RANDOM % 50000))}
-
-# Force DeepSpeed to use NCCL (avoid mpi4py path)
+# force DeepSpeed to use NCCL instead of MPI
 export DEEPSPEED_COMM_BACKEND=nccl
 
-# Weights & Biases
+# wandb
 export WANDB_PROJECT="ds-sft"
 export WANDB_WATCH="false"
 
+# dynamic master port (avoids collisions)
+export MASTER_PORT=$((10000 + RANDOM % 50000))
+
 # create logs directory
 mkdir -p logs
+LOGFILE="logs/local_2gpu_$(date +%Y%m%d_%H%M%S).log"
 
-# Launch with torchrun on 4 GPUs
+# launch with torchrun for 2 GPUs, redirect output to logfile
+echo "Logging to $LOGFILE"
 torchrun \
   --nnodes=1 \
-  --nproc_per_node=4 \
-  --master_addr=$MASTER_ADDR \
+  --nproc_per_node=2 \
   --master_port=$MASTER_PORT \
-  sft_deepspeed.py \
-  --deepspeed ds_zero3_offload.json
+  sft_deepspeed_test.py \
+  --deepspeed ds_zero3_offload_test.json \
+  >"$LOGFILE" 2>&1

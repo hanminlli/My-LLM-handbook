@@ -128,6 +128,7 @@ def main():
             max_seq_length=MAX_SEQ_LENGTH,
             output_dir=OUTPUT_DIR,
             report_to=["wandb"],
+            max_grad_norm=0.0, # turning off HF side clipping
         )
     )
 
