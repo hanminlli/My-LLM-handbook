@@ -2288,7 +2288,7 @@ Now take $b(\ms_t) = V^{\pi_\theta}(\ms_t)$, we result in
 \end{align*}
 This is called the \textbf{policy gradient theorem}.
 In practice, we still \textbf{cannot} compute $Q^{\pi_{\theta}}$ or $V^{\pi_\theta}$ exactly. 
-So we train an auxiliary \textbf{value network} (Critic) to approximate $V^{\pi_\theta}$, and we estimate $\mA^{\pi_\theta}$ from the rollout data using methods like \textbf{Generalized Advantage Estimation} (GAE), which trades bias for variance reduction, which gives us an estimate $\hat{A}_t$.
+So we train an auxiliary \textbf{value network} (Critic) to approximate $V^{\pi_\theta}$, and we estimate $A^{\pi_\theta}$ from the rollout data using methods like \textbf{Generalized Advantage Estimation} (GAE), which trades bias for variance reduction, which gives us an estimate $\hat{A}_t$.
 To do this, we relies on three basic building blocks:
 \begin{enumerate}
   \item \textbf{Monte Carlo (MC) return}: $G_t = \sum_{u=t}^{T}\gamma^{u - t}r_u$. 
@@ -2399,6 +2399,15 @@ However, \textbf{TRPO} is too time consuming in the sense that it often requires
 \begin{align*}
   \widehat{J}^{\text{PG}}(\theta; \theta_k) = \ExpSub{ \substack{t \\ \ms_t \sim \rho_{\pi_{\theta_k}} \\ \ma_t \sim \pi_{\theta_k}}}{o_t(\theta; \theta_k) \hat{A}^t}.
 \end{align*} 
+To show that this is an importance sampling of the original objective, 
+\begin{align*}
+  \nabla_\theta \widehat{J}^{\text{PG}}(\theta; \theta_k) &= \ExpSub{t, \ms_t, \ma_t}{\nabla_\theta o_t(\theta; \theta_k) \hat{A}^t} \\
+  &= \ExpSub{t, \ms_t, \ma_t}{\nabla_\theta \frac{\pisub{\theta}{\ma_t}{\ms_t}}{\pisub{\theta_{k}}{\ma_t}{\ms_t}} \hat{A}^t} \\
+  &= \ExpSub{t, \ms_t, \ma_t}{\frac{\pisub{\theta}{\ma_t}{\ms_t}}{\pisub{\theta_{k}}{\ma_t}{\ms_t}}\cdot \nabla_\theta\log \pisub{\theta}{\ma_t}{\ms_t} \hat{A}^t} \\
+  &= \ExpSub{t, \ms_t, \ma_t}{o_t(\theta; \theta_k)\cdot \nabla_\theta\log \pisub{\theta}{\ma_t}{\ms_t} \hat{A}^t}.
+\end{align*}
+Clearly the last term is an importance sampled version of the original objective $J^{\text{PG}}$.
+
 If we maximize this directly, the policy can change too aggressively, leading to instability.
 
 \paragraph{Clipping.} As a result, \textbf{PPO} in turn introduces a clipped surrogate,
