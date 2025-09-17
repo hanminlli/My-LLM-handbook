@@ -2395,22 +2395,33 @@ There are two layers of expectations: (1) over states $\ms$ that the old policy 
 However, \textbf{TRPO} is too time consuming in the sense that it often requires second order optimization methods (conjugate gradient with Fisher-vector products to enforce the KL trust region).
 
 
-\paragraph{Importance sampling based on old policy data.} \textbf{PPO} (Proximal Policy Optimization) uses a trick involved the ratio function, and first replaces the objective as 
+\paragraph{Importance sampling based on old policy data.}  
+In practice, at iteration $k$ we first collect trajectories using the current policy $\pi_{\theta_k}$. The most direct way to update would be to compute the gradient of the policy gradient objective at $\theta = \theta_k$, which is exactly on-policy with respect to the data. However, modern methods like PPO typically perform many minibatch gradient updates on the same rollout data. After the first update, the parameters have moved from $\theta_k$ to some $\theta_{k,t}$ (where $t$ indexes local iterations on this minibatch), while the data is still drawn from $\pi_{\theta_k}$. This creates a distribution mismatch: the true policy gradient is an expectation under the new policy $\pi_{\theta_{k,t}}$, but we only have samples from the old one. To address this, PPO introduces an importance-sampling correction using the ratio function
+\[
+  o_t(\theta; \theta_k) \;=\; \frac{\pi_\theta(\ma_t \mid \ms_t)}{\pi_{\theta_k}(\ma_t \mid \ms_t)}.
+\]
+The surrogate objective is then written as
+\[
+  \widehat{J}^{\text{PG}}(\theta; \theta_k) \;=\;
+  \ExpSub{ \substack{t \\ \ms_t \sim \rho_{\pi_{\theta_k}} \\ \ma_t \sim \pi_{\theta_k}} }
+  { o_t(\theta; \theta_k)\, \hat{A}^t }.
+\]
+Differentiating gives
 \begin{align*}
-  \widehat{J}^{\text{PG}}(\theta; \theta_k) = \ExpSub{ \substack{t \\ \ms_t \sim \rho_{\pi_{\theta_k}} \\ \ma_t \sim \pi_{\theta_k}}}{o_t(\theta; \theta_k) \hat{A}^t}.
-\end{align*} 
-To show that this is an importance sampling of the original objective, 
-\begin{align*}
-  \nabla_\theta \widehat{J}^{\text{PG}}(\theta; \theta_k) &= \ExpSub{t, \ms_t, \ma_t}{\nabla_\theta o_t(\theta; \theta_k) \hat{A}^t} \\
-  &= \ExpSub{t, \ms_t, \ma_t}{\nabla_\theta \frac{\pisub{\theta}{\ma_t}{\ms_t}}{\pisub{\theta_{k}}{\ma_t}{\ms_t}} \hat{A}^t} \\
-  &= \ExpSub{t, \ms_t, \ma_t}{\frac{\pisub{\theta}{\ma_t}{\ms_t}}{\pisub{\theta_{k}}{\ma_t}{\ms_t}}\cdot \nabla_\theta\log \pisub{\theta}{\ma_t}{\ms_t} \hat{A}^t} \\
-  &= \ExpSub{t, \ms_t, \ma_t}{o_t(\theta; \theta_k)\cdot \nabla_\theta\log \pisub{\theta}{\ma_t}{\ms_t} \hat{A}^t}.
+  \nabla_\theta \widehat{J}^{\text{PG}}(\theta; \theta_k)
+  &= \ExpSub{t,\ms_t,\ma_t}{ \nabla_\theta o_t(\theta; \theta_k)\, \hat{A}^t } \\
+  &= \ExpSub{t,\ms_t,\ma_t}{ \frac{\pi_\theta(\ma_t \mid \ms_t)}{\pi_{\theta_k}(\ma_t \mid \ms_t)} \,
+      \nabla_\theta \log \pi_\theta(\ma_t \mid \ms_t)\, \hat{A}^t } \\
+  &= \ExpSub{t,\ms_t,\ma_t}{ o_t(\theta; \theta_k)\,
+      \nabla_\theta \log \pi_\theta(\ma_t \mid \ms_t)\, \hat{A}^t }.
 \end{align*}
-Clearly the last term is an importance sampled version of the original objective $J^{\text{PG}}$.
+Thus the final expression is exactly the \emph{importance-sampled version of the original policy gradient}, allowing us to reuse old-policy data $\pi_{\theta_k}$ while updating toward $\theta_{k+1}$.
+This is easy to understand, we just first divide it by the probability it appears in the old disrtribution and then assigned the correct weight (the current probability) to it.
+For a formal proof, we only need to use the change of measure trick in (\ref{eq:change-measure}).
 
-If we maximize this directly, the policy can change too aggressively, leading to instability.
 
-\paragraph{Clipping.} As a result, \textbf{PPO} in turn introduces a clipped surrogate,
+\paragraph{Clipping.} If we maximize this directly, the policy can change too aggressively, leading to instability.
+As a result, \textbf{PPO} in turn introduces a clipped surrogate,
 \begin{align*}
   J^{\text{Clip}}(\theta; \theta_k) = \ExpSub{\substack{t \\ \ms_t \sim \rho_{\pi_{\theta_k}} \\ \ma_t \sim \pi_{\theta_k}}}{\min\cbrac{o_t(\theta; \theta_k) \hat{A}^t, \text{clip}\rbrac{o_t(\theta; \theta_k), 1-\varepsilon, 1+\varepsilon}\cdot\hat{A}^t}},
 \end{align*}
