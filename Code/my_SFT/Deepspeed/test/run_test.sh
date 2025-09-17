@@ -6,7 +6,7 @@
 #SBATCH --ntasks=1
 #SBATCH --gres=gpu:a100:2
 #SBATCH --mem=512G
-#SBATCH --time=1:00:00
+#SBATCH --time=2:00:00
 #SBATCH --mail-user=hanmin.li@kaust.edu.sa
 #SBATCH --mail-type=BEGIN,END,FAIL
 
@@ -40,4 +40,10 @@ export WANDB_PROJECT="ds-sft"
 export WANDB_WATCH="false"
 
 # launch with torchrun for 2 GPUs
-torchrun --nproc_per_node=2 sft_deepspeed_test.py
+export MASTER_PORT=$((10000 + RANDOM % 50000))
+torchrun \
+  --nnodes=1 \
+  --nproc_per_node=2 \
+  --master_port=$MASTER_PORT \
+  sft_deepspeed_test.py \
+  --deepspeed ds_zero3_offload_test.json
