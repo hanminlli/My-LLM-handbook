@@ -2262,7 +2262,7 @@ Using the tower property of expectation, we can further write
 \end{align*}
 Now, for variance reduction, we introduce the state-value function:
 \begin{align*}
-  V^{\pi}(s) \eqdef \ExpSub{\ma \sim \pisub{}{\cdot}{\ms}}{Q^{\pi}(\ms, \ma)} = \ExpSub{\pi}{G_t \mid \ms_t = \ms},
+  V^{\pi}(\ms) \eqdef \ExpSub{\ma \sim \pisub{}{\cdot}{\ms}}{Q^{\pi}(\ms, \ma)} = \ExpSub{\pi}{G_t \mid \ms_t = \ms},
 \end{align*}
 which is the expected return starting in state $\ms$ following $\pi$.
 The advantage function is then 
