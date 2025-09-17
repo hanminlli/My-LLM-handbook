@@ -2423,7 +2423,7 @@ if the policy is uniform then it is high.
 \paragraph{Full PPO loss.}
 The clipped surrogate is the policy gradient, but PPO also trains the critic and uses an entropy bonus.
 \begin{align*}
-  \cL^{\text{PPO}}(\theta, \psi; \theta_k) \eqdef -\underbrace{\Exp{\cL^{\text{Clip}}(\theta; \theta_k)}}_{\text{actor}} + c_v \cdot \underbrace{\Exp{\rbrac{V_{\psi}(s_t) - \hat{G}_t}^2}}_{\text{critic}} - c_e \cdot \underbrace{\Exp{\cH\rbrac{\pisub{\theta}{\cdot}{\ms_t}}}}_{\text{exploration}},
+  \cL^{\text{PPO}}(\theta, \psi; \theta_k) \eqdef -\underbrace{\Exp{\cJ^{\text{Clip}}(\theta; \theta_k)}}_{\text{actor}} + c_v \cdot \underbrace{\Exp{\rbrac{V_{\psi}(s_t) - \hat{G}_t}^2}}_{\text{critic}} - c_e \cdot \underbrace{\Exp{\cH\rbrac{\pisub{\theta}{\cdot}{\ms_t}}}}_{\text{exploration}},
 \end{align*}
 where 
 \begin{align*}
