@@ -2225,7 +2225,7 @@ We cannot backpropagate through this function properly.
 \paragraph{Policy Gradient:}
 Differentiate $J(\theta)$, we get 
 \begin{align*}
-  \nabla_{\theta} J(\theta) &= \int \nabla p_\theta(\tau) R(\tau) \quad d\tau \\
+  \nabla_{\theta} J(\theta) &= \int \nabla_\theta p_\theta(\tau) R(\tau) \quad d\tau \\
   &= \int p_\theta(\tau) \nabla_{\theta} \log p_{\theta}(\tau) \cdot R(\tau) \quad d\tau \\
   &= \ExpSub{\tau \sim p_\theta}{\nabla_\theta\log p_{\theta}(\tau)\cdot R(\tau)}.
 \end{align*}
