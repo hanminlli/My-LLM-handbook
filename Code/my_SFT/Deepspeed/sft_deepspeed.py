@@ -72,35 +72,27 @@ def main():
     set_seed(SEED)
     torch.backends.cuda.matmul.allow_tf32 = True
 
-    # Only rank 0 initializes a W&B run to avoid duplicates
     rank = int(os.environ.get("RANK", "0"))
     if rank == 0:
         wandb.init(project=WANDB_PROJECT, name=WANDB_RUN_NAME)
-    else:
-        # Disable wandb on non-zero ranks
-        os.environ["WANDB_DISABLED"] = "true"
 
-    # Tokenizer and model
     tok = AutoTokenizer.from_pretrained(MODEL_NAME, use_fast=True)
     if tok.pad_token is None:
         tok.pad_token = tok.eos_token
 
-    # Load full model; DeepSpeed/Accelerate will shard/partition
     model = AutoModelForCausalLM.from_pretrained(
         MODEL_NAME,
         torch_dtype=torch.bfloat16 if BF16 else torch.float16,
-        low_cpu_mem_usage=True,  # important when loading 20B
-        device_map=None          # let DeepSpeed/Accelerate handle placement
+        low_cpu_mem_usage=True,
+        device_map=None
     )
 
-    # Chat-format adjustments (resizes embeddings if special tokens are added)
     model, tok = setup_chat_format(model, tok)
 
     if GRADIENT_CHECKPOINTING:
         model.gradient_checkpointing_enable()
         model.config.use_cache = False
 
-    # Dataset split
     full = load_dataset(DATASET_NAME, split=DATASET_SPLIT)
     eval_size = max(100, int(len(full) * EVAL_RATIO))
     ds_train = full.select(range(len(full) - eval_size))
@@ -127,8 +119,8 @@ def main():
             max_steps=MAX_STEPS,
             max_seq_length=MAX_SEQ_LENGTH,
             output_dir=OUTPUT_DIR,
-            report_to=["wandb"],
-            max_grad_norm=0.0, # turning off HF side clipping
+            report_to=["wandb"] if rank == 0 else "none",
+            max_grad_norm=0.0,
         )
     )
 
