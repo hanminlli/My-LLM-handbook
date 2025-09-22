@@ -114,6 +114,7 @@ def main():
             per_device_eval_batch_size=1,
             logging_steps=LOGGING_STEPS,
             save_steps=SAVE_STEPS,
+            save_total_limit=2,
             evaluation_strategy="steps",
             eval_steps=EVAL_STEPS,
             max_steps=MAX_STEPS,
