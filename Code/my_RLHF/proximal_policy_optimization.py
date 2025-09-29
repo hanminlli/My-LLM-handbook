@@ -84,3 +84,9 @@ class PolicyWithValueHead(nn.Module):
             device_map=device_map
         )
         hidden_size = self.lm.config.hidden_size # dimension of the hidden representations
+        # the size of each token embedding and the output dimension of each transformer block, 
+        # GPT-2 small = 768, TinyLlama-1.1B = 2048, Qwen2.5-7B = 4096
+        self.value_head = nn.Linear(hidden_size, 1, bias=False)
+
+        self.pad_token_id = self.lm.config.pad_token_id or self.lm.config.eos_token_id
+        
