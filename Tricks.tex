@@ -2990,7 +2990,43 @@ Typical approaches to handle this problem includes:
 \end{enumerate}
 
 
+\section{Miscellaneous}
 
+\subsection{Chinchilla Optimality}
+Chinchilla optimalilty refers to the balance between model size (number of parameters) and dataset size (number of training tokens) for a fixed budget of compute.
+\begin{itemize}
+  \item Before Chinchilla, the common practice (e.g. GPT-3) was to train very large models on relatively small datasets. This made the model undertrained, which means that they had more parameters than the dataset could properly fit.
+  \item The Chinchilla paper by Deepmind in 2022 systematically showed that for a fixed budget of compute, the optimal stragety is not to make the model as large as possible, but instead to use a smaller model and train it on much more data.
+  \item Roughly speaking, they found that the optimal scaling law would be letting the number of training tokens scale linearly with the number of parameters
+  \item The empirical results show that the optimal data-to-model ratio to be around 20 tokens per paramete ($1\times$ case)\footnote{We often see $2\times$ or $4\times$ cases where we increase the number of tokens $2$ or $4$ times.}.
+  If we train with fewer tokens per parameter such as $4 \sim 5$ tokens per parameter, the model would be under-trained, and if we train with more tokens per parameter such as $50 \sim 100$ tokens per parameter, the model would be over-trained.
+\end{itemize}
+
+In practice, GPT-3 had 175B parameters but was trained on 300B tokens.
+Chinchilla showed that 70B parameters trained on 1.4T tokens (with the same compute budget) achieves much better performance.
+
+
+\subsection{Metrics (nats, bits, bpb)}
+The standard language modeling loss is the average of the negative log likelihood of the next token.
+\begin{align*}
+  \cL_{\text{LM}} = -\frac{1}{L}\sum_{t=1}^{L}\log\probsub{\theta}{\mx_t \mid \mx_{< t}},
+\end{align*}
+where $\mx = (\mx_1, \hdots, \mx_L)$ is a sequence of tokens.
+The loss it self can be reported in nats (natural log base $e$) $L_{\text{nats}}$ or bits (log base $2$) $L_{\text{bits}}$.
+If we exponentiate the average loss, we get perplexity.
+
+There is another related measure, namely bits per bytes (bpb), coming from viewing the model as a compression system, which connects to Shannon's source coding theorem.
+That is, the average number of bits needed to encode a symbol is equal to its entropy (expected negative log likelihood).
+Under this view, the bits $L_{\text{bits}}$ indicates how many bits are needed to encode each token.
+This already gives us bits per token.
+However, tokens are not uniform units, because they vary in length, so bits per token is not directly comparable across tokenization schemes.
+This is where bpb comes in.
+Instead of normalizing by token count, normalize by raw UTF-8 byte count of the text.
+If we denote the dataset text length as $T$-tokens and $B$-bytes, then 
+\begin{align*}
+  \text{bpb} = \frac{T}{B}\cdot L_{\text{bits}}.
+\end{align*}
+This makes the result more stable and comparable across models with different tokenizer.
 
 
 \end{document}
