@@ -2427,8 +2427,8 @@ As a result, \textbf{PPO} in turn introduces a clipped surrogate,
 \end{align*}
 where the clipping operator does the following:
 \begin{enumerate}
-  \item When $r_t \in [1 - \varepsilon, 1 + \varepsilon]$, we do nothing.
-  \item When $r_t$ goes beyond, we replace $r_t$ by the nearest boundary value.
+  \item When $o_t \in [1 - \varepsilon, 1 + \varepsilon]$, we do nothing.
+  \item When $o_t$ goes beyond, we replace $o_t$ by the nearest boundary value.
 \end{enumerate}
 
 \paragraph{Entropy bonus.}
@@ -2492,7 +2492,7 @@ In the $k$-th iteration, we do
     
     \item[(II)] Importance ratio,
     \begin{align*}
-      r_t(\theta; \theta_{\text{old}}) = \exp\rbrac{\log \pisub{\theta}{\ma_t}{\ms_t} - \log \pisub{\theta_{\text{old}}}{\ma_t}{\ms_t}}
+      o_t(\theta; \theta_{\text{old}}) = \exp\rbrac{\log \pisub{\theta}{\ma_t}{\ms_t} - \log \pisub{\theta_{\text{old}}}{\ma_t}{\ms_t}}
     \end{align*} 
 
     \item[(III)] Actor loss (clipped surrogate)
