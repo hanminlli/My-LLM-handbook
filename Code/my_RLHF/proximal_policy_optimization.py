@@ -9,7 +9,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from datasets import load_dataset
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoModelForCausalLM, AutoTokenizer, AutoModelForSequenceClassification
 
 
 @dataclass
@@ -176,6 +176,64 @@ def sample_batch(batch_size: int) -> List[str]:
 
 
 # Reward function
+# The ideal RM matches the backbone of the policy, but in practice we can and often use a smaller, existing 
+# RM (like the one here) for efficiency.
+rm_tok = AutoTokenizer.from_pretrained("Skywork/Skywork-Reward-V2-Qwen3-0.6B")
+rm     = AutoModelForSequenceClassification.from_pretrained(
+    "Skywork/Skywork-Reward-V2-Qwen3-0.6B",
+    device_map="auto",
+    torch_dtype=torch.bfloat16,
+).eval()
+# For reward modeling, what we need is given a full dialogue (prompt + resposne), produce one scalar reward score,
+# which is exactly AutoModelForSequenceClassification is built for, where there is a classification head on top of 
+# the transformer's pooled hidden states.
+
 @torch.no_grad()
-def func():
-    pass
+def reward_fn_rm(prompts, responses):
+    texts = [f"User: {}\nAssistant: {r}" for p, r in zip(prompts, responses)]
+    enc = rm_tok(texts, return_tensors="pt", padding=True, truncation=True, max_length=2048).to(next(rm.parameters()).device)
+    # return_tensors="pt" means that we will get a dictionary of PyTorch tensors, including input_ids, attention_mask
+    return rm(**enc).logits.squeeze(-1).float().cpu()
+    # the logits would be (B, 1) (num_labels=1).
+    # moving to CPU to save GPU memory, they do not need gradients, later some computations will be done on CPU.
+
+
+# Utility
+def pad_to_same_length(tensors: List[torch.Tensor], pad_id: int) -> torch.Tensor:
+    # Pad the generated tokens (prompt + response) to the same length to batch through the policy
+    # This is needed to compute the KL-divergence.
+    max_len = max(t.size(0) for t in tensors)
+    out = []
+    for t in tensors:
+        if t.size(0) < max_len:
+            t = F.pad(t, (0, max_len - t.size(0)), value=pad_id)
+            # pad 0 tokens on the left and max_len - t.size(0) tokens on the right
+        out.append(t)
+    return torch.stack(out, dim=0)
+
+
+def masked_mean(tensor, mask, eps=1e-8):
+    # input: (B, L)
+    num = (tensor * mask).sum()
+    den = mask.sum().clamp(min=eps)
+    return num / den
+
+
+def compute_gae_with_bootstrap(rewards, values, done, gamma, lam):
+    '''
+    GAE for variable-length responses with bootstrap value=0 after the last response token.
+    rewards/values/mask: (B, T_resp_full) aligned to positions where policy/value/logprob are defined.
+    mask is 1 on response tokens, 0 elsewhere.
+    Positions before response (prompt) are zero-masked already.
+    Returns advantages, returns with same shape as inputs (zeros outside response).
+    '''
+    B, T = reward.shape # we have already spread out the rewards
+    adv = torch.zeros_like(rewards) # A_t
+    ret = torch.zeros_like(rewards) # G_t
+
+    # For each sample, run a backward pass across response slice only
+    for i in range(B):
+        pass
+
+
+    
