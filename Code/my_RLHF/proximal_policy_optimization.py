@@ -190,7 +190,7 @@ rm     = AutoModelForSequenceClassification.from_pretrained(
 
 @torch.no_grad()
 def reward_fn_rm(prompts, responses):
-    texts = [f"User: {}\nAssistant: {r}" for p, r in zip(prompts, responses)]
+    texts = [f"User: {p}\nAssistant: {r}" for p, r in zip(prompts, responses)]
     enc = rm_tok(texts, return_tensors="pt", padding=True, truncation=True, max_length=2048).to(next(rm.parameters()).device)
     # return_tensors="pt" means that we will get a dictionary of PyTorch tensors, including input_ids, attention_mask
     return rm(**enc).logits.squeeze(-1).float().cpu()
@@ -219,7 +219,7 @@ def masked_mean(tensor, mask, eps=1e-8):
     return num / den
 
 
-def compute_gae_with_bootstrap(rewards, values, done, gamma, lam):
+def compute_gae_with_bootstrap(rewards, values, mask, gamma, lam):
     '''
     GAE for variable-length responses with bootstrap value=0 after the last response token.
     rewards/values/mask: (B, T_resp_full) aligned to positions where policy/value/logprob are defined.
@@ -227,13 +227,32 @@ def compute_gae_with_bootstrap(rewards, values, done, gamma, lam):
     Positions before response (prompt) are zero-masked already.
     Returns advantages, returns with same shape as inputs (zeros outside response).
     '''
-    B, T = reward.shape # we have already spread out the rewards
+    B, T = rewards.shape # we have already spread out the rewards
     adv = torch.zeros_like(rewards) # A_t
     ret = torch.zeros_like(rewards) # G_t
 
     # For each sample, run a backward pass across response slice only
     for i in range(B):
-        pass
+        valid_idx = mask[i].nonzero(as_tuple=False).squeeze(-1)
+        # nonzero returns (num_valid, 1)
+        if valid_idx.numel() == 0:
+            continue
+        start, end = int(valid_idx[0].item()), int(valid_idx[-1].item())
+        # Continguous
+        r = rewards[i, start : end + 1]
+        v = values[i, start : end + 1]
+        Tr = r.size(0)
+        adv_i = torch.zeros_like(r)
+        lastgaelam = torch.zeros(1, device=r.device, dtype=r.dtype) # 0
+        next_value = torch.zeros(1, device=r.device, dtype=r.dtype) # 0 
+        for t in reversed(range(Tr)):
+            delta = r[t] + gamma * next_value - v[t] # TD-redisual
+            lastgaelam = delta + gamma * lam * lastgaelam # Advantage estimation
+            adv_i[t] = lastgaelam
+            next_value = v[t] # for the previous step
+        ret_i = adv_i + v # add A and V to compute G
+        adv[i, start : end + 1] = adv_i
+        ret[i, start : end + 1] = ret_i
 
-
+    return adv, ret
     
