@@ -256,3 +256,101 @@ def compute_gae_with_bootstrap(rewards, values, mask, gamma, lam):
 
     return adv, ret
     
+
+# Build models & tokenizer
+tokenizer = AutoTokenizer.from_pretrained(args.policy_id, use_fast=True)
+if tokenizer.pad_token is None:
+    tokenizer.pad_token = tokenizer.eos_token
+tokenizer.padding_side = "left" # safe default and align with generate()
+
+dtype = torch.bfloat16 if args.use_bf16 and torch.cuda.is_available() else None
+policy = PolicyWithValueHead(args.policy_id, dtype=dtype, device_map=args.device_map) 
+ref = clone_frozen_ref(policy) # pi_ref
+
+optim = torch.optim.AdamW(
+    [
+        {"params": policy.lm.parameters(), "lr": args.learning_rate},
+        {"params": policy.value_head.parameters(), "lr": args.learning_rate},
+    ],
+    betas=(0.9, 0.95),
+    weight_decay=0.01
+)
+
+kl_coef = args.init_kl_coef
+
+
+# Rollout: prompts -> generations -> rewards -> training batch
+def rollout(batch_prompts: List[str]):
+    # format chats
+    chats = [build_chat(p) for p in batch_prompts] # List[Dict[str, str]]
+    prompts_texts = [render_chat(tokenizer, m) for m in chats] # List[str]
+    enc = tokenizer(
+        prompts_texts,
+        return_tensors="pt",
+        paddinf=True,
+        truncation=True,
+        max_length=args.max        
+    )
+    prompt_ids   = enc["input_ids"].to(policy.lm.device) # batched prompts tokens
+    prompt_mask = enc["attention_masks"].to(policy.lm.device) # padding mask
+    prompt_lens  = [int(m.sum().item()) for m in prompt_mask] # true prompt lengths
+    # recall that padding happens on the left
+
+    # generate responses
+    with torch.no_grad():
+        gen = policy.generate(
+            input_ids=prompt_ids,
+            attention_mask=prompt_mask,
+            max_new_tokens=args.max_new_tokens,
+            do_sample=True, # not always picking the same token with the maximum probability
+            temperature=args.temperature,
+            top_p=args.top_p,
+            pad_token_id=policy.pad_token_id,
+            eos_token_id=tokenizer.eos_token_id,
+        ) # (B, T_full), right padded (there is no left padding here)
+
+    # build full inputs, labels, and response mask
+    input_ids_list, attn_list = [], []
+    pad_id = tokenizer.pad_token_id
+    eos_id = tokenizer.eos_token_id
+    B_full, L_full = gen.shape
+    for i in range(B_full):
+        full = gen[i] # (L_full,)
+        # PAD-aware attention mask (1 for real tokens, 0 for PAD)
+        attn = (full != pad_id).long()
+        input_ids_list.append(full)
+        attn_list.append(attn)
+
+    # stack and pad for safety
+    input_ids = pad_to_same_length(input_ids_list, pad_id)    # (B, L_full)
+    attention_mask = pad_to_same_length(attn_list, 0)         # (B, L_full)
+
+    # Shifted labels
+    labels_shifted = input_ids[:, 1:].clone()  # (B, L_full-1)
+    B, Tm1 = labels_shifted.shape
+    # Response mask aligned with (B, T-1): 1 from (p_len-1) .. up to last target token BEFORE EOS/PAD
+    resp_mask_full = torch.zeros((B, Tm1), device=input_ids.device, dtype=torch.float32)
+    for i, p_len in enumerate(prompt_lens):
+        valid = (attention_mask[i] == 1).nonzero(as_tuple=False).squeeze(-1)
+        if valid.numel() == 0:
+            continue
+        last_real = valid[-1].item()
+        # If EOS exists, exclude it: set last target token = EOS_index - 1
+        eos_pos = (input_ids[i] == eos_id).nonzero(as_tuple=False)
+        if eos_pos.numel() > 0:
+            last_target = int(eos_pos[0].item()) - 1
+        else:
+            last_target = last_real
+
+        start = max(p_len - 1, 0)
+        end_exclusive = max(last_target, start) 
+        if end_exclusive > start:
+            resp_mask_full[i, start:end_exclusive] = 1.0
+
+    # Compute old logprobs/values (actor) and ref logprobs (reference)
+    with torch.no_grad():
+        # in the previous generation pass there are no information stored
+        logits, values = policy(input_ids, attention_mask)
+
+
+
