@@ -2990,6 +2990,76 @@ Typical approaches to handle this problem includes:
 \end{enumerate}
 
 
+
+\section{Retrieval-Augmented Generation}
+
+Retrieval-Augmented Generation (\textbf{RAG}) is a hybrid neural-information-retrieval + text-generation framework that augments a language model with access to an externel knowledge store during inference (and sometimes training).
+This is needed because an LLM's internal weight can store parametric knowledge that could be outdated or incomplete, and we need RAG to augments it with externel knowledge retrieved at run time.
+
+Mechanism:
+\begin{itemize}
+  \item \textbf{Encode the user query into a vector.}
+  \item \textbf{Retrieve top-k relevant documents} from a pre-built knowledge index using vector similarity. 
+  \item \textbf{Fuse retrieval results} into the prompt.
+  \item \textbf{Generate} the answer using the LLM conditioned on this augmented prompt\footnote{This is also known as grounded generation.}.
+\end{itemize}
+In a word, it is feeding a richer prompt built from relevant retrieved context, and then it performs normal next-token generation.
+RAG can reduce hallucinations, increase factuality and/or ground the generation model on a specific dataset.
+
+\paragraph{End to end training}
+Normally, RAG has two separate components, the retriever $\eta$ and the generator $\theta$, and in standard practice, the retriever is frozen and only the generator is finetuned.
+However, it is possible to treat the retrieval step as a latent variable in the full log likelihood
+\begin{align*}
+  \cL(\theta, \eta) = - \log\sum_{\mz} p_{\eta}(\mz \mid \mx) p_{\theta}(\my \mid \mx, \mz),
+\end{align*}
+and we update on both sets of parameters $(\theta, \eta)$ using gradients depending on how retrieval affects the final generation.
+So the retriever learns to retrieve docs that make the generator's answers more likely / accurate.
+
+However, this is hard and costly, since the summation over docs is huge, and retrieval itself involves discrete choices which means gradient cannot flow directly.
+
+\subsection{Advanced RAG Techniques}
+
+\paragraph{Query Rewriting}
+Simple RAG implementation would likely struggle with the search step if a question is too verbose, or to refer to context in previous messages in the conversation. 
+In this case, it is a good idea to use an LLM to rewrite the query into one that aids the retrieval step in getting the right information.
+
+
+\paragraph{Multi-query RAG}
+We can also extend the query rewriting to be able to search multiple queries if more than one is needed to answer a specific question. 
+A classic example would be the user asking the following question: ``Compare the data of ... in 2024 vs. 2025'', we can perhaps find such a comparison directly, but we can also make two search queries and present the top results of both queries to the model for grounded generation.
+In addition, we can also give the query rewriter the option to determine if no search is required and if it can directly generate a confident answer without searching.
+
+
+\paragraph{Multi-hop RAG}
+A more advanced question may require a series of sequential queries. 
+Example:  User Question: ``Who are the largest car manufacturers in 2023? Do they each make EVs or not?''
+
+To answer this, the system must first search for: 
+
+Step 1, Query 1: ``largest car manufacturers 2023''
+
+Then after it gets this information (the result being Toyota, Volkswagen, and Hyundai), it should ask follow-up questions:
+
+
+Step 2, Query 1: ``Toyota Motor Corporation electric vehicles''
+
+Step 2, Query 2: ``Volkswagen AG electric vehicles''
+
+Step 2, Query 3: ``Hyundai Motor Company electric vehicles''
+
+
+\paragraph{Query Routing}
+Give the model the ability to search multiple data sources.
+
+\paragraph{Agentic RAG}
+Delegates more and more responsibility to the LLM to solve more and more complex problems.
+This relies on the LLM's capability to gauge the required information needs as well as its ability to utilize multiple data sources. 
+
+
+\subsection{RAG Evaluation}
+Fluency, Perceived utility (Whether the generated answer is helpful and informative.), Citation recall / precision, LLM-as-a-judge.
+
+
 \section{Miscellaneous}
 
 \subsection{Chinchilla Optimality}
