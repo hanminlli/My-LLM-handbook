@@ -2866,6 +2866,37 @@ It is not representable as a weighted Negative Log Likelihood (NLL) form, GPRO g
 To be specific, DPO uses a pairwise logistic surrogate focuses only on to relative differences, which leads to negative coefficients for the dispreferred sample.
 
 
+\paragraph{Relation to DPO and its implementation}
+Let us recall the entire PPO objective:
+\begin{align*}
+  J^{\text{PPO}}(\theta) &= \mathbb{E}_{\substack{(\ms_t, \ma_t) \sim \pi_{\text{old}}}}\big[\min\cbrac{o_t(\theta; \theta_k) \hat{A}^t, \text{clip}\rbrac{o_t(\theta; \theta_k), 1-\varepsilon, 1+\varepsilon}\cdot\hat{A}^t} \\
+  & \quad - \beta \cdot \klD{\pisub{\theta}{\cdot}{\ms_t}}{\pisub{\thetaref}{\cdot}{\ms_t} + \lambda_{\text{ent}} H(\pisub{\theta}{\cdot}{\ms_t})}\big].
+\end{align*}
+There is one implicit constraint here, that is, we do clipping to ensure that the ration is in a certain range, which enforces we are not deviating too much from the old policy $\thetaold$, this increases stability.
+There is also an explicit constraint via KL divergence, which prevents the policy deviating too much from the reference policy $\thetaref$.
+Here the $o_t$ is defined as: 
+\begin{align*}
+  o_t(\theta; \theta_k) = \frac{\pi_{\theta}(\ma_t \mid \ms_t)}{\pi_{\text{old}}(\ma_t \mid \ms_t)} = \frac{\pi_{\theta}(\ma_t \mid \ms_t)}{\pi_{\theta_k}(\ma_t \mid \ms_t)}.
+\end{align*}
+
+In GPRO, we simpliy removes the arbitrary clipping term, and anchor everything to the referrence model $\pi_{\thetaref}$.
+We can write the GPRO objective as:
+\begin{align*}
+  J^{\text{GPRO}}(\theta) &= \mathbb{E}_{\substack{(\ms_t, \ma_t) \sim \pi_{\theta_k}}}\big[o_t(\theta; \thetaref) \hat{A}^t - \beta_k \cdot \klD{\pisub{\theta}{\cdot}{\ms_t}}{\pisub{\thetaref}{\cdot}{\ms_t} + \lambda_{\text{ent}} H(\pisub{\theta}{\cdot}{\ms_t})}\big].
+\end{align*}
+which is the on policy version of the GPRO objective.
+Here the $o_t(\theta; \thetaref)$ is defined as:
+\begin{align*}
+  o_t(\theta; \thetaref) = \frac{\pi_{\theta}(\ma_t \mid \ms_t)}{\pi_{\thetaref}(\ma_t \mid \ms_t)}.
+\end{align*}
+Notice that we will use $\beta_k$ as a dynamic controller to control the KL divergence, and it will be updated in each iteration.
+If the KL exceeds the target, we will increase $\beta_k$, otherwise, we will decrease $\beta_k$.
+Notice that sometimes we will see $o_t(\theta; \thetaref)$ which is called the ratio format, while sometimes we will see $\log \pi(\ma_t \mid \ms_t)$, which is the log format, and they are equivalent from the derivation of the policy gradient method.
+This is the on policy GPRO, sometimes we will see the off policy version, where we use $\pi_{\thetaref} = \mu$, i.e., the behavior policy, the rollouts are generated from this behavoir policy and we need the importance sampling trick to correct the distribution mismatch.
+In practice, if we use $\mu = \theta_k$ which is the current policy, then it is the same as the on policy version, we can also let it be some old policy, which allows us to reuse the rollouts generated from the old policy, or we can let it be the reference policy, which allows us to reuse the rollouts generated from the reference policy.
+Note that PPO fixes $\mu = \pi_{\text{old}}$ which is the old policy.
+
+
 \subsection{On Policy and Off Policy}
 This is one of the most fundamental distinctions in reinforcement learning
 
@@ -2883,7 +2914,7 @@ Some examples include:
   \item \textbf{DPO:} This is not really RL in the classical sense, DPO is usually described as offline preference-based fine-tuning. 
   So in strict RL terms: it's neither on-policy nor off-policy, because it doesn't collect trajectories with a policy. (It behaves like an offline / off-policy method, since it learns from pre-collected data.)
   \item \textbf{GPRO:} Same as DPO — not classical on-policy RL. 
-  It's trained on a static dataset of human preferencesm, so it's closer to off-policy / offline RLHF-style training.
+  It's trained on a static dataset of human preferences, so it's closer to off-policy / offline RLHF-style training.
 \end{enumerate}
 
 This is actually related to the broader range of reinforcement learning problem. 
