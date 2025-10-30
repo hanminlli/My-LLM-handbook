@@ -2866,7 +2866,7 @@ It is not representable as a weighted Negative Log Likelihood (NLL) form, GPRO g
 To be specific, DPO uses a pairwise logistic surrogate focuses only on to relative differences, which leads to negative coefficients for the dispreferred sample.
 
 
-\paragraph{Relation to DPO and its implementation}
+\paragraph{Relation to PPO and its implementation}
 Let us recall the entire PPO objective:
 \begin{align*}
   J^{\text{PPO}}(\theta) &= \mathbb{E}_{\substack{(\ms_t, \ma_t) \sim \pi_{\text{old}}}}\big[\min\cbrac{o_t(\theta; \theta_k) \hat{A}^t, \text{clip}\rbrac{o_t(\theta; \theta_k), 1-\varepsilon, 1+\varepsilon}\cdot\hat{A}^t} \\
@@ -2895,6 +2895,36 @@ Notice that sometimes we will see $o_t(\theta; \thetaref)$ which is called the r
 This is the on policy GPRO, sometimes we will see the off policy version, where we use $\pi_{\thetaref} = \mu$, i.e., the behavior policy, the rollouts are generated from this behavoir policy and we need the importance sampling trick to correct the distribution mismatch.
 In practice, if we use $\mu = \theta_k$ which is the current policy, then it is the same as the on policy version, we can also let it be some old policy, which allows us to reuse the rollouts generated from the old policy, or we can let it be the reference policy, which allows us to reuse the rollouts generated from the reference policy.
 Note that PPO fixes $\mu = \pi_{\text{old}}$ which is the old policy.
+
+
+\paragraph{Group}
+In GRPO, we do not treat each response-prompt pair independently.
+Instead, we group multiple responses (and their rewards) that share the same prompt into a group, so we can compare them and apply relative regularization or preference-based objectives.
+
+\textbullet~ \textbf{Preference-based objective:} For a pair of responses $\my^{+}$ and $\my^{-}$, a preference model (human or reward model) tells us $r^+ > r^-$.
+Then the preference-based loss (as in DPO or GPRO) tries to enforces
+\begin{align*}
+  \log \pi_\theta(\my^+ \mid \mx) - \log \pi_\theta(\my^- \mid \mx) 
+\end{align*} 
+should be large.
+This is equivalent to minimize 
+\begin{align*}
+  -\log \sigma \rbrac{\beta\rbrac{\log\frac{\pi_\theta(\my^+\mid\mx)}{\pi_{\theta}(\my^- \mid\mx)} - \log\frac{\pi_{\thetaref}(\my^+\mid\mx)}{\pi_{\thetaref}(\my^- \mid\mx)}}},
+\end{align*}
+which is a relative formulation.
+
+
+\textbullet~ \textbf{Relative regularization:} In GRPO, we extend this to groups of size $\geq$ 2 (say 4).
+For each group of responses $\cbrac{\my_1, \my_2, \my_3, \my_4}$ for the same prompt $\mx$, we compute relative preferences using a reward model or normalized scores 
+\begin{align*}
+  \omega_i = \frac{\exp(\beta r_i)}{\sum_{j} \exp(\beta r_j)},
+\end{align*}
+then optimize policy probabilities to match this distribution, 
+\begin{align*}
+  \min_\theta \klD{\omega_i}{\frac{\pi_{\theta}(\my_i \mid \mx)}{Z_{\theta}(x)}},
+\end{align*}
+where $Z_{\theta}(x) = \sum_{j} \pi_\theta(\my_i \mid \mx)$.
+One thing to notice is that we do not actually compute the term explicitly, as it has already been captured by the advantage estimate.
 
 
 \subsection{On Policy and Off Policy}
