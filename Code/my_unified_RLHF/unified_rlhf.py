@@ -197,26 +197,194 @@ class Rewarder:
 
 # PPO Trainer
 class PPOTrainer:
-    def __init__(self, policy_v, ref, tok, rewarder, gen, cfg, train, device):
+    def __init__(self, policy_v, ref, tok, rewarder, gen, cfg, train, device, opt):
         self.policy_v, self.ref, self.tok, self.rewarder, self.gen = policy_v, ref, tok, rewarder, gen
-        self.cfg, self.train, self.device = cfg, train, device
-    
+        self.cfg, self.train, self.device, self.opt = cfg, train, device, opt
+
     def step(self, prompts):
         with torch.no_grad():
-            from transformers import GenerationConfig
             gc = GenerationConfig(
-                max_new_tokens=self.gen.max_new_tokens, 
-                temperature=self.gen.temperature, 
-                top_p=self.gen.top_p, 
+                max_new_tokens=self.gen.max_new_tokens,
+                temperature=self.gen.temperature,
+                top_p=self.gen.top_p,
                 do_sample=self.gen.do_sample
             )
             input_ids, mask = prepare_inputs(self.tok, prompts)
             input_ids, mask = input_ids.to(self.device), mask.to(self.device)
             gen_out = self.policy_v.base.generate(input_ids=input_ids, attention_mask=mask, **gc.__dict__)
-            # base model generate performs auto-regressive text generation, 
-            # repeatedly sampling next tokens from the model until you hit EOS or max_new_tokens
-            # final results padded to maximum generated length
             responses = self.tok.batch_decode(gen_out[:, input_ids.size(1):], skip_special_tokens=True)
-            # ignore prompt, skip_special_tokens=True removes [PAD], <EOS>
 
-        rewards = self.rewarder.score(prompts, responses)
+        rewards = self.rewarder.score(prompts, responses) # [B]
+        texts = [p + r for p, r in zip(prompts, responses)]
+        ids, am = prepare_inputs(self.tok, texts, 2048)
+        ids, am = ids.to(self.device), am.to(self.device)
+
+        with torch.no_grad():
+            old_lp = sequence_logprobs(self.policy_v.base, ids, am) # [B, T-1]  frozen "old"
+            ref_lp = sequence_logprobs(self.ref, ids, am) # [B, T-1]
+            _, vals, _ = self.policy_v(ids, am) # vals: [B, T]
+        adv = rewards - vals[:, -1]  # [B]
+        resp_mask = torch.ones_like(old_lp) # [B, T-1]
+        denom = resp_mask.sum().clamp_min(1.0)
+
+        last_logs = {}
+        for _ in range(self.cfg.ppo_epochs):
+            self.opt.zero_grad(set_to_none=True)
+
+            logits, vals, _ = self.policy_v(ids, am) # current policy
+            logp = F.log_softmax(logits, dim=-1)
+            cur_lp = logp[:, :-1, :].gather(-1, ids[:, 1:].unsqueeze(-1)).squeeze(-1) # [B, T-1]
+
+            ratio = torch.exp(cur_lp - old_lp) # [B, T-1]
+            unclipped = ratio * adv.unsqueeze(1)
+            clipped = torch.clamp(ratio, 1 - self.cfg.clip_ratio, 1 + self.cfg.clip_ratio) * adv.unsqueeze(1)
+            policy_loss = - torch.sum(torch.min(unclipped, clipped) * resp_mask) / denom
+
+            value_loss = F.mse_loss(vals[:, -1], rewards) # [B] vs [B]
+            kl = (cur_lp - ref_lp).mean() 
+            loss = policy_loss + 0.5 * value_loss + self.cfg.kl_coef * kl
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(self.policy_v.parameters(), self.train.max_grad_norm)
+            self.opt.step()
+
+            last_logs = {
+                "ppo/loss": float(policy_loss.item()),
+                "ppo/kl": float(kl.item()),
+                "reward/mean": float(rewards.mean().item()),
+            }
+        return last_logs
+
+
+# DPO Trainer
+class DPOTrainer:
+    def __init__(self, policy, ref, tok, beta, device, opt):
+        self.p, self.r, self.tok, self.beta, self.dev, self.opt = policy, ref, tok, beta, device, opt
+    
+    def step(self, batch):
+        p =   [ b["prompt"] for b in batch ]
+        c =   [ b["chosen"] for b in batch ]
+        r =   [ b["rejected"] for b in batch ]
+        pos = [ p[i] + c[i] for i in range(len(p)) ]
+        neg = [ p[i] + r[i] for i in range(len(p)) ]
+
+        def agg(m, xs):
+            ids, am = prepare_inputs(self.tok, xs, 2048)
+            ids, am = ids.to(self.dev), am.to(self.dev)
+            lp = sequence_logprobs(m, ids, am) # (B, T - 1)
+            return lp.sum(dim=1) # [B]
+        
+        with torch.no_grad():
+            rp, rn = agg(self.r, pos), agg(self.r, neg) # reference
+        pp, pn = agg(self.p, pos), agg(self.p, neg) # policy
+        delta = (pp - pn) - (rp - rn) # [B]
+        loss = - F.logsigmoid(self.beta * delta).mean()
+
+        self.opt.zero_grad(set_to_none=True)
+        loss.backward()
+        torch.nn.utils.clip_grad_norm_(self.p.parameters(), 1.0)
+        self.opt.step()
+
+        acc = float((delta > 0).float().mean().item()) # fraction of improved samples
+        return {
+            "dpo/loss": float(loss.item()), 
+            "dpo/acc": acc
+        }
+
+
+# GRPO Trainer
+class GRPOTrainer:
+    def __init__(self, policy, ref, tok, rewarder, gen, cfg, device, opt):
+        self.p, self.r, self.tok, self.rewarder = policy, ref, tok, rewarder, 
+        self.gen, self.cfg, self.dev, self.opt  = gen, cfg, device, opt
+    
+    def step(self, prompts):
+        K = self.cfg.group_size
+        all_texts = [] # concatenated prompt+response strings
+        all_rewards = [] # per-response reward
+
+        # Generate K responses per prompt, score them, collect
+        for prompt in prompts:
+            # Build input once for slicing continuation correctly
+            enc = self.tok(prompt, return_tensors="pt").to(self.dev)
+            input_len = enc["input_ids"].shape[1]
+
+            reps = []
+            with torch.no_grad():
+                for _ in range(K):
+                    out = self.p.generate(
+                        **enc, 
+                        max_new_tokens=self.gen.max_new_tokens,
+                        temperature=self.gen.temperature, 
+                        top_p=self.gen.top_p,
+                        do_sample=self.gen.do_sample
+                    )
+                    cont_ids = out[0][input_len:]
+                    text = self.tok.decode(cont_ids, skip_special_tokens=True)
+                    reps.append(text)
+            # Rewards for the K responses
+            rs = self.rewarder.score([prompt] * K, reps) # [K]
+            rs_std = (rs - rs.mean()) / (rs.std() + 1e-6) # normalize
+
+            for j in range(K):
+                all_texts.append(prompt + reps[j])
+                all_rewards.append(rs_std[j].item())
+            
+        
+        # Convert to tensors for loss
+        ids, am = prepare_inputs(self.tok, all_texts, 2048)
+        ids, am = ids.to(self.dev), am.to(self.dev)
+        lp = sequence_logprobs(self.p, ids, am) # [B * K, T - 1]
+        seq_logp = lp.sum(dim=1) # [B * K,]
+        adv = torch.tensor(all_rewards, device=self.dev, dtype=torch.float32) # [B * K, ]
+
+        loss = -(adv * seq_logp).mean()
+        # --------------------------------------------------------------
+        # GRPO LOSS (Group Relative Policy Optimization)
+        # --------------------------------------------------------------
+        # Equivalent to REINFORCE loss:
+        #   L = - E[ A(x,y) * log π(y|x) ]
+        # where A(x,y) = (R - mean_group) / std_group is the standardized
+        # advantage computed within each prompt’s group of K responses.
+        # This makes training relative — the model increases probability
+        # of better-than-average responses and decreases worse ones.
+        #
+        # This simple formulation eliminates the need for a value network
+        # (baseline) used in PPO, and is more stable when rewards differ
+        # mostly in relative rank rather than absolute scale.
+        # --------------------------------------------------------------
+
+        # Optional: add a mild KL regularizer to keep policy close to ref
+        with torch.no_grad():
+            ref_lp = sequence_logprobs(self.r, ids, am)
+        kl_term = ((lp - ref_lp).mean())
+        loss = loss + 0.01 * kl_term
+
+
+        self.opt.zero_grad(set_to_none=True)
+        loss.backward()
+        torch.nn.utils.clip_grad_norm_(self.p.parameters(), 1.0)
+        self.opt.step()
+
+        return {
+            "grpo/loss": float(loss.item()),
+            "grpo/adv_mean": float(adv.mean().item()),
+        }
+    
+
+# Main
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--algo", choices=["ppo", "dpo", "grpo"], required=True)
+    parser.add_argument("--model", required=True)
+    parser.add_argument("--ref_model", default=None)
+    parser.add_argument("--dataset_path", required=True)
+    parser.add_argument("--save_dir", required=True)
+    parser.add_argument("--auto_data", type=str, default=None)
+    parser.add_argument("--reward_mode", choices=["rule", "rm"], default="rule")
+    parser.add_argument("--reward_model", default=None)
+    parser.add_argument("--seed", type=int, default=17)
+    parser.add_argument("--lr", type=float, default=1e-5)
+    parser.add_argument("--batch_size", type=int, default=2)
+    parser.add_argument("--max_steps", type=int, default=100)
+    parser.add_argument("--bf16", action="store_true")
+    parser.add_argument("--fp16", action="store_true")

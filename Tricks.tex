@@ -2223,7 +2223,34 @@ We cannot backpropagate through this function properly.
 
 
 \paragraph{Policy Gradient:}
-Differentiate $J(\theta)$, we get 
+The idea here is that 
+\begin{align*}
+  J(\theta) = \ExpSub{\my \sim \pi_{\theta}}{r(\my)} = \sum_{\my} \pi_{\theta}(\my) r(\my),
+\end{align*}
+itself is not differentiable because of the sampling process, but we can manipilate it mathematically by differentiate the expectation itself,
+\begin{align*}
+  \nabla_\theta J(\theta) = \nabla_\theta  \sum_{\my} \pi_{\theta}(\my) r(\my) = \sum_{\my} r(\my)\nabla_\theta \pi_\theta(\my).
+\end{align*}
+At this stage, everything is differentiable but we  cannot estimate by sampling, because it contains $\nabla_\theta \pi_\theta(\my)$, which we does not know, so we use the log-derivative trick to handle it mathematically again 
+\begin{align*}
+  \nabla_\theta \pi_{\theta}(\my) = \pi_{\theta}(\my) \nabla_\theta \log \pi_{\theta}(\my),
+\end{align*}
+which allows us to obtain 
+\begin{align*}
+  \nabla_\theta J(\theta) = \sum_{\my} r(\my)\pi_\theta(\my)\nabla_\theta \log \pi_{\theta}(\my),
+\end{align*}
+which is 
+\begin{align*}
+  \nabla_\theta J(\theta) = \ExpSub{\my \sim \pi_\theta}{r(\my)\nabla_\theta \log \pi_{\theta}(\my)}
+\end{align*}
+Now the gradient is expressed as an expectation over samples from $\pi_{\theta}$, so we can approximate it with Monte Carlo 
+\begin{align*}
+  J(\theta) \approx \frac{1}{N}\sum_{i} r(\my_i)\nabla_\theta \log \pi_\theta(\my_i).
+\end{align*}
+
+
+\paragraph{Details:}
+As details, differentiate $J(\theta)$, we get 
 \begin{align*}
   \nabla_{\theta} J(\theta) &= \int \nabla_\theta p_\theta(\tau) R(\tau) \quad d\tau \\
   &= \int p_\theta(\tau) \nabla_{\theta} \log p_{\theta}(\tau) \cdot R(\tau) \quad d\tau \\
@@ -2925,6 +2952,24 @@ then optimize policy probabilities to match this distribution,
 \end{align*}
 where $Z_{\theta}(x) = \sum_{j} \pi_\theta(\my_i \mid \mx)$.
 One thing to notice is that we do not actually compute the term explicitly, as it has already been captured by the advantage estimate.
+
+\paragraph{Practical Hint:}
+In practice, for each prompt $\mx_i$, we sample a group of $K$ resposnes, 
+\begin{align*}
+  \cbrac{\my_{i1}, \my_{i2}, \hdots, \my_{iK}} \sim \pi_{\theta}(\cdot \mid \mx_i),
+\end{align*}
+and use the corresponding reward $r_{ik}$ to compute the \textbf{group standardrized advantage}
+\begin{align*}
+  \hat{A}_{ik} = \frac{r_{ik} - \bar{r}_i}{\sigma_i + \varepsilon}, \qquad \text{where } \bar{r}_i = \frac{1}{K}\sum_{k=1}^{K}r_{ik}, \sigma_i = \sqrt{\frac{1}{K}\sum_{k=1}^{K} (r_{ik} - \bar{r}_i)^2}.
+\end{align*} 
+The GPRO loss can be written as 
+\begin{align*}
+  J^{\text{GRPO}} = \ExpSub{(\mx, \my) \sim \pi_{\theta}}{\hat{A}(\mx, \my)\cdot\log \pi_{\theta}(\my \mid \mx)}.
+\end{align*}
+Optionally, we can add a KL penalty term 
+\begin{align*}
+  J^{\text{GRPO-reg}} = \ExpSub{(\mx, \my) \sim \pi_{\theta}}{\hat{A}(\mx, \my)\cdot\log \pi_{\theta}(\my \mid \mx) - \beta\cdot \klD{\pi_{\theta}}{\pi_{\thetaref}}}
+\end{align*}
 
 
 \subsection{On Policy and Off Policy}
