@@ -15,6 +15,7 @@
 \usepackage{hyperref}   % for clickable refs
 \usepackage{cleveref}   % optional, for "Table 1" style
 \usepackage{tikz}
+\usepackage{listings}
 \usetikzlibrary{positioning,shapes,arrows.meta,calc} % <-- added calc
 
 \tikzset{
@@ -1511,277 +1512,7 @@ In practice we will just mask in the following way.
 
 
 
-\subsubsection{Parallelism}
 
-There are different types of parallelism, such as 
-\begin{itemize}
-  \item \textbf{Data Parallelism (DP):} Each GPU has a full copy of the model, different GPUs process different data batches, need to synchronize gradients so all model copies stay in sync.
-  Examples incldue raw DDP, ZeRO-1/2/3, which is memory efficient.
-  This is always used, and is the foundation.
-
-  \item \textbf{Tensor Parallelism (TP):} Split the tensor (maths) inside a layer across GPUs, such as a giant weigt matrix $\mW \in \R^{d \times d}$ can be row-sharded and column-sharded. Each forward/backward involves collective ops (all-reduce, all-gather).
-  An example would be splitting a large weight matrix so that each GPU only holds a part of it, and they work together to do the full matrix multiplication (Each GPU only handles a fraction of the FLOPs.).
-  Activations are then synced (e.g. via all-reduce or all-gather) to assemble the layer's output.
-  However, this comes at the price of extra communication overhead.
-  This is more about \textbf{mathematical parallelism} within layers.
-  Example implementations include Megatron-LM tensor parallelism and Nvidia's Megatron-Deepspeed hybrid.
-  This is needed when individual layers are too big for a single GPU.
-
-  \item \textbf{Fully Sharded Data Parallelism (FSDP):} Shards all parameters, gradients, and optimizer states across devices.
-  It works in a way that during forward pass: just before we need a layer's weights, they're gathered from all shards into full form, and after the forward/backward, they're sharded back.
-  So, at any instant, only one layer's full weights need to live on a GPU, which brings memory usage down, but this comes at a price of lots of all-gather and reduce-scatter around each layer.
-
-  \item \textbf{Hybrid:} One may think of combining TP + FSDP. 
-  Refer to the next subsection for an example of TP, FSDP and TP + FSDP.
-  On top of this, we can also add DP, where an example of dimension $2$ would be to divide $8$ GPUs into $4$ groups of $2$ GPUs each, each group does TP + FSDP, and across groups we do DP.
-
-  \item \textbf{Pipeline Parallelism (PP):} Split the model layers across GPUs (like an assembly line), each GPU owns a block of layers, passes activations to the next stage.
-  There are techniques exist such as microbatching that keeps the pipeline busy.
-  Examples include GPipe, PipeDream and DeepSpeed pipeline parallelism.
-  This is used when the model is too deep to fit on a single GPU's memory.
-
-  \item  \textbf{Sequence Parallelism:} Split the sequence length dimension across GPUs.Each GPU processes a slice of the tokens. Reduces memory by distributing activations along the time axis.
-  Examples: Megatron-LM introduced sequence parallelism for attention/MLP layers.
-  This is used when very long context windows are present.
-
-  \item \textbf{Expert / Mixture-of-Experts (MoE) Parallelism:} Explained before.
-\end{itemize}
-
-
-\subsubsection{An example of TP, FSDP and TP + FSDP:}
-We will use a simple linear layer $\mY = \mX\mW$, $\mX \in \R^{B \times \din}, \mW \in \R^{\din \times \dout}$ and $\mY \in \R^{B \times \dout}$ to illustrate how TP, FSDP and TP + FSDP works, and consider the case of $2$ GPUs.
-
-\paragraph{FSDP only:}
-\begin{itemize}
-  \item We let GPU $0$ holds $\mW_{0:} = \mW[0:\frac{\din}{2}, :] \in \R^{\frac{\din}{2} \times \dout}$ and GPU $1$ holds $\mW_{1:} = \mW[\frac{\din}{2}:\din, :] \in \R^{\frac{\din}{2} \times \dout}$.
-  \item When computing:
-  \begin{enumerate}
-    \item We all-gather $\mW$, which lets both GPUs have the full $\mW$.
-    \item Each GPU then compute $\mY = \mW\mX$ locally.
-    \item Backward pass is similar, we compute local gradients, then reduce-scatter to shard the gradients back to $\mW_{0:}$ and $\mW_{1:}$.
-  \end{enumerate}
-
-  \item Clearly this is memory efficient since no GPU holds full $\mW$ permanently, but each GPU still does the full FLOPs.
-\end{itemize}
-
-
-\paragraph{TP only:}
-\begin{itemize}
-  \item We let GPU $0$ holds $\mW_{:0} = \mW[:, 0: \frac{\dout}{2}] \in \R^{\din \times \frac{\dout}{2}}$ and GPU $1$ holds $\mW_{:1} = \mW[:, \frac{\dout}{2} : \dout] \in \R^{\din \times \frac{\dout}{2}}$.
-
-  \item During forward:
-  \begin{enumerate}
-    \item Rank $0$ computes $\mY_0 = \mX\mW_{:0} \in \R^{B \times \frac{\dout}{2}}$.
-    \item Rank $1$ computes $\mY_1 = \mX\mW_{:1} \in \R^{B \times \frac{\dout}{2}}$.
-    \item We all-gather activations to concatenate $\mY = [\mY_0, \mY_1] \in \R^{B \times \dout}$.
-  \end{enumerate}
-
-  \item During backward:
-  \begin{enumerate}
-    \item The upstream gradient $\nabla \mY \in \R^{B \times \dout}$ is split consistently as $\nabla \mY = [\nabla \mY_{:0}, \nabla \mY_{:1}]$, where each rank receives only its local slice.
-    \item Each rank computes its local weight gradient:
-    \[ \nabla \mW_{:j} = \mX^\top \nabla \mY_{:j} \in \R^{\din \times \frac{\dout}{2}}, \quad j \in \{0,1\}. \](No communication required.)
-
-    \item Each rank computes its partial input gradient: 
-    \[ \nabla \mX_j = \nabla \mY_{:j} \mW_{:j}^\top \in \R^{B \times \din}. \]
-
-    \item We all-reduce (sum) these partials across ranks to obtain the full input gradient:
-    \[
-        \nabla \mX = \nabla \mX_0 + \nabla \mX_1.
-    \]
-    This is due to the formula based on chain rule: 
-    \[
-      \nabla \mX = \nabla \mY \mW^\top = \nabla \mY_{:0} \mW_{:0}^\top + \nabla \mY_{:1} \mW_{:1}^\top.
-    \]
-  \end{enumerate}
-  The formulas are easy to derive if we write out the sums explicitly\footnote{A simple way of derivation would be to focus directly on the dimensions.}.
-
-  \item FLOPs are halved per GPU, Each GPU stores only its slice of $\mW$, and we need synchronization for every layer's forward and backward.
-\end{itemize}
-
-
-\paragraph{TP + FSDP:}
-Assume now we are in a little bit more complicated setting where we have $4$ GPUs, and we want to do TP + FSDP with $2$ GPUs for each.
-\begin{itemize}
-  \item We will use index $i \in \cbrac{0, 1}$ for FSDP shard and $j \in \cbrac{0, 1}$ for TP shard.
-  \item We first do TP splitting, where we have 2 GPUs in each TP group: 
-  \[
-    \mW = \sbrac{\mW_{:0}, \mW_{:1}}, \quad \mW_{:0} \in \R^{\din \times \frac{\dout}{2}}, \mW_{:1} \in \R^{\din \times \frac{\dout}{2}}.
-  \]
-  Then we do FSDP splitting within each TP shard:
-  \[
-    \mW_{:j} = \sbrac{\mW_{0j}, \mW_{1j}}, \quad \mW_{0j} \in \R^{\frac{\din}{2} \times \frac{\dout}{2}}, \mW_{1j} \in \R^{\frac{\din}{2} \times \frac{\dout}{2}}.
-  \]
-
-  \item In the forward path:
-  \begin{enumerate}
-    \item For the $j$-th TP block, we all-gather rows on the two GPU we have for FSDP, on each GPU, we reconstruct $\mW_{:j} \in \R^{\din \times \frac{\dout}{2}}$.
-    \item We do local matmul and obtain 
-    \[
-      \mY_{:j} = \mX\mW_{:j} \in \R^{B \times \frac{\dout}{2}}
-    \]
-    \item Then we do TP all-gather activations, which allows us to obtain
-    \[
-      \mY = [\mY_{:0}, \mY_{:1}] \in \R^{B \times \dout}
-    \]
-
-    \item Then we do FSDP reshard, each GPU only keeps $\mW_{ij}$, free the temporary all-gathered parameter.
-  \end{enumerate}
-
-  \item In the backward path:
-  \begin{enumerate}
-    \item We are given the upstream gradient 
-    \[
-      \nabla \mY = [\nabla \mY_{:0}, \nabla \mY_{:1}], \qquad \nabla \mY_{:j} \in \R^{B \times \frac{\dout}{2}}.
-    \]
-
-    \item FSDP all gather rows of each $\mW_{:j}$ again.
-    \item Local weight gradient, then reduce scatter back into shards,
-    \[
-      \nabla \mW_{:j} = \mX^{\top}\nabla\mY_{:j} \in \R^{\din \times \frac{\dout}{2}}.
-    \]
-    and each rank $(i, j)$ keeps $\nabla \mW_{ij} \in \R^{\frac{\din}{2} \times \frac{\dout}{2}}$.
-    \item Input gradient, 
-    \[ 
-      \nabla \mX_j = \nabla\mY_{:j}\mW_{:j}^{\top} \in \R^{B \times \din}
-    \]
-    and then all reduce to 
-    \[
-      \nabla \mX = \nabla \mX_0 + \nabla \mX_1.
-    \]
-  \end{enumerate}
-
-  \item The memory cost now becomes $\frac{\din \dout}{4}$ parameters per rank, this is easy to understand, because parameters, optimizer states and gradients all correspond to the $\frac{\din\dout}{4}$ matrix.
-  
-  \item The computational baseline ($\mX\mW$) costs $2B\din\dout$ FLOPs ($1$ addition plus $1$ multiplication).
-  While if we do TP only, then each rank needs $2B\din \frac{\dout}{2} = B\din\dout$ FLOPs which is half of baseline, thats why TP reduced computation per rank.
-  In the case of TP + FSDP, within each TP group, each rank still need $2B\din \frac{\dout}{2} = B\din\dout$ because of internal FSDP, so the computation per rank is still halved.
-  Notice that in this case, the total FLOPs is doubled, compared to the baseline, which is $4B\din\dout$, per rank is halved is only possible because we have $4$ GPUs.
-\end{itemize}
-
-
-
-\subsubsection{Common Distributed Training Frameworks}
-\paragraph{PyTorch DDP:}
-Currently, the baseline of finetuning models in parallel is to use raw PyTorch DDP (distributed data parallel), where we have $1$ GPU for each process.
-
-Gradients are averaged via ``torch.distributed.all\_reduce''.
-
-\paragraph{Pros:}
-
-\textbullet~ Native PyTorch, minimal dependencies, and we have full control over everything.
-
-\paragraph{Cons:}
-
-\textbullet~ We must handle everything, checkpointing, gradient accumulation, optimizer sharding and memory scaling, which makes it hard to handle for very large models (10B +)
-
-\paragraph{Hugging face accelerate:}
-This is pretty common nowadays, basically, we just use the PyTorch training loop and add decorators, now it would run on one or serveral GPUs, with optional DeepSeed/FSDP integration.
-
-Under the hood, it is still DDP, but we 
-\begin{itemize}
-  \item Handles GPU assignment, logging only on rank $0$, checkpoint saving.
-  \item Can automatically switch to DeepSpeed ZeRO or FSDP with a config file.
-  \item Hugely reduces boilerplate.
-\end{itemize}
-
-Common use cases include: SFT of 7B - 13B models across 4-8 A100 GPUs.
-
-\paragraph{DeepSpeed ZeRO}
-This enables massive models by sharding optimizer, gradients and parameters across GPUs.
-Its key idea is ZeRO which is zero redundancy optimizer, it includes stages:
-\begin{itemize}
-  \item Stage 1: shard optimizer states. 
-  \item Stage 2 (ZeRO2): shard optimizer states + gradients. (Splits gradients and optimizer states accross GPUs, each GPU still holds a full copy of the model parameter.)
-  \item Stage 3 (ZeRO3 with offload): shard everything. (including parameters) (Splits parameters, gradients and optimizer states across GPUs, no single GPU holds the full model, which makes train very large models even with limited GPUs possible.)
-  
-  \item \textbf{Offload}: Store some of the states in CPU RAM (or NVMe SSD) and bring them in when needed. 
-\end{itemize}
-and extras such as CPU/NVMe offloading, activation checkpointing, communication optimizations.
-
-Use cases: Training 13B-70B models across 64-512 GPUs, needed when VRAM is limiting, even with 80GB A100s. 
-Often combined with LoRA/QLoRA for finetuning.
-
-
-\paragraph{PyTorch FSDP}
-This is basically a native PyTorch way to do what DeepSpeed ZeRO does.
-It works in a way that it (i) shards parameters and gradients across ranks, (ii) loads only parts of the model per GPU at a time. 
-This also supports activation checkpointing.
-
-
-\paragraph{HuggingFace Trainer}
-Where we do not write loop, just pass datasets + model + arguments.
-
-As a summary 
-\begin{itemize}
-  \item Small models ($\leq$ 13B), we do SFTTrainer + LoRA + Accelerate (4-8) GPUs.
-  \item Medium models (13B - 30B), we do Accelerate + DeepSpeed ZeRO-2/FSDP.
-  \item Large models ($\geq$ 65B), DeepSpeed ZeRO-3 or FSDP across hundreds of GPUs. HuggingFace Trainer or custom PyTorch loop orchestrated by Accelerate.. Always with mixed precision (bf16/FP8)
-\end{itemize}
-
-
-\subsubsection{Examples}
-Let us consider the following cases:
-
-\paragraph{Case 1: How raw DDP works.}
-\begin{itemize}
-  \item \textbf{No ZeRO (normal DDP):} In this case, each GPU keeps a full copy of all $N$ parameters, during training, each GPU does forward backward on its minibatch and gradients are averaged (all-reduce).
-  The memory cost should be: each GPU stores $N$ parameters + all optimizer states.
-  The problem this that this does not scale to very large models, because each GPU must hold the entire model.
-\end{itemize}
-
-\paragraph{Case 2: How ZeRO2 works.}
-\begin{itemize}
-  \item \textbf{ZeRO2:} In this case, each GPU still has a full copy of the $N$ parameters, but optimizer states, such as Adam's momentum $m$ and second momentum $v$ are sharded across GPUs.
-  The memory cost would be the $N$ parameters + only a slice of the optimizer states and grads, we save memory, but the full model still sits on every GPU.
-\end{itemize}
-Assuming there are $2$ GPUs with $N$ parameters and each GPU is proceeding with a microbatch of size $1$ with gradient accumulation step $4$.
-\begin{enumerate}
-  \item Forward + backward on GPU 0, 1 with micro-batch=$1$, computing all gradients, then we do reduce scatter\footnote{Sharded after all reduce (averaging).} (instead of all reduce in plain DDP), and each GPU holds a shard of gradients of size $\frac{N}{2}$, the shard is accumulated and later used to update the (second order) momentum.
-  
-  \item We repeat the process so that the gradients shards gets accumulated.
-  
-  \item At each optimizer step, every GPU only updates its shard of parameters using its shards of grads.
-  
-  \item After the update, the parameters are all gathered, so all GPUs gets the fully freshed model for the next forward.
-\end{enumerate} 
-Basically, we are asking each GPU to be responsible for less parameters because some of them are just simply redundant, the final result is mathematically equivalent:
-\begin{align}
-  \theta_{\text{DDP}}^{t+1} = \theta^{t+1}_{\text{ZeRO-}2}.
-\end{align}
-
-
-\paragraph{Case 3: How ZeRO3 works.}
-\begin{itemize}
-  \item Now we also shard the parameters themselves, with Adam, we only need about $\nicefrac{1}{3}$ of the memory on $1$ GPU compared to that of DDP, instead of $\nicefrac{2}{3}$ in ZeRO-2.
-\end{itemize}
-
-Assume we are in the same setting as before.
-\begin{enumerate}
-  \item Forward passes: since now each GPU does not hold all params for a certain layer $L$ (tensor parallelism) anymore, we need to call all gather for each GPU and they will temporarily assemble the full weight matrix for that layer, and the forward for layer $L$ is computed locally on each GPU.
-  After this layer is done, those gathered weights can be released (kept only in CPU/NVMe if offloading).
-
-  \item Backward passes: Before computing the grads for layer $L$, weights are all gathered and gradients are computed after that.
-  
-  \item Reduce-Scatter: Instead of all reduce, gradients are reduce-scattered, so each GPU only keeps its shard.
-  
-  \item Optimizer Step: Each GPU only updates its shard of optimizer state and parameters, no one ever touches the other shard. 
-\end{enumerate}
-Baically ZeRO-3 saves GPU memory but does more communication.
-
-
-\paragraph{Case 4: How ZeRO-3 + CPU/NVMe offload works.}
-The same sharding applies, but now we decide where the shards live when they're not in active use.
-
-Assuming we are in the same setting as before.
-\begin{enumerate}
-  \item \textbf{Parameter Offload:} Sharded params that are not immediately needed for the current layer can be moved to CPU RAM (or NVMe if RAM is still too small).\footnote{Originally, each GPU has to carry it otherwise it is gone. Now we store them in CPU and only load back the layer used. At each time, GPU memory only holds the weights for the current layer but not the whole shards.}
-  Before a layer executes, ZeRO all-gathers the shards back onto GPU(s). After use, they can be evicted back to CPU.
-
-  \item \textbf{Optimizer State Offload:} Adam's momentum states are big (2x param size), offloading lets each GPU keep only its shard in CPU RAM/NVMe, when optimizer step happens, that shard is pulled onto GPU, updated, and can be offloaded again. (This saves a huge amount of persistent GPU memory.)
-  
-  \item \textbf{Gradient Offload:} Typically not offloaded explicitly but can be done, since grads are transient. They live in GPU memory just long enough to accumulate (over gradient accumulation steps).
-\end{enumerate}
 
 
 \subsection{Instruction Tuning}
@@ -3164,6 +2895,341 @@ This relies on the LLM's capability to gauge the required information needs as w
 
 \subsection{RAG Evaluation}
 Fluency, Perceived utility (Whether the generated answer is helpful and informative.), Citation recall / precision, LLM-as-a-judge.
+
+
+\section{Parallelism}
+
+There are different types of parallelism, such as 
+\begin{itemize}
+  \item \textbf{Data Parallelism (DP):} Each GPU has a full copy of the model, different GPUs process different data batches, need to synchronize gradients so all model copies stay in sync.
+  Examples incldue raw DDP, ZeRO-1/2/3, which is memory efficient.
+  This is always used, and is the foundation.
+
+  \item \textbf{Tensor Parallelism (TP):} Split the tensor (maths) inside a layer across GPUs, such as a giant weigt matrix $\mW \in \R^{d \times d}$ can be row-sharded and column-sharded. Each forward/backward involves collective ops (all-reduce, all-gather).
+  An example would be splitting a large weight matrix so that each GPU only holds a part of it, and they work together to do the full matrix multiplication (Each GPU only handles a fraction of the FLOPs.).
+  Activations are then synced (e.g. via all-reduce or all-gather) to assemble the layer's output.
+  However, this comes at the price of extra communication overhead.
+  This is more about \textbf{mathematical parallelism} within layers.
+  Example implementations include Megatron-LM tensor parallelism and Nvidia's Megatron-Deepspeed hybrid.
+  This is needed when individual layers are too big for a single GPU.
+
+  \item \textbf{Fully Sharded Data Parallelism (FSDP):} Shards all parameters, gradients, and optimizer states across devices.
+  It works in a way that during forward pass: just before we need a layer's weights, they're gathered from all shards into full form, and after the forward/backward, they're sharded back.
+  So, at any instant, only one layer's full weights need to live on a GPU, which brings memory usage down, but this comes at a price of lots of all-gather and reduce-scatter around each layer.
+
+  \item \textbf{Hybrid:} One may think of combining TP + FSDP. 
+  Refer to the next subsection for an example of TP, FSDP and TP + FSDP.
+  On top of this, we can also add DP, where an example of dimension $2$ would be to divide $8$ GPUs into $4$ groups of $2$ GPUs each, each group does TP + FSDP, and across groups we do DP.
+
+  \item \textbf{Pipeline Parallelism (PP):} Split the model layers across GPUs (like an assembly line), each GPU owns a block of layers, passes activations to the next stage.
+  There are techniques exist such as microbatching that keeps the pipeline busy.
+  Examples include GPipe, PipeDream and DeepSpeed pipeline parallelism.
+  This is used when the model is too deep to fit on a single GPU's memory.
+
+  \item  \textbf{Sequence Parallelism:} Split the sequence length dimension across GPUs.Each GPU processes a slice of the tokens. Reduces memory by distributing activations along the time axis.
+  Examples: Megatron-LM introduced sequence parallelism for attention/MLP layers.
+  This is used when very long context windows are present.
+
+  \item \textbf{Expert / Mixture-of-Experts (MoE) Parallelism:} Explained before.
+\end{itemize}
+
+
+\subsection{An example of TP, FSDP and TP + FSDP:}
+We will use a simple linear layer $\mY = \mX\mW$, $\mX \in \R^{B \times \din}, \mW \in \R^{\din \times \dout}$ and $\mY \in \R^{B \times \dout}$ to illustrate how TP, FSDP and TP + FSDP works, and consider the case of $2$ GPUs.
+
+\paragraph{FSDP only:}
+\begin{itemize}
+  \item We let GPU $0$ holds $\mW_{0:} = \mW[0:\frac{\din}{2}, :] \in \R^{\frac{\din}{2} \times \dout}$ and GPU $1$ holds $\mW_{1:} = \mW[\frac{\din}{2}:\din, :] \in \R^{\frac{\din}{2} \times \dout}$.
+  \item When computing:
+  \begin{enumerate}
+    \item We all-gather $\mW$, which lets both GPUs have the full $\mW$.
+    \item Each GPU then compute $\mY = \mW\mX$ locally.
+    \item Backward pass is similar, we compute local gradients, then reduce-scatter to shard the gradients back to $\mW_{0:}$ and $\mW_{1:}$.
+  \end{enumerate}
+
+  \item Clearly this is memory efficient since no GPU holds full $\mW$ permanently, but each GPU still does the full FLOPs.
+\end{itemize}
+
+
+\paragraph{TP only:}
+\begin{itemize}
+  \item We let GPU $0$ holds $\mW_{:0} = \mW[:, 0: \frac{\dout}{2}] \in \R^{\din \times \frac{\dout}{2}}$ and GPU $1$ holds $\mW_{:1} = \mW[:, \frac{\dout}{2} : \dout] \in \R^{\din \times \frac{\dout}{2}}$.
+
+  \item During forward:
+  \begin{enumerate}
+    \item Rank $0$ computes $\mY_0 = \mX\mW_{:0} \in \R^{B \times \frac{\dout}{2}}$.
+    \item Rank $1$ computes $\mY_1 = \mX\mW_{:1} \in \R^{B \times \frac{\dout}{2}}$.
+    \item We all-gather activations to concatenate $\mY = [\mY_0, \mY_1] \in \R^{B \times \dout}$.
+  \end{enumerate}
+
+  \item During backward:
+  \begin{enumerate}
+    \item The upstream gradient $\nabla \mY \in \R^{B \times \dout}$ is split consistently as $\nabla \mY = [\nabla \mY_{:0}, \nabla \mY_{:1}]$, where each rank receives only its local slice.
+    \item Each rank computes its local weight gradient:
+    \[ \nabla \mW_{:j} = \mX^\top \nabla \mY_{:j} \in \R^{\din \times \frac{\dout}{2}}, \quad j \in \{0,1\}. \](No communication required.)
+
+    \item Each rank computes its partial input gradient: 
+    \[ \nabla \mX_j = \nabla \mY_{:j} \mW_{:j}^\top \in \R^{B \times \din}. \]
+
+    \item We all-reduce (sum) these partials across ranks to obtain the full input gradient:
+    \[
+        \nabla \mX = \nabla \mX_0 + \nabla \mX_1.
+    \]
+    This is due to the formula based on chain rule: 
+    \[
+      \nabla \mX = \nabla \mY \mW^\top = \nabla \mY_{:0} \mW_{:0}^\top + \nabla \mY_{:1} \mW_{:1}^\top.
+    \]
+  \end{enumerate}
+  The formulas are easy to derive if we write out the sums explicitly\footnote{A simple way of derivation would be to focus directly on the dimensions.}.
+
+  \item FLOPs are halved per GPU, Each GPU stores only its slice of $\mW$, and we need synchronization for every layer's forward and backward.
+\end{itemize}
+
+
+\paragraph{TP + FSDP:}
+Assume now we are in a little bit more complicated setting where we have $4$ GPUs, and we want to do TP + FSDP with $2$ GPUs for each.
+\begin{itemize}
+  \item We will use index $i \in \cbrac{0, 1}$ for FSDP shard and $j \in \cbrac{0, 1}$ for TP shard.
+  \item We first do TP splitting, where we have 2 GPUs in each TP group: 
+  \[
+    \mW = \sbrac{\mW_{:0}, \mW_{:1}}, \quad \mW_{:0} \in \R^{\din \times \frac{\dout}{2}}, \mW_{:1} \in \R^{\din \times \frac{\dout}{2}}.
+  \]
+  Then we do FSDP splitting within each TP shard:
+  \[
+    \mW_{:j} = \sbrac{\mW_{0j}, \mW_{1j}}, \quad \mW_{0j} \in \R^{\frac{\din}{2} \times \frac{\dout}{2}}, \mW_{1j} \in \R^{\frac{\din}{2} \times \frac{\dout}{2}}.
+  \]
+
+  \item In the forward path:
+  \begin{enumerate}
+    \item For the $j$-th TP block, we all-gather rows on the two GPU we have for FSDP, on each GPU, we reconstruct $\mW_{:j} \in \R^{\din \times \frac{\dout}{2}}$.
+    \item We do local matmul and obtain 
+    \[
+      \mY_{:j} = \mX\mW_{:j} \in \R^{B \times \frac{\dout}{2}}
+    \]
+    \item Then we do TP all-gather activations, which allows us to obtain
+    \[
+      \mY = [\mY_{:0}, \mY_{:1}] \in \R^{B \times \dout}
+    \]
+
+    \item Then we do FSDP reshard, each GPU only keeps $\mW_{ij}$, free the temporary all-gathered parameter.
+  \end{enumerate}
+
+  \item In the backward path:
+  \begin{enumerate}
+    \item We are given the upstream gradient 
+    \[
+      \nabla \mY = [\nabla \mY_{:0}, \nabla \mY_{:1}], \qquad \nabla \mY_{:j} \in \R^{B \times \frac{\dout}{2}}.
+    \]
+
+    \item FSDP all gather rows of each $\mW_{:j}$ again.
+    \item Local weight gradient, then reduce scatter back into shards,
+    \[
+      \nabla \mW_{:j} = \mX^{\top}\nabla\mY_{:j} \in \R^{\din \times \frac{\dout}{2}}.
+    \]
+    and each rank $(i, j)$ keeps $\nabla \mW_{ij} \in \R^{\frac{\din}{2} \times \frac{\dout}{2}}$.
+    \item Input gradient, 
+    \[ 
+      \nabla \mX_j = \nabla\mY_{:j}\mW_{:j}^{\top} \in \R^{B \times \din}
+    \]
+    and then all reduce to 
+    \[
+      \nabla \mX = \nabla \mX_0 + \nabla \mX_1.
+    \]
+  \end{enumerate}
+
+  \item The memory cost now becomes $\frac{\din \dout}{4}$ parameters per rank, this is easy to understand, because parameters, optimizer states and gradients all correspond to the $\frac{\din\dout}{4}$ matrix.
+  
+  \item The computational baseline ($\mX\mW$) costs $2B\din\dout$ FLOPs ($1$ addition plus $1$ multiplication).
+  While if we do TP only, then each rank needs $2B\din \frac{\dout}{2} = B\din\dout$ FLOPs which is half of baseline, thats why TP reduced computation per rank.
+  In the case of TP + FSDP, within each TP group, each rank still need $2B\din \frac{\dout}{2} = B\din\dout$ because of internal FSDP, so the computation per rank is still halved.
+  Notice that in this case, the total FLOPs is doubled, compared to the baseline, which is $4B\din\dout$, per rank is halved is only possible because we have $4$ GPUs.
+\end{itemize}
+
+
+
+\subsection{Common Distributed Training Frameworks}
+\paragraph{PyTorch DDP:}
+Currently, the baseline of finetuning models in parallel is to use raw PyTorch DDP (distributed data parallel), where we have $1$ GPU for each process.
+
+Gradients are averaged via ``torch.distributed.all\_reduce''.
+
+\paragraph{Pros:}
+
+\textbullet~ Native PyTorch, minimal dependencies, and we have full control over everything.
+
+\paragraph{Cons:}
+
+\textbullet~ We must handle everything, checkpointing, gradient accumulation, optimizer sharding and memory scaling, which makes it hard to handle for very large models (10B +)
+
+\paragraph{Hugging face accelerate:}
+This is pretty common nowadays, basically, we just use the PyTorch training loop and add decorators, now it would run on one or serveral GPUs, with optional DeepSeed/FSDP integration.
+
+Under the hood, it is still DDP, but we 
+\begin{itemize}
+  \item Handles GPU assignment, logging only on rank $0$, checkpoint saving.
+  \item Can automatically switch to DeepSpeed ZeRO or FSDP with a config file.
+  \item Hugely reduces boilerplate.
+\end{itemize}
+
+Common use cases include: SFT of 7B - 13B models across 4-8 A100 GPUs.
+
+\paragraph{DeepSpeed ZeRO}
+This enables massive models by sharding optimizer, gradients and parameters across GPUs.
+Its key idea is ZeRO which is zero redundancy optimizer, it includes stages:
+\begin{itemize}
+  \item Stage 1: shard optimizer states. 
+  \item Stage 2 (ZeRO2): shard optimizer states + gradients. (Splits gradients and optimizer states accross GPUs, each GPU still holds a full copy of the model parameter.)
+  \item Stage 3 (ZeRO3 with offload): shard everything. (including parameters) (Splits parameters, gradients and optimizer states across GPUs, no single GPU holds the full model, which makes train very large models even with limited GPUs possible.)
+  
+  \item \textbf{Offload}: Store some of the states in CPU RAM (or NVMe SSD) and bring them in when needed. 
+\end{itemize}
+and extras such as CPU/NVMe offloading, activation checkpointing, communication optimizations.
+
+Use cases: Training 13B-70B models across 64-512 GPUs, needed when VRAM is limiting, even with 80GB A100s. 
+Often combined with LoRA/QLoRA for finetuning.
+
+
+\paragraph{PyTorch FSDP}
+This is basically a native PyTorch way to do what DeepSpeed ZeRO does.
+It works in a way that it (i) shards parameters and gradients across ranks, (ii) loads only parts of the model per GPU at a time. 
+This also supports activation checkpointing.
+
+
+\paragraph{HuggingFace Trainer}
+Where we do not write loop, just pass datasets + model + arguments.
+
+
+\paragraph{Nvidia's Megatron-LM}
+Megatron-LM is a stand-alone training framework for large Transformer models (GPT, BERT, T5, etc.).
+Its main innovation was model parallelism — splitting one model within layers across multiple GPUs (tensor parallelism).
+In the very beginning, it looks like the following:
+
+\begin{verbatim}
+Megatron-LM
+|-- Model code (Transformer layers, GPT, BERT)
+|-- Parallelism engine (tensor + pipeline)
+\-- Training loop (PyTorch)
+\end{verbatim}
+It uses PyTorch Distributed (torch.distributed) directly — no DeepSpeed at all.
+
+DeepSpeed (from Microsoft) was developed around the same time but with different goals:
+\begin{itemize}
+  \item memory efficiency (ZeRO optimizer sharding)
+  \item easy configuration (JSON configs)
+  \item pipeline parallelism and offloading
+  \item mixed precision training, etc.
+\end{itemize}
+DeepSpeed did not define models, but it could run any PyTorch model more efficiently.
+
+\textbf{Megatron-Deepspeed:} Eventually, they are combined, resulting in the Megatron-DeepSpeed.
+This happens when people start to train very large models, they realize each framework solved part of the scaling problem:
+\begin{table}[h!]
+\centering
+\caption{Comparison of Megatron and DeepSpeed capabilities.}
+\label{tab:megatron_deepspeed}
+\begin{tabular}{ll}
+\hline
+\textbf{Problem} & \textbf{Who solved it best} \\
+\hline
+Model too big for one GPU      & Megatron's tensor parallelism \\
+Optimizer too big for memory   & DeepSpeed's ZeRO sharding \\
+Need pipeline across nodes     & Both, combined \\
+Need fused high-speed kernels  & Megatron \\
+Need easy config \& launch     & DeepSpeed \\
+\hline
+\end{tabular}
+\end{table}
+As a result, these two were merged side-by-side.
+\begin{verbatim}
+[ PyTorch ]
+     ↓
+[ DeepSpeed Engine ] ← handles ZeRO, optimizer sharding, pipeline, etc.
+     ↓
+[ Megatron Model ] ← implements tensor parallel layers, fused ops
+     ↓
+[ CUDA / NCCL ]
+\end{verbatim}
+This framework works, but was quite messy, and it is basically two frameworks glued together.
+
+\textbf{Megatron-Core}: Since 2023, NVIDIA has refactored everything into a clean, modular library called Megatron-Core (inside the new Megatron-LM repo). 
+\begin{itemize}
+  \item Exposes official APIs for tensor, pipeline, and sequence parallelism.
+  \item Integrates with NVIDIA Transformer Engine, FP8 training, FSDP, etc.
+  \item Used internally by NVIDIA and by open-source projects like NeMo.
+\end{itemize}
+
+
+\paragraph{Summary}
+As a summary 
+\begin{itemize}
+  \item Small models ($\leq$ 13B), we do SFTTrainer + LoRA + Accelerate (4-8) GPUs.
+  \item Medium models (13B - 30B), we do Accelerate + DeepSpeed ZeRO-2/FSDP.
+  \item Large models ($\geq$ 65B), DeepSpeed ZeRO-3 or FSDP across hundreds of GPUs. HuggingFace Trainer or custom PyTorch loop orchestrated by Accelerate.. Always with mixed precision (bf16/FP8)
+\end{itemize}
+
+
+\subsection{Examples}
+Let us consider the following cases:
+
+\paragraph{Case 1: How raw DDP works.}
+\begin{itemize}
+  \item \textbf{No ZeRO (normal DDP):} In this case, each GPU keeps a full copy of all $N$ parameters, during training, each GPU does forward backward on its minibatch and gradients are averaged (all-reduce).
+  The memory cost should be: each GPU stores $N$ parameters + all optimizer states.
+  The problem this that this does not scale to very large models, because each GPU must hold the entire model.
+\end{itemize}
+
+\paragraph{Case 2: How ZeRO2 works.}
+\begin{itemize}
+  \item \textbf{ZeRO2:} In this case, each GPU still has a full copy of the $N$ parameters, but optimizer states, such as Adam's momentum $m$ and second momentum $v$ are sharded across GPUs.
+  The memory cost would be the $N$ parameters + only a slice of the optimizer states and grads, we save memory, but the full model still sits on every GPU.
+\end{itemize}
+Assuming there are $2$ GPUs with $N$ parameters and each GPU is proceeding with a microbatch of size $1$ with gradient accumulation step $4$.
+\begin{enumerate}
+  \item Forward + backward on GPU 0, 1 with micro-batch=$1$, computing all gradients, then we do reduce scatter\footnote{Sharded after all reduce (averaging).} (instead of all reduce in plain DDP), and each GPU holds a shard of gradients of size $\frac{N}{2}$, the shard is accumulated and later used to update the (second order) momentum.
+  
+  \item We repeat the process so that the gradients shards gets accumulated.
+  
+  \item At each optimizer step, every GPU only updates its shard of parameters using its shards of grads.
+  
+  \item After the update, the parameters are all gathered, so all GPUs gets the fully freshed model for the next forward.
+\end{enumerate} 
+Basically, we are asking each GPU to be responsible for less parameters because some of them are just simply redundant, the final result is mathematically equivalent:
+\begin{align}
+  \theta_{\text{DDP}}^{t+1} = \theta^{t+1}_{\text{ZeRO-}2}.
+\end{align}
+
+
+\paragraph{Case 3: How ZeRO3 works.}
+\begin{itemize}
+  \item Now we also shard the parameters themselves, with Adam, we only need about $\nicefrac{1}{3}$ of the memory on $1$ GPU compared to that of DDP, instead of $\nicefrac{2}{3}$ in ZeRO-2.
+\end{itemize}
+
+Assume we are in the same setting as before.
+\begin{enumerate}
+  \item Forward passes: since now each GPU does not hold all params for a certain layer $L$ (tensor parallelism) anymore, we need to call all gather for each GPU and they will temporarily assemble the full weight matrix for that layer, and the forward for layer $L$ is computed locally on each GPU.
+  After this layer is done, those gathered weights can be released (kept only in CPU/NVMe if offloading).
+
+  \item Backward passes: Before computing the grads for layer $L$, weights are all gathered and gradients are computed after that.
+  
+  \item Reduce-Scatter: Instead of all reduce, gradients are reduce-scattered, so each GPU only keeps its shard.
+  
+  \item Optimizer Step: Each GPU only updates its shard of optimizer state and parameters, no one ever touches the other shard. 
+\end{enumerate}
+Baically ZeRO-3 saves GPU memory but does more communication.
+
+
+\paragraph{Case 4: How ZeRO-3 + CPU/NVMe offload works.}
+The same sharding applies, but now we decide where the shards live when they're not in active use.
+
+Assuming we are in the same setting as before.
+\begin{enumerate}
+  \item \textbf{Parameter Offload:} Sharded params that are not immediately needed for the current layer can be moved to CPU RAM (or NVMe if RAM is still too small).\footnote{Originally, each GPU has to carry it otherwise it is gone. Now we store them in CPU and only load back the layer used. At each time, GPU memory only holds the weights for the current layer but not the whole shards.}
+  Before a layer executes, ZeRO all-gathers the shards back onto GPU(s). After use, they can be evicted back to CPU.
+
+  \item \textbf{Optimizer State Offload:} Adam's momentum states are big (2x param size), offloading lets each GPU keep only its shard in CPU RAM/NVMe, when optimizer step happens, that shard is pulled onto GPU, updated, and can be offloaded again. (This saves a huge amount of persistent GPU memory.)
+  
+  \item \textbf{Gradient Offload:} Typically not offloaded explicitly but can be done, since grads are transient. They live in GPU memory just long enough to accumulate (over gradient accumulation steps).
+\end{enumerate}
 
 
 \section{Miscellaneous}

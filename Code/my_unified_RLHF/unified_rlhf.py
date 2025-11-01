@@ -12,7 +12,7 @@ from typing import Dict, List, Optional, Tuple
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset, DataLoader, default_collate
 from datasets import load_dataset
 from transformers import (
     AutoModelForCausalLM,
@@ -21,6 +21,7 @@ from transformers import (
     PreTrainedModel,
     PreTrainedTokenizerBase,
     get_linear_schedule_with_warmup,
+    GenerationConfig,
 )
 
 # set seeds
@@ -52,8 +53,9 @@ def auto_prepare_dataset(args):
         ds = load_dataset("Anthropic/hh-rlhf", split="train[:2000]")
         if args.algo == "dpo":
             out = [
-                    {"prompt": ex["prompt"], "chosen": ex["chosen"], "rejected": ex["rejected"]} for ex in ds
-                ]
+                { "prompt": ex.get("input", ""), "chosen": ex["chosen"], "rejected": ex["rejected"] }
+                for ex in ds
+            ]
         else:
             out = [ {"prompt": ex["prompt"]} for ex in ds ]
     elif name in {"openassistant", "oasst"}:
@@ -104,7 +106,7 @@ class JSONLDPOPairs(Dataset):
 # Config
 @dataclass
 class GenConfig:
-    max_new_tokens: int = 128
+    max_new_tokens: int = 64
     temperature: float = 0.7
     top_p: float = 0.95
     do_sample: bool = True
@@ -131,7 +133,7 @@ class DPOConfig:
 
 @dataclass
 class GRPOConfig:
-    group_size: int = 4
+    group_size: int = 2
     # In GPRO, we do not treat each response-prompt pair independently, we group multiple 
     # responses and their rewards that share the same prompt into a group, so we can 
     # compare them and apply relative regularization or preferenced-based objectives.
@@ -163,13 +165,14 @@ def prepare_inputs(tok, texts, max_len=1024):
     return enc["input_ids"], enc["attention_mask"]
 
 
-@torch.no_grad()
-def sequence_logprobs(model, ids, mask):
-    out = model(ids, attention_mask=mask) # [B, T, V]
-    logp = F.log_softmax(out.logits, dim=-1) # [B, T, V]
-    lp = logp[:, :-1, :].gather(-1, ids[:, 1:].unsqueeze(-1)).squeeze(-1) # first transform to [B, T-1, V]
-    # the last one is excluded because it is a prediction without label, gather along the last dimension
-    # result: [B, T-1]
+def sequence_logprobs(model, ids, mask, no_grad: bool = False):
+    ctx = torch.no_grad() if no_grad else torch.enable_grad()
+    with ctx:
+        out = model(ids, attention_mask=mask) # [B, T, V]
+        logp = F.log_softmax(out.logits, dim=-1) # [B, T, V]
+        lp = logp[:, :-1, :].gather(-1, ids[:, 1:].unsqueeze(-1)).squeeze(-1) # first transform to [B, T-1, V]
+        # the last one is excluded because it is a prediction without label, gather along the last dimension
+        # result: [B, T-1]
     return lp
 
 # Rewarder
@@ -214,35 +217,42 @@ class PPOTrainer:
             gen_out = self.policy_v.base.generate(input_ids=input_ids, attention_mask=mask, **gc.__dict__)
             responses = self.tok.batch_decode(gen_out[:, input_ids.size(1):], skip_special_tokens=True)
 
-        rewards = self.rewarder.score(prompts, responses) # [B]
+        rewards = self.rewarder.score(prompts, responses)  # [B]
         texts = [p + r for p, r in zip(prompts, responses)]
         ids, am = prepare_inputs(self.tok, texts, 2048)
         ids, am = ids.to(self.device), am.to(self.device)
 
+        # Precompute fixed logprobs & values (detach fully)
         with torch.no_grad():
-            old_lp = sequence_logprobs(self.policy_v.base, ids, am) # [B, T-1]  frozen "old"
-            ref_lp = sequence_logprobs(self.ref, ids, am) # [B, T-1]
-            _, vals, _ = self.policy_v(ids, am) # vals: [B, T]
-        adv = rewards - vals[:, -1]  # [B]
-        resp_mask = torch.ones_like(old_lp) # [B, T-1]
+            old_lp = sequence_logprobs(self.policy_v.base, ids, am).detach() # need to do detach
+            # the reason is those tensors were created out of the local epochs, and the backprop will only
+            # be viable for the first epoch, then freed, we ask them to be treated as constant
+            ref_lp = sequence_logprobs(self.ref, ids, am).detach()
+            _, vals, _ = self.policy_v(ids, am)
+            vals = vals.detach()
+
+        adv = (rewards - vals[:, -1]).detach()  # [B]
+        resp_mask = torch.ones_like(old_lp)
         denom = resp_mask.sum().clamp_min(1.0)
 
         last_logs = {}
         for _ in range(self.cfg.ppo_epochs):
             self.opt.zero_grad(set_to_none=True)
 
-            logits, vals, _ = self.policy_v(ids, am) # current policy
+            # New forward pass per epoch (fresh graph)
+            logits, vals, _ = self.policy_v(ids, am)
             logp = F.log_softmax(logits, dim=-1)
-            cur_lp = logp[:, :-1, :].gather(-1, ids[:, 1:].unsqueeze(-1)).squeeze(-1) # [B, T-1]
+            cur_lp = logp[:, :-1, :].gather(-1, ids[:, 1:].unsqueeze(-1)).squeeze(-1)
 
-            ratio = torch.exp(cur_lp - old_lp) # [B, T-1]
+            ratio = torch.exp(cur_lp - old_lp)
             unclipped = ratio * adv.unsqueeze(1)
             clipped = torch.clamp(ratio, 1 - self.cfg.clip_ratio, 1 + self.cfg.clip_ratio) * adv.unsqueeze(1)
-            policy_loss = - torch.sum(torch.min(unclipped, clipped) * resp_mask) / denom
+            policy_loss = -torch.sum(torch.min(unclipped, clipped) * resp_mask) / denom
 
-            value_loss = F.mse_loss(vals[:, -1], rewards) # [B] vs [B]
-            kl = (cur_lp - ref_lp).mean() 
+            value_loss = F.mse_loss(vals[:, -1], rewards)
+            kl = (cur_lp.detach() - ref_lp).mean()  # KL detached
             loss = policy_loss + 0.5 * value_loss + self.cfg.kl_coef * kl
+
             loss.backward()
             torch.nn.utils.clip_grad_norm_(self.policy_v.parameters(), self.train.max_grad_norm)
             self.opt.step()
@@ -252,7 +262,9 @@ class PPOTrainer:
                 "ppo/kl": float(kl.item()),
                 "reward/mean": float(rewards.mean().item()),
             }
+
         return last_logs
+
 
 
 # DPO Trainer
@@ -267,15 +279,15 @@ class DPOTrainer:
         pos = [ p[i] + c[i] for i in range(len(p)) ]
         neg = [ p[i] + r[i] for i in range(len(p)) ]
 
-        def agg(m, xs):
+        def agg(m, xs, no_grad=False):
             ids, am = prepare_inputs(self.tok, xs, 2048)
             ids, am = ids.to(self.dev), am.to(self.dev)
             lp = sequence_logprobs(m, ids, am) # (B, T - 1)
             return lp.sum(dim=1) # [B]
         
         with torch.no_grad():
-            rp, rn = agg(self.r, pos), agg(self.r, neg) # reference
-        pp, pn = agg(self.p, pos), agg(self.p, neg) # policy
+            rp, rn = agg(self.r, pos, no_grad=True), agg(self.r, neg, no_grad=True) # reference
+        pp, pn = agg(self.p, pos, no_grad=False), agg(self.p, neg, no_grad=False) # policy
         delta = (pp - pn) - (rp - rn) # [B]
         loss = - F.logsigmoid(self.beta * delta).mean()
 
@@ -294,7 +306,7 @@ class DPOTrainer:
 # GRPO Trainer
 class GRPOTrainer:
     def __init__(self, policy, ref, tok, rewarder, gen, cfg, device, opt):
-        self.p, self.r, self.tok, self.rewarder = policy, ref, tok, rewarder, 
+        self.p, self.r, self.tok, self.rewarder = policy, ref, tok, rewarder
         self.gen, self.cfg, self.dev, self.opt  = gen, cfg, device, opt
     
     def step(self, prompts):
@@ -356,7 +368,8 @@ class GRPOTrainer:
         # Optional: add a mild KL regularizer to keep policy close to ref
         with torch.no_grad():
             ref_lp = sequence_logprobs(self.r, ids, am)
-        kl_term = ((lp - ref_lp).mean())
+            
+        kl_term = (lp - ref_lp).mean()
         loss = loss + 0.01 * kl_term
 
 
@@ -388,3 +401,70 @@ def main():
     parser.add_argument("--max_steps", type=int, default=100)
     parser.add_argument("--bf16", action="store_true")
     parser.add_argument("--fp16", action="store_true")
+
+    args = parser.parse_args()
+    set_seed(args.seed)
+    if args.auto_data:
+        auto_prepare_dataset(args)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    
+    tok = AutoTokenizer.from_pretrained(args.model)
+    if tok.pad_token_id is None:
+        tok.pad_token = tok.eos_token
+    
+    model = AutoModelForCausalLM.from_pretrained(args.model)
+    model.to(device)
+    ref = AutoModelForCausalLM.from_pretrained(args.ref_model or args.model).to(device)
+    ref.eval()
+
+    os.makedirs(args.save_dir, exist_ok=True)
+    gen_cfg = GenConfig()
+    rewarder = Rewarder(args.reward_mode, tok, rm_model_name=args.reward_model, device=device)
+
+    # Create dataloader with correct collate behavior
+    if args.algo == "dpo":
+        ds = JSONLDPOPairs(args.dataset_path)
+        dl = DataLoader(ds, batch_size=args.batch_size, shuffle=True, drop_last=True, collate_fn=lambda x: x)
+    else:
+        ds = JSONLPromptDataset(args.dataset_path)
+        dl = DataLoader(ds, batch_size=args.batch_size, shuffle=True, drop_last=True, collate_fn=lambda x: x)
+    it = cycle(dl)
+
+    # Choose trainer + dedicated optimizer
+    if args.algo == "ppo":
+        policy_v = PolicyWithValue(model, model.config.hidden_size).to(device)
+        opt = torch.optim.AdamW(policy_v.parameters(), lr=args.lr)
+        trainer = PPOTrainer(policy_v, ref, tok, rewarder, gen_cfg, 
+                             PPOConfig(), TrainConfig(), device, opt)
+    elif args.algo == "dpo":
+        opt = torch.optim.AdamW(model.parameters(), lr=args.lr)
+        trainer = DPOTrainer(model, ref, tok, beta=0.1, device=device, opt=opt)
+    else:
+        opt = torch.optim.AdamW(model.parameters(), lr=args.lr)
+        trainer = GRPOTrainer(model, ref, tok, rewarder, gen_cfg, GRPOConfig(), device, opt)
+    
+    step = 0
+    while step < args.max_steps:
+        batch = next(it)
+        if args.algo == "dpo":
+            logs = trainer.step(batch)  # batch is already a list of dicts
+        else:
+            # for PPO/GRPO we only need the prompt strings
+            batch_prompts = [b["prompt"] for b in batch]
+            logs = trainer.step(batch_prompts)
+        step += 1
+        if step % 5 == 0:
+            print(f"[{args.algo.upper()}] step {step}: {json.dumps({k: float(v) for k, v in logs.items()})}")
+    
+    # save 
+    if args.algo == "ppo":
+        trainer.policy_v.base.save_pretrained(os.path.join(args.save_dir, "final"))
+        tok.save_pretrained(os.path.join(args.save_dir, "final"))
+        torch.save(trainer.policy_v.value.state_dict(), os.path.join(args.save_dir, "final", "value_head.pt"))
+    else:
+        model.save_pretrained(os.path.join(args.save_dir, "final"))
+        tok.save_pretrained(os.path.join(args.save_dir, "final"))
+
+
+if __name__ == "__main__":
+    main()
