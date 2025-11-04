@@ -3232,6 +3232,99 @@ Assuming we are in the same setting as before.
 \end{enumerate}
 
 
+
+\section{Agent}
+
+\subsection{AI agent based on LLMs}
+An AI agent based on large language models (LLMs) is an intelligent, modular system designed to extend a model's text generation ability into goal-directed reasoning and action.
+\textbullet~ At its core lies the LLM, which interprets user instructions, maintains contextual memory and decides the next action through natural-language reasoning.
+
+\textbullet~ Surrounding this model is a runtime layer, often called an agent framework, that manages tool invocation, state tracking, and communication with the external environment.
+
+\textbullet~ When the model determines that a task requires external information or computation, it emits a structured tool call (e.g., a JSON-formatted request) which the runtime routes to a corresponding tool handler implemented as a function, API, or MCP server.
+The tool executes the requested operation, such as running Python code, retrieving documents, or calling a database, and returns the result to the agent as structured data.
+The model then processes this observation, updates its reasoning trace, and may choose to plan further actions or present a final answer.
+
+\textbullet~ This loop of \textbf{reason} $\rightarrow$ \textbf{act} $\rightarrow$ \textbf{observe} $\rightarrow$ \textbf{reflect} turns the LLM into an autonomous cognitive system, where the model provides the ``mind'' (language, reasoning, planning), and the MCP-connected tools form the ``body'' (sensing, acting, retrieving).
+Together, they enable a continuous cycle of grounded decision making, allowing the agent to interact with digital systems, perform iterative workflows, and accomplish complex multi-step objectives with minimal human intervention.
+
+
+\subsection{Model Context Protocol (MCP)}
+The Model Context Protocol (MCP) is an open communication standard designed to enable structured, secure, and interoperable interaction between large language models (LLMs) and external systems.
+Introduced to replace ad-hoc plugin and API formats, MCP defines a universal layer that allows an LLM to discover, describe, and call external tools, data sources, and services in a standardized way.
+An MCP ecosystem typically consists of three components:
+
+\begin{itemize}
+  \item \textbf{MCP Client (Agent Runtime):} embedded alongside the LLM, this component exposes a structured list of available tools and mediates communication between the model and the external world.
+  
+  \item \textbf{MCP Server:} a backend service hosting one or more tools or data interfaces (e.g., file systems, code execution, API calls). 
+  Each server declares its capabilities using JSON schemas so that any compliant model can understand how to invoke them.
+
+  \item \textbf{Protocol Layer:} defines message types such as list\_tools, call\_tool, and tool\_result, enabling asynchronous, bi-directional exchange between the model and the environment via JSON-RPC over stdin / stdout or WebSocket.
+\end{itemize}
+
+An example would be: When a model operating through an MCP client decides to perform an action, such as summarizing a document or querying a database, it issues a tool invocation request that conforms to MCP's structured schema.
+The server executes the corresponding function and returns a structured result, which the model integrates into its reasoning process.
+This architecture allows any compliant model (OpenAI, Anthropic, local LLaMA, etc.) to interact seamlessly with tools built by independent developers, forming a modular ecosystem of interoperable agents and toolchains.
+
+
+\subsection{Training an AI Agent for Tool Use and Reasoning}
+Training an LLM-based AI agent involves teaching the model not only to generate text, but also to decide when and how to act through structured interactions.
+This is typically done in three progressive stages:
+
+\begin{itemize}
+  \item \textbf{Supervised Instruction Tuning (SFT)}: The base LLM is fine-tuned on datasets of instruction-response pairs that include examples of \textbf{tool-augmented reasoning}. 
+  Each example demonstrates when to call a tool, how to format the call (e.g., JSON), and how to integrate tool results back into language output. 
+  Example training pair:
+  \begin{verbatim}
+  User: What's the weather in Paris?
+  Model: <tool_call name="get_weather" args={"city": "Paris"} />
+  \end{verbatim}
+  After executing the tool, the model learns to continue the dialogue:
+  \begin{verbatim}
+    Result: {"temp": 12, "condition": "Cloudy"}
+    Model: The temperature in Paris is 12°C with cloudy skies.
+  \end{verbatim}
+  This is when model learns how to make a proper response.
+
+  \item \textbf{Reinforcement Learning with Feedback (RLHF, RLAIF):} Once the model can perform basic tool calls, it is refined using reinforcement signals, human or automated, to prefer efficient, accurate, and contextually appropriate actions.
+  The reward model scores not only linguistic quality but also tool-use efficiency and task success, encouraging the LLM to call tools only when beneficial.
+  This is when the model learns which responses are better.
+
+  \begin{itemize}
+    \item \textbf{RLAIF}: The name alone already indicates that it is Reinforcement Learning from AI Feedback.
+    The motivation is simply RLHF is powerful but expensive and slow, because it needs: (1) Humans to rate or rank model outputs, (2) Thousands or millions of examples to train a reward model.
+    As a result, \textbf{RLAIF} replaces human rater with an AI rater, which typically is a stronger, safer or more instructed model (like GPT-4-Turbo, Claude Opus, etc.).
+    Example: GPT-4 is asked:
+    "Between response A and response B, which is more factual, helpful, and safe?"
+    → The output “A is better” becomes the supervision signal.
+    This produces a dataset of AI judgments, which is then distilled into a reward model.
+
+    \item \textbf{Why it works well}: (1) High-quality models can give consistent, cheap, and fast feedback.
+    (2) Scales much better than hiring human raters.
+    (3) Reduces bias/noise from inconsistent human annotation. 
+    (4) Enables bootstrapping: we can train Model B with feedback from Model A.
+    
+    \item This is how Anthropic trained Claude 3 series, they call it \textbf{Constitutional AI}, which is essentially RLAIF guided by an ethical constitution rather than human labelers.
+  \end{itemize}
+
+  \item \textbf{Agentic Meta-Training (Planning \& Reflection Loops):} Advanced agents undergo iterative training in closed environments (e.g., code execution sandboxes or retrieval tasks) where they practice multi-step reasoning and self-correction.
+  \textbf{During this phase, the model learns higher-level patterns: planning multiple actions, reflecting on previous outcomes, and maintaining stateful dialogues across steps.} Some frameworks (like OpenAI's  ``ReAct'' and ``Reflexion'') explicitly simulate these loops, teaching the model to alternate between reasoning (``thoughts'') and actions (``tool calls'').
+\end{itemize}
+
+
+\subsection{Agentic Meta-Training (Planning \& Reflection Loops):}
+
+Traditional LLM training (pretraining + SFT + RLHF/RLAIF) teaches a model to produce good single responses, but:
+\begin{itemize}
+  \item It doesn't train \textbf{multi-step planning}.
+  \item It doesn't give \textbf{memory} across actions.
+  \item It doesn't teach \textbf{self-correction} after failure.
+\end{itemize}
+Agentic meta-training addresses this by explicitly training or simulating interactive reasoning loops where the model must decide, act, observe, and adapt, just like a human or reinforcement-learning agent \footnote{A reinforcement learning (RL) agent is an autonomous decision-making system that learns to achieve a goal by interacting with an environment and receiving feedback (rewards or penalties) for its actions.}.
+
+
+
 \section{Miscellaneous}
 
 \subsection{Chinchilla Optimality}
