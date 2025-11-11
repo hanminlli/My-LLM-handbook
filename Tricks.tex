@@ -17,6 +17,17 @@
 \usepackage{tikz}
 \usepackage{listings}
 \usetikzlibrary{positioning,shapes,arrows.meta,calc} % <-- added calc
+\usepackage{listings}
+\lstset{
+  basicstyle=\ttfamily\small,
+  backgroundcolor=\color{gray!5},
+  frame=single,
+  columns=fullflexible,
+  keepspaces=true,          % preserves spaces exactly
+  showstringspaces=false,   % don't show spaces as underscores
+  breaklines=true,          % wrap long lines
+  postbreak=\mbox{\textcolor{gray}{$\hookrightarrow$}\space},
+}
 
 \tikzset{
   block/.style={draw, rounded corners, minimum width=26mm, minimum height=7mm, align=center},
@@ -3322,6 +3333,59 @@ Traditional LLM training (pretraining + SFT + RLHF/RLAIF) teaches a model to pro
   \item It doesn't teach \textbf{self-correction} after failure.
 \end{itemize}
 Agentic meta-training addresses this by explicitly training or simulating interactive reasoning loops where the model must decide, act, observe, and adapt, just like a human or reinforcement-learning agent \footnote{A reinforcement learning (RL) agent is an autonomous decision-making system that learns to achieve a goal by interacting with an environment and receiving feedback (rewards or penalties) for its actions.}.
+
+It has a shared foundation with RLHF or RLAIF, built upon the same optimization machinery: (i) staring from a pretrained language mode, (ii) collect interaction data (prompt - model output - feedback), (iii) and then optimize via SFT, RL (PPO/DPO/GRPO), or distillation.
+
+They differ not in how gradients are computed, but in what kind of behaviors the data is designed to teach.
+
+\begin{itemize}
+  \item In \textbf{RLHF} or \textbf{RLAIF}, we are trying to do alignment with respect to answers.
+  Our goal is to make the model's final responses match human or AI preferences.
+
+  Training data example: 
+  \begin{lstlisting}
+    Prompt: "Explain black holes to a 10-year-old."
+    Output_A: "Black holes are cosmic vacuum cleaners..."
+    Output_B: "Black holes have infinite gravity..."
+    Preference: A > B
+  \end{lstlisting}
+
+  Reward model learns the preference and policy learns to output more A like answers.
+
+  \item In \textbf{Agentic meta-training}, we are trying to do alignment with respect to process.
+  Our goal is to make the model learn a multi-step reasoning pattern.
+
+  Training data example:
+  \begin{lstlisting}
+    Question: "Who won the 2020 Olympics 100m race?"
+    Thought: "I should search for the result."
+    Action: search["2020 Olympics 100m winner"]
+    Observation: "It was Marcell Jacobs."
+    Thought: "Now I can answer."
+    FinalAnswer: "Marcell Jacobs."
+    Reflection: "Efficient. Next time, avoid redundant searches."
+  \end{lstlisting}
+  This teaches the model how to plan (decompose tasks), when to act (call tools, run code, query retrieval), and how to interpret results. 
+  In addition, we teach the model how to reflect on past performance.
+  Mechanically, it is still SFT or RL on text, but the text now encodes reasoning trajectories.
+\end{itemize}
+
+We often combine the two: (i) Meta-train on reasoning trajectories (teach the process). (ii) Apply RLHF/RLAIF on the final answers (align the outcomes).
+
+Examples: OpenAI's tool-use and reflection models, Anthropic's Constitutional AI with self-critique loops, Google DeepMind's ``RFT'' (Reasoning Fine-Tuning).
+
+\subsection{LLM Reasoning}
+``Chain of thought'' (\textbf{CoT}) refers to the internal reasoning steps of the language model, the text it generates silently (or explicitly, during training) to reason before answering.
+That reasoning happens inside the LLM (for example, Mistral, GPT-4, or Llama-3)
+
+\paragraph{ReAct.} This is a framework (a prompting and interaction framework) proposed by Google to make large language models operate as interactive agents that can both think and do.
+The idea is to let the model generate two alternating kinds of outputs:
+\begin{enumerate}
+  \item \textbf{Reasoning steps:} (``Thought''): the model explains what it's thinking or planning to do.
+  \item \textbf{Actions:} (``Act''): the model issues structured commands to tools or environments.
+\end{enumerate}
+Then the system gives back an \textbf{Observation} (the result of that action),
+and the model continues reasoning based on it.
 
 
 
