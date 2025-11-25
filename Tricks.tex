@@ -108,6 +108,35 @@ Any matrix $\mA \in \R^{m \times n}$ can be decomposed into the sum of its rows:
 where $e_i$ are standard basis vectors of $\R^m$.
 Notice that this is a rank $1$ decomposition.
 
+\subsection{Trace-vec identities.}
+The notation $\otimes$, we wil be using for tensor (Kronecker) product.
+Let $\mA \in \R^{m \times n}$ and $\mB \in \R^{p \times q}$, then 
+\begin{align*}
+  \mA \otimes \mB \in \R^{(mp) \times (nq)},
+\end{align*}
+is the block matrix defined by 
+\begin{align*}
+  \mA \otimes \mB = \begin{pmatrix*}
+    \mA_{11} \cdot \mB & \hdots & \mA_{1n} \cdot \mB \\
+    \vdots & \vdots & \vdots \\
+    \mA_{m1} \cdot \mB & \hdots & \mA_{mn} \cdot \mB.
+  \end{pmatrix*}
+\end{align*}
+Some properties involve: 
+\begin{itemize}
+  \item $(\mA \otimes \mB)(\mC \otimes \mD) = (\mA\mC)\otimes(\mB\mD)$.
+  \item $(\mA \otimes \mB)^{\top} = \mA^{\top} \otimes \mB^{\top}$.
+  \item If $\mA, \mB$ are invertible, $(\mA \otimes \mB)^{-1} = \mA^{-1} \otimes \mB^{-1}$. 
+\end{itemize}
+
+The notation $\vecc{\mA}$, means vectorize the matrix $\mA$ by stacking the columns of $\mA$ into a single long column vector.
+
+\begin{itemize}
+  \item \textbf{Core identity 1:} $\vecc{\mX\mY\mZ} = (\mZ^{\top} \otimes \mX) \, \vecc{\mY}$.
+  \item \textbf{Core identity 2:} $\tr{\mX^{\top}\mY} = \vecc{\mX}^{\top}\vecc{\mY}$.
+\end{itemize}
+
+
 
 \section{Multithreading}
 Per-thread scratch buffers (aka thread-local workspaces) are a very common pattern to cut allocation overhead and lock contention in multi-threaded code.
@@ -3617,6 +3646,103 @@ It is commonly used in tiny transformers and quantized models.
 \subsection{Model Compression}
 Modern LLMs (7B to 405B) are expensive to run. Inference cost is dominated by memory bandwidth (moving weights around), activation sizes, KV cache growth in long-context inference.
 In general there are 4 types of model compression, which we have seen most of them.
+
+\begin{itemize}
+  \item \textbf{Quantization:} Convert high precision weights/activations into low precision. This includes 
+  \begin{itemize}
+    \item \textbf{Weight-only quantization:} W4A16, W3A16 and W2A16. This is practical for most LLMs, and preserve accuracy superisingly well.
+    \item \textbf{Activation quantization:} Needed for fully low-precision inference.
+    \item \textbf{KV-cache quantization:} Large gains for long-context inference.
+    \item \textbf{Group quantization:} reduces precision but protects outliers. (weight vector splitted further into small-sized groups.)
+  \end{itemize}
+
+  \item \textbf{Pruning:} Pruning removes unnecessary weights or even the entire neurons.
+  \begin{itemize}
+    \item \textbf{Unstructured pruning:} Remove individual weights based on magnitude. Hard to accelerate on GPU.
+    \item \textbf{Structured pruning:} Remove entire attention heads, MLP channels, blocks, leads to real speedups.
+  \end{itemize}
+  This will be discussed in detail later.
+
+  \item \textbf{Distillaton:} As discussed previously, teacher and student framework.
+  
+  \item \textbf{Low-rank factorization:}
+  \begin{itemize}
+    \item \textbf{Training time compression:} LoRA reduces trainable parameters.
+    \item \textbf{Inference time compression:} An example would be we have a big matrix $\mW$, we can compute an SVD or similar factorization offline decomposing it into $\mW \simeq \mU_r\mathbf{\Sigma}_r\mV_r = \mA\mB$, and we store only $\mA, \mB$ or compute $\mA(\mB x)$ when inferencing, which reduces memory footprint or compute.
+  \end{itemize}
+\end{itemize}
+
+
+\subsection{Pruning}
+The general idea would be to remove weights, neurons or even the entire attention heads / MLP blocks while trying to preserve accuracy.
+This helps reduce memory footprint, inference latency, compute cost.
+Typically, there are two types of pruning.
+
+\paragraph{Unstructured Pruning (weight pruning):}
+Removes individual weights based on magnitude or other criteria.
+
+\begin{itemize}
+  \item \textbf{Pros:} We could achieve high compression rate, and it is flexible.
+  \item \textbf{Cons:} This creates irregular sparsity, which is not easy to use by hardwares, real speed ups require specialized sparse-kernel implementations.
+\end{itemize}
+
+This is still used in some places, but not an ideal technique for real development.
+
+\paragraph{Structured Pruning:}
+This is where most practical LLM pruning happens.
+We remove groups of weights: such as the entire neurons in MLP, the entire attention head, the entire FFN channels. 
+Sometimes an rare case is that we remove the entire layer.
+
+\begin{itemize}
+  \item \textbf{Pros:} Gives actual speedup on standard hardware, easy to implement, and plays nicely with quantization and distilation.
+\end{itemize}
+
+Modern structured pruning methods include: Wanda, SparseGPT, LLaMA-Pro block pruning, outlier-aware pruning and GPTQ-aware channel pruning.
+
+
+\paragraph{Activation / dynamic pruning:}
+These methods disable computation for tokens or layers depending on runtime signals.
+This is more like runtime optimization rather than classical pruning.
+
+
+\paragraph{Specific Pruning Algorithms}
+Here, we review some of the pruning methods.
+
+\textbullet~ \textbf{Simple Magnitude Pruning:} It could be (i) Compute the magnitude of weights $\lvert \mW_{ij} \rvert$ and drop the smallest. (ii) For structured pruning, sum over groups $g_k = \norm{\mW_k}_2$ and remove groups with the smallest norms.
+
+
+\textbullet~ \textbf{SparseGPT:} post-training, weight-pruning method designed for LLM, it prunes billions of weights without retraining, while keeping perplexity degradation small.
+
+Pruning is done layer-by-layer, block-by-block by solving a local quadratic minimization problem.
+The \textbf{core motivation} here would be that we know pruning must change the weights, but we must not let the change of weights change the layer's output distribution.
+Otherwise the error will propagates through dozen's of layers and the whole model collapses.
+
+To keep the layer output almost unchanged, we need a way to predict how zeroing some weights will change the output.
+Let us take an linear layer for example $\my = \mW \mx$.
+Assume that we apply pruning to $\Delta \mW$ to $\mW \in \R^{m \times d}$, i.e., 
+\begin{align*}
+  \mW^\prime = \mW + \Delta \mW.
+\end{align*}
+The output will now become 
+\begin{align*}
+  \cL(\Delta \mW) = \my^\prime = \rbrac{\mW + \Delta \mW} = \my + \Delta \mW \mx.
+\end{align*}
+We would like to have $\my^\prime \simeq \my$, so we minimize 
+\begin{align*}
+  \min_{\Delta \mW} = \ExpSub{\mx}{\norm{\Delta \mW x}^2}.
+\end{align*}
+Suppose that we have a calibration batch of $N$ activation vectors $\mX \in \R^{d \times N}$, each column corresponds to each sample.
+We approximate the expectation via empirical mean:
+\begin{align*}
+  \cL(\Delta \mW) \simeq \frac{1}{N}\sum_{i=1}^{N} \norm{\Delta \mW \mx_i} &= \frac{1}{N}\norm{\Delta \mW \mX}^2_{F} \\
+  &= \frac{1}{N}\tr{\mX^{\top} (\Delta\mW)^{\top} \Delta \mW \mX} \\
+  &= \tr{\Delta \mW \rbrac{\frac{1}{N}\mX\mX^{\top}}(\Delta \mW)^{\top}}.
+\end{align*}
+Define the empirical input variance $\mC = \frac{1}{N}\mX\mX^{\top} \in \R^{d \times d}$, we can write $\cL_{\Delta\mW} = \tr{\Delta \mW \mC (\Delta \mW)^{\top}}$.
+Now, if we write $\delta = \vecc{\Delta \mW}$, we can rewrite the loss function using the trace vec identity as
+\begin{align*}
+  \cL(\delta) = \delta^{\top}\rbrac{\mC \otimes \mI_m} \delta.
+\end{align*}
 
 
 
