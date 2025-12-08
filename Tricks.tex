@@ -3725,7 +3725,7 @@ Assume that we apply pruning to $\Delta \mW$ to $\mW \in \R^{m \times d}$, i.e.,
 \end{align*}
 The output will now become 
 \begin{align*}
-  \cL(\Delta \mW) = \my^\prime = \rbrac{\mW + \Delta \mW} = \my + \Delta \mW \mx.
+  \cL(\Delta \mW) = \my^\prime = \rbrac{\mW + \Delta \mW}\mx = \my + \Delta \mW \mx.
 \end{align*}
 We would like to have $\my^\prime \simeq \my$, so we minimize 
 \begin{align*}
@@ -3743,6 +3743,46 @@ Now, if we write $\delta = \vecc{\Delta \mW}$, we can rewrite the loss function 
 \begin{align*}
   \cL(\delta) = \delta^{\top}\rbrac{\mC \otimes \mI_m} \delta.
 \end{align*}
+Denote $\omega = \vecc{\mW}$ and $\omega^\prime = \vecc{\mW^\prime}$, we have $\omega^\prime = \omega + \delta$, and since we are doing pruning, let $\cS$ be the set of indices of pruned coordinates, we have 
+\begin{align*}
+  \delta_i = \begin{cases}
+    - \omega_i, \qquad &\text{if } i \in \cS, \\
+    0, \qquad &\text{otherwise}.
+  \end{cases}
+\end{align*}
+We can actually reorder the coordinates of $\delta$, so that 
+\begin{align*}
+  \delta = \sbrac{\delta_{\cS}, \delta_{\bar{\cS}}}^{\top}.
+\end{align*}
+Based on this new order, we can reorder $\mC \otimes \mI_m$ in the same way, obtaining 
+\begin{align*}
+  \mH = \begin{bmatrix}
+    \mH_{\cS\cS} & \mH_{\cS\bar{\cS}} \\
+    \mH_{\bar{\cS}\cS} & \mH_{\bar{\cS}\bar{\cS}} \\
+  \end{bmatrix}
+\end{align*}
+where $\mH_{\cS\cS}$ means that rows in $\cS$ and columns in $\cS$, and others have similar meanings.
+We will often refer to this as the Hessian surrogate or the curvature matrix.
+Plug this into the original loss inequality (notice that change of order does not change the loss), we obtain 
+\[
+  L(\delta) = \delta^\top H \delta = \begin{bmatrix}
+    \delta_S \\
+    \delta_{\bar S}
+  \end{bmatrix}^{\!\top} \begin{bmatrix}
+    H_{SS} & H_{S\bar S} \\
+    H_{\bar S S} & H_{\bar S \bar S}
+  \end{bmatrix} \begin{bmatrix}
+    \delta_S \\
+    \delta_{\bar S}
+  \end{bmatrix}.
+\]
+Expanding it, we get 
+\[
+  L(\delta) = \delta_S^\top H_{SS} \,\delta_S \;+\;
+  2\,\delta_{\bar S}^\top H_{\bar S S}\,\delta_S \;+\;
+  \delta_{\bar S}^\top H_{\bar S \bar S}\,\delta_{\bar S}.
+\]
+Now, notice that we can treat $\delta_{\cS}$ as constant (assume that we have already selected the coordinates in some way, which we will dicuss later, and because the values of those coordinates are fixed, they are constants), we can take the gradient w.r.t. to $\delta_{\bar{\cS}}$.  
 
 
 
