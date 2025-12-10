@@ -134,7 +134,7 @@ class DPOConfig:
 @dataclass
 class GRPOConfig:
     group_size: int = 2
-    # In GPRO, we do not treat each response-prompt pair independently, we group multiple 
+    # In GRPO, we do not treat each response-prompt pair independently, we group multiple 
     # responses and their rewards that share the same prompt into a group, so we can 
     # compare them and apply relative regularization or preferenced-based objectives.
     grpo_epochs: int = 1
@@ -165,7 +165,7 @@ def prepare_inputs(tok, texts, max_len=1024):
     return enc["input_ids"], enc["attention_mask"]
 
 
-def sequence_logprobs(model, ids, mask, no_grad: bool = False):
+def sequence_loGRPObs(model, ids, mask, no_grad: bool = False):
     ctx = torch.no_grad() if no_grad else torch.enable_grad()
     with ctx:
         out = model(ids, attention_mask=mask) # [B, T, V]
@@ -222,12 +222,12 @@ class PPOTrainer:
         ids, am = prepare_inputs(self.tok, texts, 2048)
         ids, am = ids.to(self.device), am.to(self.device)
 
-        # Precompute fixed logprobs & values (detach fully)
+        # Precompute fixed loGRPObs & values (detach fully)
         with torch.no_grad():
-            old_lp = sequence_logprobs(self.policy_v.base, ids, am).detach() # need to do detach
+            old_lp = sequence_loGRPObs(self.policy_v.base, ids, am).detach() # need to do detach
             # the reason is those tensors were created out of the local epochs, and the backprop will only
             # be viable for the first epoch, then freed, we ask them to be treated as constant
-            ref_lp = sequence_logprobs(self.ref, ids, am).detach()
+            ref_lp = sequence_loGRPObs(self.ref, ids, am).detach()
             _, vals, _ = self.policy_v(ids, am)
             vals = vals.detach()
 
@@ -282,7 +282,7 @@ class DPOTrainer:
         def agg(m, xs, no_grad=False):
             ids, am = prepare_inputs(self.tok, xs, 2048)
             ids, am = ids.to(self.dev), am.to(self.dev)
-            lp = sequence_logprobs(m, ids, am) # (B, T - 1)
+            lp = sequence_loGRPObs(m, ids, am) # (B, T - 1)
             return lp.sum(dim=1) # [B]
         
         with torch.no_grad():
@@ -345,7 +345,7 @@ class GRPOTrainer:
         # Convert to tensors for loss
         ids, am = prepare_inputs(self.tok, all_texts, 2048)
         ids, am = ids.to(self.dev), am.to(self.dev)
-        lp = sequence_logprobs(self.p, ids, am) # [B * K, T - 1]
+        lp = sequence_loGRPObs(self.p, ids, am) # [B * K, T - 1]
         seq_logp = lp.sum(dim=1) # [B * K,]
         adv = torch.tensor(all_rewards, device=self.dev, dtype=torch.float32) # [B * K, ]
 
@@ -367,7 +367,7 @@ class GRPOTrainer:
 
         # Optional: add a mild KL regularizer to keep policy close to ref
         with torch.no_grad():
-            ref_lp = sequence_logprobs(self.r, ids, am)
+            ref_lp = sequence_loGRPObs(self.r, ids, am)
             
         kl_term = (lp - ref_lp).mean()
         loss = loss + 0.01 * kl_term

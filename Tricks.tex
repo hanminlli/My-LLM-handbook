@@ -2435,17 +2435,17 @@ Since in the pariwise preference model the bias $C(\mx)$ cancels out, this justi
 In a word, the DPO choice of $r$ comes from the PPO + KL setup, but with simplifications such as implicit reward model and sequence level loss instead of per token.
 
 
-\subsection{GPRO (Generalized Preference Optimization)}
-GPRO generalizes DPO further, in the sense that it instead of relying only on binary preferences (preferred vs dispreferred), it allows training with arbitrary reward functions (scalar signals, multiple preferences, or mixtures).
+\subsection{GRPO (Group Relative Preference Optimization)}
+GRPO generalizes DPO further, in the sense that it instead of relying only on binary preferences (preferred vs dispreferred), it allows training with arbitrary reward functions (scalar signals, multiple preferences, or mixtures).
 
 Consider the dataset $\cD_{\text{pref}} = \cbrac{(\mx_j, \my_j, r(\mx_j, \my_j))}_{j=1}^M$ (Different $x_j$ could be the same.).
 We now define the log-ratio between policy and preference 
 \begin{align*}
   z_\theta(\mx, \my) = \log \frac{\pisub{\theta}{\my}{\mx}}{\pisub{\thetaref}{\my}{\mx}}.
 \end{align*}
-The GPRO loss is given by 
+The GRPO loss is given by 
 \begin{align*}
-  J^{\text{GPRO}}(\theta) = \ExpSub{\rbrac{\mx, \my} \sim \cD_{\text{pref}}}{\Omega^\star\rbrac{\beta z_\theta(\mx, \my)} - \beta r(\mx, \my)z_{\theta}(\mx, \my)},
+  J^{\text{GRPO}}(\theta) = \ExpSub{\rbrac{\mx, \my} \sim \cD_{\text{pref}}}{\Omega^\star\rbrac{\beta z_\theta(\mx, \my)} - \beta r(\mx, \my)z_{\theta}(\mx, \my)},
 \end{align*}
 where $\Omega^\star$ is the convex conjugate of a link function $\Omega$,$\beta > 0$.
 The training follows maximizing this dual objective.
@@ -2521,7 +2521,7 @@ In principle, if we have explicit $r(\mx, \my)$ for all candidate responses $\my
 \end{align*}
 which is log-sum-exp (log-partition function) all possible completions $\my$, which is not computable.
 
-\paragraph{The insight of GPRO:}
+\paragraph{The insight of GRPO:}
 Instead of trying to match $\pi_{\theta}$ to the global closed form $\pi^\star$, we can design a tractable convex surrogate that drives the model's log-ratio\footnote{The question is simply: how do we train a parameterized $\pi_\theta$ so that its log-ratio $z_{\theta}$ behaves like $z_\star$ without that partition function.} 
 \begin{align*}
   z_{\theta}(\my) = \log \rbrac{\frac{\pisub{\theta}{\my}{\mx}}{\pisub{\thetaref}{\my}{\mx}}},
@@ -2579,7 +2579,7 @@ We can define the following objective from Fenchel-Young,
   \cS_{\mx}(z_\theta) \eqdef \ExpSub{\my \sim \pisub{\thetaref}{\cdot}{\mx}}{\Omega^\star(\beta z_{\theta}(\my))} - \beta \cdot \ExpSub{\my \sim \pi^\star(\cdot \mid \mx)}{z_{\theta}(\my)} - \text{constant},
 \end{align*}
 where $\cS_{\mx}(z_\theta) \geq 0$, $\cS_{\mx}(z_\theta) = 0$ if and only if $z = z^\star$ and clearly it is convex.
-Notice that this surrogates resembles the original GPRO loss.
+Notice that this surrogates resembles the original GRPO loss.
 This surrogate serves as a way to drive $z_\theta$ to what we want without ever computing the log partition.
 Notice that for the first term, we have 
 \begin{align*}
@@ -2626,12 +2626,12 @@ if we further aggregate over prompts
 \begin{align*}
   \widehat{L}(\theta) =  \sum_{x \in \cD_{\text{pref}}} \cL_{\mx}(\theta) = -\beta \sum_{\mx} \sum_{i=1}^{K_{\mx}} \omega_i(\mx)\log \pisub{\theta}{\my_i}{\mx},
 \end{align*}
-which is clearly equivalent to the original GPRO dual loss, since it is our starting point (denoted as $\cS_{\mx}(z_\theta)$ here). 
+which is clearly equivalent to the original GRPO dual loss, since it is our starting point (denoted as $\cS_{\mx}(z_\theta)$ here). 
 Note that we are trying to minimize this loss as we are trying to minimizer $\cS_{\mx}$.
 
 \paragraph{Relation to DPO}
-DPO is related to GPRO, let a training item be a pair $(\mx, \my^+, \my^-)$ with the label $\my^+ \succ \my^-$.
-From the GPRO analysis, we have 
+DPO is related to GRPO, let a training item be a pair $(\mx, \my^+, \my^-)$ with the label $\my^+ \succ \my^-$.
+From the GRPO analysis, we have 
 \begin{align*}
   z^\star(\mx, \my) = \frac{r(\mx, \my)}{\beta} - \log \ExpSub{\my \sim \pisub{\thetaref}{\cdot}{\mx}}{\exp\rbrac{\frac{r(\mx, \my)}{\beta}}},
 \end{align*}
@@ -2660,7 +2660,7 @@ If we differentiate with respect to $\theta$, we get
   &= -\frac{1}{\beta}\rbrac{\sigma(-m_\theta)\nabla_\theta \log\pisub{\theta}{\my^+}{\mx} - \sigma(-m_\theta)\nabla_\theta \log\pisub{\theta}{\my^-}{\mx}}.
 \end{align*}
 As we can see, this is a weighted sum of the log-likelihood gradients, but the coefficient of the less preferred sample is negative, which means that one ``weight'' is negative. 
-It is not representable as a weighted Negative Log Likelihood (NLL) form, GPRO generalizes DPO in spirits.
+It is not representable as a weighted Negative Log Likelihood (NLL) form, GRPO generalizes DPO in spirits.
 To be specific, DPO uses a pairwise logistic surrogate focuses only on to relative differences, which leads to negative coefficients for the dispreferred sample.
 
 
@@ -2677,12 +2677,12 @@ Here the $o_t$ is defined as:
   o_t(\theta; \theta_k) = \frac{\pi_{\theta}(\ma_t \mid \ms_t)}{\pi_{\text{old}}(\ma_t \mid \ms_t)} = \frac{\pi_{\theta}(\ma_t \mid \ms_t)}{\pi_{\theta_k}(\ma_t \mid \ms_t)}.
 \end{align*}
 
-In GPRO, we simpliy removes the arbitrary clipping term, and anchor everything to the referrence model $\pi_{\thetaref}$.
-We can write the GPRO objective as:
+In GRPO, we simpliy removes the arbitrary clipping term, and anchor everything to the referrence model $\pi_{\thetaref}$.
+We can write the GRPO objective as:
 \begin{align*}
-  J^{\text{GPRO}}(\theta) &= \mathbb{E}_{\substack{(\ms_t, \ma_t) \sim \pi_{\theta_k}}}\big[o_t(\theta; \thetaref) \hat{A}^t - \beta_k \cdot \klD{\pisub{\theta}{\cdot}{\ms_t}}{\pisub{\thetaref}{\cdot}{\ms_t} + \lambda_{\text{ent}} H(\pisub{\theta}{\cdot}{\ms_t})}\big].
+  J^{\text{GRPO}}(\theta) &= \mathbb{E}_{\substack{(\ms_t, \ma_t) \sim \pi_{\theta_k}}}\big[o_t(\theta; \thetaref) \hat{A}^t - \beta_k \cdot \klD{\pisub{\theta}{\cdot}{\ms_t}}{\pisub{\thetaref}{\cdot}{\ms_t} + \lambda_{\text{ent}} H(\pisub{\theta}{\cdot}{\ms_t})}\big].
 \end{align*}
-which is the on policy version of the GPRO objective.
+which is the on policy version of the GRPO objective.
 Here the $o_t(\theta; \thetaref)$ is defined as:
 \begin{align*}
   o_t(\theta; \thetaref) = \frac{\pi_{\theta}(\ma_t \mid \ms_t)}{\pi_{\thetaref}(\ma_t \mid \ms_t)}.
@@ -2690,7 +2690,7 @@ Here the $o_t(\theta; \thetaref)$ is defined as:
 Notice that we will use $\beta_k$ as a dynamic controller to control the KL divergence, and it will be updated in each iteration.
 If the KL exceeds the target, we will increase $\beta_k$, otherwise, we will decrease $\beta_k$.
 Notice that sometimes we will see $o_t(\theta; \thetaref)$ which is called the ratio format, while sometimes we will see $\log \pi(\ma_t \mid \ms_t)$, which is the log format, and they are equivalent from the derivation of the policy gradient method.
-This is the on policy GPRO, sometimes we will see the off policy version, where we use $\pi_{\thetaref} = \mu$, i.e., the behavior policy, the rollouts are generated from this behavoir policy and we need the importance sampling trick to correct the distribution mismatch.
+This is the on policy GRPO, sometimes we will see the off policy version, where we use $\pi_{\thetaref} = \mu$, i.e., the behavior policy, the rollouts are generated from this behavoir policy and we need the importance sampling trick to correct the distribution mismatch.
 In practice, if we use $\mu = \theta_k$ which is the current policy, then it is the same as the on policy version, we can also let it be some old policy, which allows us to reuse the rollouts generated from the old policy, or we can let it be the reference policy, which allows us to reuse the rollouts generated from the reference policy.
 Note that PPO fixes $\mu = \pi_{\text{old}}$ which is the old policy.
 
@@ -2700,7 +2700,7 @@ In GRPO, we do not treat each response-prompt pair independently.
 Instead, we group multiple responses (and their rewards) that share the same prompt into a group, so we can compare them and apply relative regularization or preference-based objectives.
 
 \textbullet~ \textbf{Preference-based objective:} For a pair of responses $\my^{+}$ and $\my^{-}$, a preference model (human or reward model) tells us $r^+ > r^-$.
-Then the preference-based loss (as in DPO or GPRO) tries to enforces
+Then the preference-based loss (as in DPO or GRPO) tries to enforces
 \begin{align*}
   \log \pi_\theta(\my^+ \mid \mx) - \log \pi_\theta(\my^- \mid \mx) 
 \end{align*} 
@@ -2733,7 +2733,7 @@ and use the corresponding reward $r_{ik}$ to compute the \textbf{group standardr
 \begin{align*}
   \hat{A}_{ik} = \frac{r_{ik} - \bar{r}_i}{\sigma_i + \varepsilon}, \qquad \text{where } \bar{r}_i = \frac{1}{K}\sum_{k=1}^{K}r_{ik}, \sigma_i = \sqrt{\frac{1}{K}\sum_{k=1}^{K} (r_{ik} - \bar{r}_i)^2}.
 \end{align*} 
-The GPRO loss can be written as 
+The GRPO loss can be written as 
 \begin{align*}
   J^{\text{GRPO}} = \ExpSub{(\mx, \my) \sim \pi_{\theta}}{\hat{A}(\mx, \my)\cdot\log \pi_{\theta}(\my \mid \mx)}.
 \end{align*}
@@ -2759,7 +2759,7 @@ Some examples include:
   \item \textbf{PPO:} This is on policy, because PPO collects rollouts (trajectories) using the current policy $\pi_{\theta}$, and immediately uses them to update the same policy.
   \item \textbf{DPO:} This is not really RL in the classical sense, DPO is usually described as offline preference-based fine-tuning. 
   So in strict RL terms: it's neither on-policy nor off-policy, because it doesn't collect trajectories with a policy. (It behaves like an offline / off-policy method, since it learns from pre-collected data.)
-  \item \textbf{GPRO:} Same as DPO — not classical on-policy RL. 
+  \item \textbf{GRPO:} Same as DPO — not classical on-policy RL. 
   It's trained on a static dataset of human preferences, so it's closer to off-policy / offline RLHF-style training.
 \end{enumerate}
 
