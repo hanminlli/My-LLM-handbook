@@ -3795,6 +3795,9 @@ Solving gives
 \begin{align*}
   \delta_{\bar{\cS}}^\star = -\mH_{\bar{\cS}\bar{\cS}}^{-1} \mH_{\bar{\cS}\cS}\delta_{\cS} = \mH_{\bar{\cS}\bar{\cS}}^{-1} \mH_{\bar{\cS}\cS}\omega_{\cS}.
 \end{align*}
+Note that the the matrix $\mH_{\bar{\cS}\bar{cS}}$, while PSD, is not necessarily invertible.
+In practice what we do is that we add a $\lambda \cdot \mI$, which is actually equivalent to adding a regularizer $\lambda \cdot \norm{\delta_{\bar{\cS}}}^2$ to the objective.
+This is often refers to as \textbf{damping}.
 The final weights are now given by 
 \begin{align*}
   \omega^\prime_{\cS} = 0, \qquad \omega^\prime_{\bar{\cS}} = \omega_{\bar{\cS}} + \delta^\star_{\bar{\cS}}.
@@ -3832,7 +3835,7 @@ with certain constraints (instead of zero, we put on some grid) on $\mQ_{\mW}$, 
 
 
 \textbullet~ \textbf{SparseGPT-variants}: With nearly the same mathematics, SparseGPT can be extended to multiple other sparsity pattern.
-\begin{itemize}
+\begin{enumerate}
   \item \textbf{Block sparsity:} Fixed size blocks (e.g. $8 \times 8$, $16 \times 16$ are either kept or removed), sometimes the block sizes can be asymmetric, and typically, $50-75\%$ sparsity.
   Mainly in GPU-oriented research and less common then $N:M$ sparsity.
 
@@ -3844,10 +3847,53 @@ with certain constraints (instead of zero, we put on some grid) on $\mQ_{\mW}$, 
   The key is that the groups are contiguous in memory and the hardware encodes is aware of a compacted mask, so it could reduce the number of FMA (Fused-Multiply-Add) operations.
 
   The Nvidia Tensor Cores have dedicated spares MMA instructions which half the multiplications.
-  This results in $1.5 ~ 2$ speedups.
-\end{itemize}
+  This results in $1.5 \sim 2$ speedups.
+\end{enumerate}
 
 
+\textbullet~ \textbf{Wanda:} Wanda is a first order, activation-aware pruning method that esitmates weights importance using only activation statistics and weight magnitudes, without any second-order (Hessian) compensation.
+
+SparseGPT shows that second order pruning works extremely well, but it is computationally heavy because of damping and inverse.
+A natural question based on that is that: 
+\begin{verbatim}
+  Can we get most of the benefit of SparseGPT without computing or
+  inverting any Hessian?
+\end{verbatim}
+Let us consider the same linear layer with $\mW$, sparseGPT uses $\omega_i \mH_{ii}$ as the importance score, note that 
+\begin{align*}
+  \mH_{ii} = \Exp{x_j^2}, 
+\end{align*}
+for the corresponding input channel.
+This is justifed, since that for each coordinate $i$ in $\omega$, there must be a corresponding $(r, j)$ in $\mW$ where $r$ is the index in the out dimension and $j$ is the index in the in dimension, we have $i = (j-1)m + r$.
+Thus, 
+\begin{align*}
+  \mH_{ii} = \mC_{jj} = \Exp{x_j^2},
+\end{align*}
+where $x \in \R^d$ is the input.
+\textbf{Wanda} makes the following approximation: $\mH_{ii} \simeq \Exp{\lvert x_j \rvert}$, i.e. 
+\begin{align*}
+  \mH_{ii} \simeq \norm{\mX_{j,:}}_1 \text{    or   } \mH_{ii} \simeq \norm{\mX_{j,:}}_2,
+\end{align*} 
+i.e, we take all $i$-th coordinates over the calibration batch and use $1$ or $2$ norm.
+And we replace the original pruning score as. 
+\begin{align*}
+  \text{score}_i = \lvert \omega_i \rvert \norm{\mX_{j,:}}.
+\end{align*}
+After we determine which set of the parameters to prune, we do the pruning, and thats it, no compensation. 
+Roughly speaking, Wanda is effectively replacing the sparseGPT score $\omega^2_i \mH_ii$ with $\lvert\omega_i\rvert \cdot \sqrt{\mH_ii}$, which is just a first order proxy of the second order sparseGPT criterion.
+Now that we do not adjust the weights of the unpruned.
+This works empirically, and the intuition is roughly that this is just first order approximations.
+
+
+\subsection{Low-Precision Inference Techniques for LLMs}
+
+Beyond model architecture and algorithmic improvements, precision reduction has emerged as a key strategy to reduce memory footprint, improve throughput, and lower inference cost.
+
+\paragraph{AWQ:}
+Activation-Aware Weight Quanization (AWQ), is a widely adopted post-training quantization method and is supported by several production inference frameworks, including vLLM and TensorRT-LLM.
+It is commonly used for INT4-weight only inference on GPUs \footnote{This refers to that model weights are stored in $4$ bits integers and activations and most computations remain in higher precision (FP16 / BF16 / sometimes INT 8), this setup is executed efficiently on GPUs.}.
+
+\textbf{Motivation:}
 
 
 
