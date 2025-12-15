@@ -3705,13 +3705,13 @@ These methods disable computation for tokens or layers depending on runtime sign
 This is more like runtime optimization rather than classical pruning.
 
 
-\paragraph{Specific Pruning Algorithms}
+\paragraph{Specific Pruning Algorithms:}
 Here, we review some of the pruning methods.
 
 \textbullet~ \textbf{Simple Magnitude Pruning:} It could be (i) Compute the magnitude of weights $\lvert \mW_{ij} \rvert$ and drop the smallest. (ii) For structured pruning, sum over groups $g_k = \norm{\mW_k}_2$ and remove groups with the smallest norms.
 
 
-\textbullet~ \textbf{SparseGPT:} post-training, weight-pruning method designed for LLM, it prunes billions of weights without retraining, while keeping perplexity degradation small.
+\textbullet~ \textbf{SparseGPT:} (Mostly niche now.) post-training, weight-pruning method designed for LLM, it prunes billions of weights without retraining, while keeping perplexity degradation small.
 
 Pruning is done layer-by-layer, block-by-block by solving a local quadratic minimization problem.
 The \textbf{core motivation} here would be that we know pruning must change the weights, but we must not let the change of weights change the layer's output distribution.
@@ -3765,24 +3765,88 @@ where $\mH_{\cS\cS}$ means that rows in $\cS$ and columns in $\cS$, and others h
 We will often refer to this as the Hessian surrogate or the curvature matrix.
 Plug this into the original loss inequality (notice that change of order does not change the loss), we obtain 
 \[
-  L(\delta) = \delta^\top H \delta = \begin{bmatrix}
-    \delta_S \\
-    \delta_{\bar S}
+  \cL(\delta) = \delta^\top \mH \delta = \begin{bmatrix}
+    \delta_\cS \\
+    \delta_{\bar \cS}
   \end{bmatrix}^{\!\top} \begin{bmatrix}
-    H_{SS} & H_{S\bar S} \\
-    H_{\bar S S} & H_{\bar S \bar S}
+    \mH_{\cS\cS} & \mH_{\cS\bar \cS} \\
+    \mH_{\bar \cS \cS} & \mH_{\bar \cS \bar \cS}
   \end{bmatrix} \begin{bmatrix}
-    \delta_S \\
-    \delta_{\bar S}
+    \delta_\cS \\
+    \delta_{\bar \cS}
   \end{bmatrix}.
 \]
 Expanding it, we get 
 \[
-  L(\delta) = \delta_S^\top H_{SS} \,\delta_S \;+\;
-  2\,\delta_{\bar S}^\top H_{\bar S S}\,\delta_S \;+\;
-  \delta_{\bar S}^\top H_{\bar S \bar S}\,\delta_{\bar S}.
+  \cL(\delta) = \delta_\cS^\top \mH_{\cS\cS} \,\delta_\cS \;+\;
+  2\,\delta_{\bar \cS}^\top \mH_{\bar \cS \cS}\,\delta_\cS \;+\;
+  \delta_{\bar \cS}^\top \mH_{\bar \cS \bar \cS}\,\delta_{\bar \cS}.
 \]
-Now, notice that we can treat $\delta_{\cS}$ as constant (assume that we have already selected the coordinates in some way, which we will dicuss later, and because the values of those coordinates are fixed, they are constants), we can take the gradient w.r.t. to $\delta_{\bar{\cS}}$.  
+Now, notice that we can treat $\delta_{\cS}$ as constant (assume that we have already selected the coordinates in some way, which we will dicuss later, and because the values of those coordinates are fixed (as $-\omega_i$ to make the original parameter zero.), they are constants), we can take the gradient w.r.t. to $\delta_{\bar{\cS}}$. \footnote{We can think of this as a simplification on purpose: originally, we have to select which of the coordinates to prune and by how much on purpose, but now we choose to do it in a sequential manner, i.e., we first select the group of parameters to prune according to some standard, which allows us to solve the subsequent optimization problem via standard tools.}
+As a result, we can write the minimization problem as 
+\begin{align*}
+  \min_{\delta_{\bar \cS}} \cL(\delta_{\bar{\cS}}; \delta_{\cS}). 
+\end{align*}  
+Notice that for this specific problem, we can actually use the optimality condition 
+\begin{align*}
+  2\mH_{\bar{\cS} \bar{\cS}} \delta_{\bar \cS} + 2\mH_{\bar{\cS}\cS} \delta_{\cS} = 0,
+\end{align*}
+Solving gives 
+\begin{align*}
+  \delta_{\bar{\cS}}^\star = -\mH_{\bar{\cS}\bar{\cS}}^{-1} \mH_{\bar{\cS}\cS}\delta_{\cS} = \mH_{\bar{\cS}\bar{\cS}}^{-1} \mH_{\bar{\cS}\cS}\omega_{\cS}.
+\end{align*}
+The final weights are now given by 
+\begin{align*}
+  \omega^\prime_{\cS} = 0, \qquad \omega^\prime_{\bar{\cS}} = \omega_{\bar{\cS}} + \delta^\star_{\bar{\cS}}.
+\end{align*}
+
+Now, we answer the remaining question of which of the parameters we wants to prune.
+This is done with approximations using a cheap importance score.
+
+\textbf{Importance of pruning a single weight:} If we prune only coordinate $i$, i.e., 
+\begin{align*}
+  \delta_i = -\omega_i, \quad \delta_j = 0 (j \neq i)
+\end{align*}
+then we have 
+\begin{align*}
+  \cL(\delta) = \omega_i^2\mH_{ii},
+\end{align*}
+We will treat this as the importance score, and the larger it is, the more sensitive this direction is (notice that it is always PSD), and we should be less willing to prune this.
+
+In large LLMs, $\mH$ is huge typically, so we actually divide it into small blocks (e.g., $128 \times 128$) and compute the importance scores for weights in that block, and prune the lowest-scoring weights to hit the sparsity target.
+
+A final remark on sparseGPT is that this type of pruning actually introduces unstructured sparsity, which is not useful for hardware acceleration.
+However, it is not designed for this purpose in the begining.
+
+\textbullet~ \textbf{GPTQ:} The idea is very similar to sparseGPT.
+Imagine for a linear layer $\mW$, we want to quantized it to replace $\mW$ by a quantized matrix $\mQ_{\mW}$.
+Define the perturbation, 
+\begin{align*}
+  \Delta \mW = \mQ_{\mW} - \mW, \qquad \delta = \vecc{\Delta \mW}.
+\end{align*}
+We want to minimize the output distortion 
+\begin{align*}
+  \cL(\delta) = \Exp{\norm{\Delta\mW x}^2} \simeq \delta^{\top}\mH\delta, 
+\end{align*}
+with certain constraints (instead of zero, we put on some grid) on $\mQ_{\mW}$, we can therefore use a similar way to approximate this optimization process.
+
+
+\textbullet~ \textbf{SparseGPT-variants}: With nearly the same mathematics, SparseGPT can be extended to multiple other sparsity pattern.
+\begin{itemize}
+  \item \textbf{Block sparsity:} Fixed size blocks (e.g. $8 \times 8$, $16 \times 16$ are either kept or removed), sometimes the block sizes can be asymmetric, and typically, $50-75\%$ sparsity.
+  Mainly in GPU-oriented research and less common then $N:M$ sparsity.
+
+  \item \textbf{N:M sparsity:} one of the most important parttern today (as of 2025), which is semi-structured.
+  An example would be 2:4 sparsity, which means that in every 4 weights, exactly 2 are zero.
+
+  One may wonder why such a pattern leads to acceleration.
+  In fact, the hardware (Ampere, Hopper) knows that in every contiguous group of 4 weights along a specific dimension, exactly 2 must be zero in advance.
+  The key is that the groups are contiguous in memory and the hardware encodes is aware of a compacted mask, so it could reduce the number of FMA (Fused-Multiply-Add) operations.
+
+  The Nvidia Tensor Cores have dedicated spares MMA instructions which half the multiplications.
+  This results in $1.5 ~ 2$ speedups.
+\end{itemize}
+
 
 
 
