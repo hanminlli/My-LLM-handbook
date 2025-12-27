@@ -505,6 +505,9 @@ If we are given an input 2D/Convolutional data $\mX \in \R^{B \times C \times H 
 \end{align*}
 basically, we are computing mean and variance per channel.
 Notice that \textbf{LayerNorm is still the default in most Vision Transformer (ViT-style) backbones}. 
+In pratice, when we do the training, we can simply use the batch mean and batch variance, but in the inference stage, we have to use the running statistics (momentum apply to generate running mean and running variance).
+This is because that during inference, the batchsize might be $1$ or different from that is used in the training phase.
+
 In CNN, sometimes GroupNorm replaces BatchNorm because it's batch-size independent and mixes well with vision features.
 
 
@@ -1466,11 +1469,11 @@ which is the negative log-likelihood over the sequence.
 This can be written equivalently as the cross entropy between the model's predicted distribution $\probsub{\theta}{\cdot \mid x_{< t}} \in \R^{\lvert\cV \rvert}$ and the one-hot true token $\my_t \in \cbrac{0, 1}^{\lvert\cV \rvert}$, where $\cV$ is the vocabulary,
 \begin{align}
   \label{eq:CrossEntropy}
-  \cL_{\text{pretrain}}\rbrac{\theta} = -\frac{1}{L}\sum_{t=1}^{L}\sum_{v \in \cV} \rbrac{\mx^\prime_{t}}_v \log \probsub{\theta}{v \mid \mx_{<T}}, \tag{Cross Entropy}
+  \cL_{\text{pretrain}}\rbrac{\theta} = -\frac{1}{L}\sum_{t=1}^{L}\sum_{v \in \cV} \rbrac{\my_{t}}_v \log \probsub{\theta}{v \mid \mx_{<t}}, \tag{Cross Entropy}
 \end{align} 
-where $\rbrac{\mx^\prime_t}_v = \mathbf{1}\cbrac{v = \mx_t} \in \R^{\abs{\cV}}$.
+where $\rbrac{\my_t}_v = \mathbf{1}\cbrac{v = \mx_t} \in \R^{\abs{\cV}}$.
 Basically, we are summing over all possible vocabularies.
-The equivalence is clear once we see that, in \eqref{eq:CrossEntropy} $\mx^\prime_t$ itself is a one hot vector, and it is $1$ nowhere but when $v = \mx_t$, with everywhere else $0$.
+The equivalence is clear once we see that, in \eqref{eq:CrossEntropy} $\my_t$ itself is a one hot vector, and it is $1$ nowhere but when $v = \mx_t$, with everywhere else $0$.
 The training itself reduces to a \textbf{maximum likelihood} problem given a trainable set of parameter $\theta$.  
 A quick implementation is that 
 \begin{verbatim}
@@ -3785,6 +3788,214 @@ Expanding it, we get
 Now, notice that we can treat $\delta_{\cS}$ as constant (assume that we have already selected the coordinates in some way, which we will dicuss later, and because the values of those coordinates are fixed, they are constants), we can take the gradient w.r.t. to $\delta_{\bar{\cS}}$.  
 
 
+\subsection{Softmax Tricks}
+The usual softmax of a vector $\mx$, is given by the following formula:
+\begin{align*}
+  \operatorname{softmax}(\mx)_i = \frac{e^{\mx_i}}{\sum_{j=1}^{d} e^{\mx_j}}.
+\end{align*}
+The problem is, if certain $x_i$ are too large, $e^{x_i}$ will overflow and become ``inf'', which causes trouble in training stability.
 
+\paragraph{Safe softmax trick:} This refers to the following practice, 
+\begin{align*}
+  \operatorname{softmax}(\mx)_i = \frac{e^{\mx_i - m}}{\sum_{j=1}^{d} e^{\mx_j - m}}, \quad \text{where  } m \eqdef \max_i \mx_i.
+\end{align*}
+The two are equivalent in mathmatics, because we only divide each term by $e^m$, every $e^{\mx_i - m}$ is between $[0, 1]$, and the overflow problem is much more controllable.
+
+\paragraph{The log-sum-exp trick:}
+Now, if we imagine that we have obtained a logit vector $\mx$, we first compute the softmax to transform it into a probability vector, then take the log and finally we compute the negative log likelihood as the cross entropy, basically, we have 
+\begin{align*}
+  \operatorname{NLL}(\mx) = - \log \frac{e^{\mx_y}}{\sum_j e^{\mx_j}},
+\end{align*}
+where we actually faces the same problem as before.
+But notice we can simplify the expression a bit, by 
+\begin{align*}
+  - \log \frac{e^{\mx_y}}{\sum_j e^{\mx_j}} &= - \rbrac{\mx_y + \log\frac{1}{\sum_j e^{\mx_j}}} \\
+  &= -\rbrac{\mx_y + \log\frac{1}{e^{m}\sum_j e^{\mx_j - m}}} \\
+  &= -\rbrac{\mx_y - m + \log \frac{1}{\sum_j e^{\mx_j - m}}} \\
+  &= -\mx_y + m + \log \sum_j e^{\mx_j - m}.
+\end{align*}
+
+
+\subsection{KL divergence and Cross Entropy}
+Let us first give the definition, let $\mq, \mpp$ be a discrete probability distribution over the vocabulary $\cV$, then we have the term entropy defined as  
+\begin{align}
+  H(\mq) = - \sum_{v \in \cV} \mq(v) \cdot \log \mq(v). \tag{Entropy}
+\end{align} 
+and cross entropy defined as 
+\begin{align}
+  H(\mq, \mpp) = - \sum_{v \in \cV} \mq(v) \log \mpp(v). \tag{Cross Entropy}
+\end{align}
+The KL divergence is defined as 
+\begin{align}
+  \text{KL}(\mq || \mpp) = \sum_{v \in \cV} \mq(v) \log \frac{\mq(v)}{\mpp(v)}. \tag{KL Divergence}
+\end{align}
+It is easy to check that the three definitions satisfies 
+\begin{align}
+  \label{eq:relation-kl-cross}
+  \text{KL}(\mq || \mpp) = -H(\mq) + H(\mq, \mpp).
+\end{align}
+
+One may notice that in the cross entropy loss, we use $\mq$ as the goal (data-generating) distribution, and $\mpp$ as the model / parametric distribution, hence, minimizing the cross entropy loss is just equivalent to minimizing the KL divergence via \eqref{eq:relation-kl-cross}.
+To this end, one can interpret the minimization as a type of projection based on KL divergence.
+
+
+\subsection{Contiguous}
+Many PyTorch operations (especially `.view') assume the tensor is laid out contiguously in memory.
+If it isn't, the operation either fails or silently does extra work (copies), which affects correctness assumptions and performance.
+
+\paragraph{Definition:}
+A tensor is contiguous if its elements are stored in memory in the same order as its logical indexing.
+Example:
+\begin{lstlisting}
+  x = tensor( [[a, b, c],
+              [d, e, f]] )
+\end{lstlisting}
+It has a memory lay out of 
+\begin{lstlisting}
+  [a, b, c, d, e, f],
+\end{lstlisting}
+which is contiguous.
+
+\paragraph{How tensors become non-contiguous:}
+Slicing, transposing, permuting does not move data, it only changes strides.
+\begin{lstlisting}
+  x = torch.randn(4, 5, 6)
+  y = x[:, :-1, :]      # slicing
+  z = x.transpose(1, 2)
+\end{lstlisting}
+Both y and z are usually non-contiguous. 
+They are views pointing to the same memory, but with different strides.
+
+\paragraph{.view()}
+.view() is a pure reinterpretation of memory.
+It requires: new shape is compatible with existing strides.
+\begin{lstlisting}
+  x = torch.randn(2, 3, 4)
+  y = x[:, :-1, :]      # non-contiguous
+  y.view(-1, 4)         # RuntimeError
+\end{lstlisting}
+Because the memory layout is no longer ``linear'' in the way .view() expects.
+\begin{lstlisting}
+  y = y.contiguous()
+  y.view(-1, 4)
+\end{lstlisting}
+works because .contiguous() physically copies the data into a contiguous block.
+
+\paragraph{.reshape()}
+It is kind of smarter in the sense that in the case that the tensor is contiguous, it returns a view (zero cost), but in the other cases, it will silently allocate a contiguous copy.
+However, if we use this function, we lose control of when memory is allocated, how much memory is allocated and performance predictability.
+That's why we often write 
+\begin{lstlisting}
+  y = y.contiguous().view(...)
+\end{lstlisting}
+to make the cost explicit.
+
+All in one sentence: If we slice / transpose / permute a tensor and then call .view(), we should almost always call .contiguous() first.
+
+\paragraph{Stride:}
+Strides are the rule that tells PyTorch how to walk through memory when we index a tensor.
+For a tensor $\mx$ with shape $(d_0, d1, \hdots, d_n)$, stride at dimension $k$ is how many memory elements we must skip to move the index by $+1$ along that dimension.
+If $\mx$ has base pointer $\text{ptr}$ and strides $s = (s_0, s_1, \hdots, s_n)$ then the address of $\mx\sbrac{i_0, i_1, \hdots, i_n}$ is given by 
+\begin{align*}
+  \text{ptr} + \sum_{k=0}^{n}i_k \cdot s_k.
+\end{align*}
+
+
+\subsection{Binary Classification, AUC and ROC}
+In binary classification tasks, we often construct the confusion matrix, which has the following four categories:
+\begin{itemize}
+  \item TP: Ground Truth Positive and Prediction Positive
+  \item FP: Ground Truth Negative and Prediction Positive
+  \item TN: Ground Truth Positive and Prediction Negative
+  \item FN: Ground Truth Negative and Prediction Negative
+\end{itemize}
+We define two key rates 
+\begin{itemize}
+  \item Recall: (True Positive Rate) 
+  \begin{align*}
+    \text{TPR} = \frac{\text{TP}}{\text{TP} + \text{FN}}
+  \end{align*}
+  This stands for the percentage of TP in the total correct examples.
+
+  \item Sensitivity: (False Positive Rate)
+  \begin{align*}
+    \text{FPR} = \frac{\text{FP}}{\text{FP} + \text{TN}}
+  \end{align*}
+  This stands for the percentage of FP in the total wrong examples.
+\end{itemize}
+
+Then the ROC (Receiver Operating Characteristic) curve is the curve that 
+\begin{itemize}
+  \item $x$ axis: False Positive Rate (FPR)
+  \item $y$ axis: True Positive Rate (TPR)
+\end{itemize}
+As the threshold go from $0$ to $1$ (assume the score output by the model is in $[0, 1]$), FPR, TPR changes thats why we get a curve, for threshold $0$, we predict all positive, so $y$ should be $1$ (because $\text{FN} = 0$), and $x$ should be $1$ (because $\text{TN} = 0$). 
+When we set threshold to be $1$ (all negative predictions), we get $(0, 0)$
+
+AUC (Area under the ROC curve) measures how well a model ranks positive examples above negative ones, i.e., AUC is the probability that a randomly chosen positive sample gets a higher score than a randomly chosen negative sample.
+Mathematically:
+\begin{align*}
+  \text{AUC} = \int_{0}^{1} \text{TPR}(\text{FPR})\, \textbf{d}\, \text{FPR}.
+\end{align*}
+Now notice that each in FPR corresponds to letting one more negative pass the threshold (FP increases, and FPR increases), the corresponding TPR tells you how many positives are already above that negative.
+\begin{align*}
+  \text{TPR}(t) &= \frac{\lvert\cbrac{x^+: s(x^{+}) \geq t}\rvert}{\text{P}} \\
+  \text{FPR}(t) &= \frac{\lvert\cbrac{x^+: s(x^{+}) < t} \rvert}{N}
+\end{align*}
+Fix a ground-truth negative sample $x^-$ with score $s^-$, at the threshold $t = s^-$, this negative just becomes predicted positive so $\text{FPR}$ increases $1/\text{N}$, and if we plug in $t = s^-$, we realize $\text{TPR}$ becomes the fraction of postive samples that has a higher score than this negative example.
+Since each negative contributes:
+\begin{align*}
+  \Delta \text{FPR} = \frac{1}{\text{N}},
+\end{align*}
+Assume no ties, the integral becomes a summation of 
+\begin{align*}
+  \text{AUC} = \frac{1}{\text{N}} \sum_{x^-} \frac{\lvert \cbrac{x^+ : s(x^+) > s(x^-) }\rvert}{\text{P}} = \frac{1}{\text{PN}}\sum_{x^-}\lvert \cbrac{x^+: s(x^+) > s(x^-) }\rvert
+\end{align*}
+The numerator counts all positive negative pairs where $s(x^+) > s(x^-)$ and the denominator is the total number of pairs.
+Thus 
+\begin{align*}
+  \text{AUC} = \text{Pr}\cbrac{s(x^+) > s(x^-)},
+\end{align*}
+because we first computed for each $x^-$ the probability of a $x^{+}$ that has a larger $s(x^{+}) \geq s(x^{-})$, then average over $x^-$.
+
+\paragraph{The case where ties happens:}
+It could happen that $s(x^+) = s(x^-)$, in this case, we define 
+\begin{align*}
+  \phi(x^+, x^-) = \begin{cases}
+    1, &\quad s(x^+) > s(x^-) \\
+    \frac{1}{2}, &\quad s(x^+) = s(x^-) \\
+    0, &\quad s(x^+) < s(x^-).
+  \end{cases}
+\end{align*}
+Then AUC becomes 
+\begin{align*}
+  \text{AUC} = \frac{1}{\text{PN}} \sum_{x^+}\sum_{x^-} \phi(x^+, x^-) = \text{Pr}\cbrac{s(x^+) > s(x^-)} + \frac{1}{2}\text{Pr}\cbrac{s(x^+) = s(x^-)}.
+\end{align*}
+
+\paragraph{Practical Hint.}
+Assume we have the ground truth labels $y_i \in \cbrac{0, 1}$ and the model score $s_i \in \R$.
+\begin{itemize}
+  \item Sort all samples decreasingly in terms of their $s_i$.
+  \item Move threshold from $+\infty$ to each point $s_i$ and compute $(\text{FPR}_k, \text{TPR}_k)$.
+  \item Compute the area, given ROC points we have generated, we have 
+  \begin{align*}
+    \text{AUC} = \sum_k (\text{FPR}_{k+1} - \text{FPR}_k) * \frac{\text{TPR}_k + \text{TPR}_{k+1}}{2}.
+  \end{align*}
+\end{itemize}
+
+We may use the Mann-Whiteney formula (uses the pairwise ranking view)
+\begin{itemize}
+  \item Rank all samples by score and record their ranking $r_i$, with average ranks are used for ties.
+  \item \begin{align*}
+    \text{AUC} = \frac{\text{R}_+ - \frac{\text{P}\rbrac{\text{P} + 1}}{2}}{\text{PN}}
+  \end{align*}
+  where $\text{R}_+$ is sum of ranks of positive samples, which is mathematically identical to ROC integration and very efficient.
+\end{itemize}
+
+\begin{lstlisting}
+  from sklearn.metrics import roc_auc_score
+  auc = roc_auc_score(labels.cpu(), scores.cpu())
+\end{lstlisting}
+Remark: Random guessing gives AUC around $0.5$ numerically.
 
 \end{document}
