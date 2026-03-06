@@ -3442,6 +3442,61 @@ Some times ReAct agents are combined with reflection (self-critique) and memory 
 
 
 
+\section{Multi Modality}
+
+
+\subsection{How to make LLMs understand images}
+As we know, LLMs understand sequences of embeddings.
+So for images, the whole game is to build a front-end that converts an image into a sequence of vectors that is compatible with the language model.
+This is what modern multimodel systems do: a \textbf{vision encoder} turns the image into visual features and then a \textbf{small bridge / connector} makes those features usable by the LLM.
+
+\paragraph{From pixels to visual tokens:}
+The standard starting point today is a vision transformer (ViT) style encoder: ViT explicitly treats an image as a sequence of patches, split the image into small blocks such as $16 \times 16$, flatten/project each patch, add positional information, and run a transformer over the resulting patch sequence.
+In this sense, patches play the role of tokens.
+Conceptually, 
+\begin{align*}
+  \mI \in \R^{H \times W \times C} \rightarrow \cbrac{\mpp_1, \hdots, \mpp_N} \rightarrow \cbrac{\mv_1, \hdots, \mv_N}, \quad \mv_i \in \R^{d_v},
+\end{align*}
+where $\mpp_i$ are image patches, and $\mv_i$ are learned visual embeddings.
+The image becomes a sequence.
+
+In many practical systems, the vision encoder is not trained from scratch together with the LLM.
+Instead, people often start from a strong pretrained vision model such as CLIP or a ViT-like backbone already aligned with text.
+CLIP learns image representations from large-scale image-text pairing by predicting which caption matches which image, and that gives a very useful semantic visual space before touching the LLM at all.
+
+\paragraph{Raw visual tokens are not enough:}
+Even after ViT or CLIP, we do not yet have something the LLM can naturally consume.
+This is due to that (1) LLM's token embeddings live in a language-centric space, while the image encoder outputs vectors in a different representation space.
+Also, (2) an image may produce hundreds or thousands of patch embeddings, which is expensive and often redundant.
+
+So we need a \textbf{modality bridge}.
+This is the central design problem in multimodal LLM input pipelines.
+
+\begin{itemize}
+  \item \textbf{Family A: simple projector into the LLM embedding space.} (Simplest and most common) 
+  The pipeline in this case is 
+  \begin{lstlisting}
+    image -> vision encoder -> visual features -> linear / MLP projector -> LLM token space.
+  \end{lstlisting}
+  To be specific, suppose that one image is $x \in \R^{H \times W \times C}$, a ViT-style vision encoder splits it into patches and outputs a sequence of visual feature vectors.
+  Suppose there are $N$ patches and the vision backbone hidden size is $d_v$, then the encoder output is typically $F \in \R^{N \times d_v}$. 
+  This is what we termed as visual features. 
+  The projector maps the last dimension from the vision space into LLM embedding space.
+  As usual, we will denote the hidden size of LLM as $\dmodel$, then the simplest projector is just a linear map $\mW \in \R^{d_v \times \dmodel}$.
+  We can also use an MLP.
+  In both cases the token count stays the same and the result becomes $\R^{N \times \dmodel}$.
+  Some architectures do add a resampler / pooling / query bottleneck, which can reduce the number of visual tokens.
+
+  The system usually does the two pipelines in parallel (text side / image side). Then they are assembled into one transformer input sequence.
+
+  This is essentially the spirit of \textbf{LLaVA}: connect a pretrained vision encoder and an LLM with a trainable projection layer, then instruction-tune the whole multimodal system on image-text instruction data.
+  This design is attractive because it is simple, cheap, and compatible with standard autoregressive decoding. The downside is that a plain projector can be a relatively weak bottleneck for fine-grained spatial reasoning, OCR, and high-resolution detail. That is why later work keeps modifying the connector or increasing multi-scale visual input.
+
+  \item \textbf{Family B: learned querying / resampling modules:} Instead of passing all patch tokens into the LLM, another strategy is to use a learned bottleneck that extracts only the most useful visual information.
+\end{itemize}
+
+
+
 \section{Miscellaneous}
 
 \subsection{Chinchilla Optimality}
