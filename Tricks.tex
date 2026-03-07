@@ -3464,6 +3464,33 @@ In many practical systems, the vision encoder is not trained from scratch togeth
 Instead, people often start from a strong pretrained vision model such as CLIP or a ViT-like backbone already aligned with text.
 CLIP learns image representations from large-scale image-text pairing by predicting which caption matches which image, and that gives a very useful semantic visual space before touching the LLM at all.
 
+\paragraph{What is CLIP:}
+It is a dual-encoder model that learns a shared embedding space for images and text.
+One encoder maps an image to a vector (its image encoder is often a ViT backbone), another encoder maps a caption or text prompt to a vector, and training pushes matched image-text pairs closer while pushing mismatched pairs apart.
+In the original paper, OpenAI trained it on $400$ million image-text pairs and showed strong zero-shot transfer across many vision tasks.
+Then CLIP normalizes these embeddings and uses their similarity, typically cosine similarity up to a learned temperature, to score whether image $x_i$ matches text $t_j$.
+Training is basically a symmetric contrastive objective over a minibatch: each image should match its paired text and not the others, and vice versa.
+This is why CLIP is often described as ``language-supervised representation learning'' rather than generative modeling.
+
+
+\paragraph{ViT as visual encoder:}
+A ViT (Vision Transformer) is basically the image analogue of a token-based Transformer: instead of taking text tokens as input, it takes an image, chops it into patches, turns each patch into a vector, adds position information, and runs standard Transformer layers over the resulting sequence.
+Each patch is flattened and linearly projected into a hidden dimension $d_{\text{hid}}$, giving a sequence of vectors in $\R^{d_{\text{hid}}}$, which is the direct visual analogue of token embeddings in NLP.
+
+In the original classification setup, ViT prepends a learned [CLS] token whose final hidden state is used for classification, although in multimodal systems people often care more about the full sequence of patch features than just a single pooled representation.
+
+Concretely, 
+\begin{lstlisting}
+  image -> patch embedding -> positional encoding -> stack of Transformer blocks (ViT) -> visual features.
+\end{lstlisting}
+Patch embedding in $\R^{\dmodel}$ is often results of projection of the patch vector in the space of $\R^{CP^2}$, where $P$ is the patch size.
+This is often equivalent to a Conv2D with kernel size $P$ and stride $P$.
+The choices of positional encodings are often: (1) Learned absolute positional embeddings. The classic ViT choice, and also very common in CLIP-style ViT backbones. Add a learned embedding to each patch token position.
+(2) Fixed 2D sine-cosine embeddings: also common, especially in self-supervised ViT variants such as MAE. These are not learned in the same way and preserve a cleaner 2D geometric structure.
+(3) Relative position bias: common in hierarchical/windowed vision transformers such as Swin.
+
+
+
 \paragraph{Raw visual tokens are not enough:}
 Even after ViT or CLIP, we do not yet have something the LLM can naturally consume.
 This is due to that (1) LLM's token embeddings live in a language-centric space, while the image encoder outputs vectors in a different representation space.
@@ -3473,7 +3500,7 @@ So we need a \textbf{modality bridge}.
 This is the central design problem in multimodal LLM input pipelines.
 
 \begin{itemize}
-  \item \textbf{Family A: simple projector into the LLM embedding space.} (Simplest and most common) 
+  \item \textbf{Family A: simple projector into the LLM embedding space.} (Simplest and most common: Industrial default: We have a pretrained LLM, and a pretrained vision encoder, and we only need a connector that maps features into the language model's input space.) 
   The pipeline in this case is 
   \begin{lstlisting}
     image -> vision encoder -> visual features -> linear / MLP projector -> LLM token space.
@@ -3489,11 +3516,146 @@ This is the central design problem in multimodal LLM input pipelines.
 
   The system usually does the two pipelines in parallel (text side / image side). Then they are assembled into one transformer input sequence.
 
-  This is essentially the spirit of \textbf{LLaVA}: connect a pretrained vision encoder and an LLM with a trainable projection layer, then instruction-tune the whole multimodal system on image-text instruction data.
+  This is essentially the spirit of \textbf{LLaVA}: connect a pretrained vision encoder and an LLM with a trainable projection layer, then instruction-tune (multimodal SFT) the whole multimodal system on image-text instruction data.
   This design is attractive because it is simple, cheap, and compatible with standard autoregressive decoding. The downside is that a plain projector can be a relatively weak bottleneck for fine-grained spatial reasoning, OCR, and high-resolution detail. That is why later work keeps modifying the connector or increasing multi-scale visual input.
 
   \item \textbf{Family B: learned querying / resampling modules:} Instead of passing all patch tokens into the LLM, another strategy is to use a learned bottleneck that extracts only the most useful visual information.
+  Two influential examples are:
+  \begin{enumerate}
+    \item \textbf{BLIP-2: Q-Former}: BLIP-2\footnote{Note that it is not the same as BLIP.} freezes the image encoder and the LLM, and inserts a lightweight Querying Transformer (Q-Former) between them (This is exactly what is trained.). 
+    A small number of learned query tokens attend to the image features and compress them into a compact set of visual representations that the LLM can use. 
+    This is a cleaner alignment mechanism than a bare linear projector.
+
+    \begin{verbatim}
+    image -> frozen image encoder 
+    -> Q-Former -> linear projection -> frozen LLM
+    \end{verbatim}
+
+    Querying bottleneck: the Q-former is a trainable transformer module placed between the frozen image encoder and the frozen LLM. Its job is to extract a fixed number of visual features from the image encoder output, independent of image resolution.
+    Architecturally, the paper says Q-Former has two transformer submodules that share the same self-attention layers: an image transformer that interacts with the frozen image encoder, and a text transformer that can operate as a text encoder or decoder.
+
+    \textbf{Conceptually:} BLIP-2: use learned latent queries to read from visual tokens first, then pass only the compressed result onward.
+
+    The inputs to the Q-Former are (1) sequence of visual features output by frozen image encoder $F \in \R^{M \times d_v}$. 
+    (2) Self defined small set of learnable query tokens (32 queries each dimension 768) These query embeddings are model parameters, just like a learned prompt $Q^{(0)} \in \R^{K \times d_q}$.
+    The image features are not treated as ordinary input tokens to be mixed directly into one long sequence at the beginning. Instead, the query tokens attend to the frozen image features through cross-attention.
+    Specifically: suppose that at some layer the current hidden states of the learned query tokens are $H \in \R^{K \times d}$, and the frozen image features are the previous $F$.
+    \begin{align*}
+      Q_{\text{attn}} &= H W_{Q} \\
+      K_{\text{attn}} &= F W_{K}, \quad V_{\text{attn}} = F W_{V}. \\ 
+      \text{Attn}(H, F) &= \text{Softmax}\rbrac{\frac{Q_{\text{attn}}K^{\top}_{\text{attn}}}{\sqrt{d_k}}}V_{\text{attn}}
+    \end{align*}
+
+    \textbf{Training:} 2-steps: (1) vision-language representation learning: Here, the Q-Former is attached to the frozen image encoder, but not yet really used as a generative interface to the LLM. The goal is to make the learned queries extract visual information that is strongly aligned with text. The paper describes this as teaching the Q-Former to learn visual representation most relevant to the text.
+    (2) vision-to-language generative learning: Now the Q-Former output is linearly projected into the frozen LLM's embedding space and used as soft prompts. The goal here is different: the representation is no longer only ``text-aligned'', it must become interpretable by the LLM as a conditioning signal for generation.
+
+    Stage 1 teaches what visual information to extract; Stage 2 teaches how to present it to a frozen LLM.
+
+    \textbf{More details on Stage 1:} BLIP-2 uses image-text pairs $(x, y)$, no frozen LLM, image $x$ goes through visual encoder and becomes embedding $F$, which later interacts with query embeddings $Q^{(0)}$ and output summary $Z \in \R^{32 \times 768}$.
+    Text $y$ goes through text tokenizer and Q-former text transformer and becomes hidden vector, where $t \in \R^{768}$ is defined as the output embedding of [CLS] token (text representation). 
+    It is a single vector summarizing the whole text sequence.
+    (1) ITC: Image-Text Contrastive Learning: BLIP-2 wants the image representation and text representation to be close for matched pairs and far for mismatched pairs.
+    In image-text contrastive learning, BLIP-2 aligns $Z$ with $t$, specifically, it computes similarity between each query output $z_i$ with $t$ then takes the highest one as the image-text similarity.
+    Then over the minibatch, BLIP-2 contrasts the score of the true pair $(x, y)$ against mismatched pairs using in-batch negatives. (Contrastive Loss)
+
+    (2) ITG: Image-grounded Text Generation: Generate text conditioned on image queries. The attention mask is causual.
+    So this is literally just language modeling conditioned on the query outputs. (Language Modelling loss)
+
+    (3) ITM: Image-Text Matching: Instead of computing similarity separately, the model lets the queries interact with the text tokens. Then do a binary classification to predict whether they are a pair. (Binary classfication loss.)
+
+    Each loss teaches the query vectors a different property.
+  
+
+    \item \textbf{Flamingo: Perceiver Resampler + cross-attention:} Flamingo also bridges a pretrained vision model and a frozen language model, but uses a Perceiver Resampler to convert visual features into a fixed-size set of latent visual tokens. Then it inserts newly trained cross-attention layers inside the language model so the text stream can attend to visual memory while generating text. Flamingo was explicitly designed to handle interleaved text and visual inputs, including images and videos.
+    
+    \textbf{Details:}
+    Imagine that the original prompt is a mixture of images and texts
+    \begin{lstlisting}
+      (image_1, "This is a dog.", image_2, "What animal is this?")
+    \end{lstlisting}
+    Flamingo converts the text side into something like 
+    \begin{lstlisting}
+      <image> This is a dog. <image> What animal is this?
+    \end{lstlisting}
+    and then tokenizes that text. 
+    Meanwhile, each image is processed separately by the visual stack.
+    A subtle but very important point: Flamingo later uses a masking rule so that each text token directly cross-attends only to the visual tokens of the most recent preceding image.
+    Each image $\mI^m \in \R^{H \times W \times C}$ is handled separately by the pretrained frozen vision encoder and results in the spatial visual features $\mX_f^m \in \R^{S_m \times d_v}$, before it is sent to the perceiver resampler. \footnote{For video, frames are sampled at 1 FPS and encoded independently before being concatenated downstream.} \textbf{In Flamingo, the vision encoder is a frozen feature extractor.}
+
+    \textbf{Details on Perceiver Resampler:}
+    An image or video may produce too many raw visual features, but the language model wants a manageable number of visual tokens.
+    So the Perceiver Resampler compresses a variable-size set of visual features into a fixed-size set of learned visual tokens. This is one of Flamingo's key ideas.
+    For video, the input can be regarded as $\mX_f \in \R^{T \times S \times d_v}$, for an image we just take $T=1$ which means that the number of frames is $1$. $S$ stands for the number of spatial locations per frame.
+    Then module also uses (1) learned time pos embeddings $e \in \R^{T \times 1 \times d}$ for frames, (2) $R$ learned latent queries, with shape $\R^{R \times d_v}$.
+
+    \begin{lstlisting}
+      def perceiver_resampler(
+        x_f,  # The [T, S, d] visual features (T=time, S=space)
+        time_embeddings,  # The [T, 1, d] time pos embeddings.
+        x,  # R learned latents of shape [R, d]
+        num_layers,  # Number of layers
+      ):
+  
+        """The Perceiver Resampler model."""
+        # Add the time position embeddings and flatten.
+          x_f = x_f + time_embeddings
+          x_f = flatten(x_f)  # [T, S, d] -> [T * S, d]
+        # Apply the Perceiver Resampler layers.
+        for i in range(num_layers):
+          # Attention.
+          x = x + attention_i(q=x, kv=concat([x_f, x]))
+          # Feed forward.
+          x = x + ffw_i(x)
+        return x
+    \end{lstlisting}
+    (Flamingo concatenates the learned latents into the keys and values together with the visual features, and that this performed slightly better in their experiments.)
+
+    The output is $\mZ \in \R^{R \times d}$, which is a fixed number of visual tokens, regardless of image resolution or video length.
+    In the paper, the motivation is exactly to reduce the cost of vision-text cross-attention; in practice they use a small fixed number, stated as 64 outputs.
+    Those $\mZ$ are stored as visual memory.
+
+    \textbf{Details on GATED XATTN-DENSE block:}
+    This is the component that lets the language model look at the visual tokens.
+    The paper inserts these blocks between frozen LM layers. Each such block: (1) lets language states cross-attend to visual tokens, (2) passes the result through a feed-forward layer, (3) gates the new branch so that the original pretrained LM is not disturbed at initialization.
+    \begin{lstlisting}
+      def gated_xattn_dense(
+        y,  # input language features (L, d)
+        x,  # input visual features (R, d)
+        alpha_xattn, # xattn gating parameter - init at 0.
+        alpha_dense, # ffw gating parameter - init at 0.
+      ):
+      """Applies a GATED XATTN-DENSE layer."""
+      # 1. Gated Cross Attention
+        y = y + tanh(alpha_xattn) * attention(q=y, kv=x)
+      # 2. Gated Feed Forward (dense) Layer
+        y = y + tanh(alpha_dense) * ffw(y)
+      # Regular self-attention + FFW on language
+        y = y + frozen_attention(q=y, kv=y)
+        y = y + frozen_ffw(y)
+      return y  # output visually informed language features
+    \end{lstlisting}
+    Line $9$: In Flamingo, when multiple images are present, this is the stage where the image-aware masking is applied so each text position directly reads only the relevant preceding image's visual tokens.
+    The residual connection is there because the block is not replacing the language state. It is adding a visually informed correction to it.
+    This keeps the language stream stable and compatible with the pretrained LM. That is exactly the spirit of Flamingo: preserve the frozen LM behavior and inject visual information additively.
+    Third, the frozen LM layers let the model continue standard language modeling while preserving the pretrained linguistic competence of the base LM.
+    Refer to Figure 3 of the original paper for more details.
+
+    \paragraph{Why not a separate projector:} The output of the Perceiver Resampler is used directly as the visual input to the GATED XATTN-DENSE block. There is no need for projection because the cross-attention layer already contains the needed projection mechanism. In Flamingo, the Perceiver Resampler is not just a compression gadget. It is one of the two learnable components that bridge the frozen vision encoder and the frozen language model.
+
+    \paragraph{How to obtain the latents:} The latent queries are learned jointly with the Resampler parameters during multimodal training.
+  \end{enumerate}
 \end{itemize}
+
+
+\paragraph{Training Recipe:}
+\begin{enumerate}
+  \item \textbf{Text LLM pretraining:} Pretrain the language model on text.
+  \item \textbf{Vision encoder pretraining:} Start from a strong vision encoder.
+  \item \textbf{Bridge:} Connect the visual stream to the LLM. This connector can be a simple projector, a resampler, cross-attention, or some other bridge.
+  \item \textbf{Aligment:} Do multimodal pretraining / alignment with a text objective (Train on image-text data, not raw text alone.). (Qwen2-VL: both text and image tokens appear in training, but supervision is only provided for the text tokens.) --> The image is just conditioning context.
+  \item \textbf{Multimodal SFT:} After coarse alignment, run supervised fine-tuning (SFT) on instruction-style data: image + question/instruction + answer.
+  \item Optionally do preference tuning / RL-style post-training.
+\end{enumerate}
 
 
 
