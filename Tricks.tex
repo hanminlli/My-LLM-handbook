@@ -3658,6 +3658,41 @@ This is the central design problem in multimodal LLM input pipelines.
 \end{enumerate}
 
 
+\subsection{How to make LLMs understand videos}
+The simplest and most common mental model is: 
+\begin{enumerate}
+  \item sample frames from the video.
+  \item run an image encoder on each frame.
+  \item attach some notion of temporal position / timestamp.
+  \item pool / resample / compress the resulting tokens.
+  \item feed them to the LLM through a \textbf{projector} or \textbf{cross-attention}.
+\end{enumerate}
+
+Modern video LLMs differ mainly in whether time is modeled before the LLM, at the bridge, or inside the multimodal interaction layers.
+
+\begin{enumerate}
+  \item \textbf{Family A (frame-as-image + temporal aggregation):} most current and most common public recipe.
+  \item Many recent open video LMMs still look like ``strong image VLM + video sampling/compression tricks + projector + LLM,'' rather than a completely new native video architecture.
+  LLaVA-Video builds on LLaVA-OneVision with a vision encoder plus LLM and explicit video representation choices, and Video-XL explicitly says it inherits the minimal LLaVA design of visual encoder + projector + LLM. Qwen2.5-VL also adds video support through dynamic FPS and absolute time encoding rather than abandoning the VLM paradigm.
+
+  \item \textbf{Family B: native spatiotemporal video encoder: (treats video as a first class modality)} ViViT and TimeSformer are still important and conceptually clean, but they were introduced as video-understanding backbones that model space and time directly, not as the dominant full-stack recipe for modern video assistants. In practice, this family is more ``specialized and principled''.
+  
+  \item \textbf{Family C: compressed visual memory + cross-attention into the LLM:} Flamingo remains a foundational design because it explicitly supports images and videos via learned visual bridging and cross-attention.
+\end{enumerate}
+
+We will now review family A since its most commonly used.
+This family actually starts from the very pragmatic observation that we already have very strong image encoders and image-VLM training pipelines.
+So instead of designing a native video model first, we sample the video into frames or short clips, encode them with an image backbone, inject temporal information, compress the result, and let the LLM reason over that compressed sequence.
+So after per-frame encoding we have something like a tensor in $\R^{T \times N \times d_v}$ with $T$ sampled frames, $N$ visual tokens per frame, and hidden size $d_v$.
+Then we add temporal structure: timestamps, frame indices, slow/fast grouping, temporal pooling, or a temporal projector.
+And finally map to the LLM dimension $\dmodel$.
+Qwen2.5-VL explicitly highlights dynamic FPS training and absolute time encoding for video; LLaVA-Video describes a SlowFast-style representation to balance frame count and token budget.
+
+The main weakness is that time is not native at the front end. If you sample poorly, you lose the event. If the motion is subtle, frame-wise image features may miss it. Apollo's design study is useful here: it reports that FPS-based sampling beats uniform frame sampling, and that Perceiver Resampler beats average pooling, which is a strong hint that in these systems the bottleneck is often not ``language reasoning'' but ``how you preserve temporal evidence under a token budget''.
+
+\paragraph{Dynamic FPS training:} 
+
+
 
 \section{Miscellaneous}
 
