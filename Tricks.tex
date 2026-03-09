@@ -621,6 +621,21 @@ Now define the rotated vector:
 \end{align}
 where $\mR(l)$ is a block diagonal rotation matrix built from $\nicefrac{\dhead}{2}$ rotation blocks, this can be intepreted as if we rotate clockwisely for angle $t$ and counter-clockwisely for angle $s$, the combination of the result is to rotate clockwisely for angle $t-s$.
 
+
+\paragraph{Difference:}
+The core difference between RoPE and Sinusoidal is where and how the position information enters the model.
+For sinusoidal, we create a position vector for each index $p$ and we add it to the token embedding at the input.
+\begin{align*}
+  \mx_p^\prime = \mx_p + \text{PE}(p).
+\end{align*}
+So the embedding is additive and usually treated as an absolute postion encoding.
+And it is usually applied before the transformer layers.
+
+But for RoPE, we do not add a position vector to the token embedding, instead, we apply a position-dependent rotation to the query and key vectors inside the attention.
+
+With sinusoidal embedding, position is given to the model as an input feature, while for RoPE, position is built directly into the attention score, which makes RoPE naturally encodes relative position differences.
+
+
 \paragraph{Key result:}
 When computing attention, the score between query at position $s$ and key at position $t$ is 
 \begin{align}
@@ -3691,6 +3706,56 @@ Qwen2.5-VL explicitly highlights dynamic FPS training and absolute time encoding
 The main weakness is that time is not native at the front end. If you sample poorly, you lose the event. If the motion is subtle, frame-wise image features may miss it. Apollo's design study is useful here: it reports that FPS-based sampling beats uniform frame sampling, and that Perceiver Resampler beats average pooling, which is a strong hint that in these systems the bottleneck is often not ``language reasoning'' but ``how you preserve temporal evidence under a token budget''.
 
 \paragraph{Dynamic FPS training:} 
+The problem it tries to solve is simple: a video can be sampled at very different rates.
+The same 10 seconds event can be represented by 10 frams at 1 FPS or 20 frames at 20 FPS.
+If a model is always trained at one fixed sampling rate it tends to become brittle when inference uses another one.
+Qwen2.5-VL explicitly addresses this by introducing dynamic FPS sampling / training, described as extending dynamic resolution into the temporal dimension so the model can handle videos with varied sampling rates.
+The paper also says they dynamically sampled FPS during training to make the training distribution over FPS more even.
+
+This is to make the model aware that ``video understanding'' should be robust to whether frames were taken every 1 second, every 0.5 seconds, or at some other interval. That improves generalization to different video lengths, different motion speeds, and different inference-time token budgets. \footnote{Right now, most video LLMs samples only at 1-8 FPS, while human visual system behaves like a 60-100 FPS sensor. This is far below human temporal resolution, which means that they probably relies more on semantic redundancy rather than true motion understanding.}
+
+But dynamic FPS training alone is not enough.
+It tells the model to survive different sampling rates, but it does not by itself tell the model the real elapsed time between sampled frames.
+That is exactly why absolute time encoding is introduced.
+
+
+\paragraph{Absolute time encoding}
+Older frame-based schemes often use temporal positions like $1, 2, \hdots, T$ which tells the model about the order, but not real time.
+This does not account for content speed changes or the absolute timing of events.
+Qwen2.5 VL's fix is to align the temporal component of MRoPE to absolute time.
+Instead of saying only ``this is the next frame'', the model gets a temporal encoding whose intervals reflect real timestamps.
+The paper states that by aligning MRoPE IDs directly with timestamps, the model can understand tempo through the intervals between temporal IDs, without adding extra grounding heads.
+This is crucial for questions like: What happens around 1 minute 35 seconds?
+The benefits are two fold: first: it helps with tempo: fast-changing and slow-changing clips are no longer temporally ambiguous. Second, it helps with temporal localization: the model can better map language about time to actual moments in the video.
+
+\paragraph{MRoPE}
+This refers to Multimodal extension of the Rotary Position Embedding.
+In Qwen2-VL, this is the multimodal extension of 1D RoPE: instead of having only one positional axis, it splits the positional encoding for visual tokens into three components: temporal, height and width.
+
+\begin{enumerate}
+  \item For \textbf{text} tokens, the three position IDs are set identically, so it behaves like standard 1D RoPE.
+  \item For \textbf{images}, the temporal ID is fixed while height/width vary by patch location
+  \item For \textbf{videos}, height / width vary within each frame and the temporal ID changes across frames.
+\end{enumerate}
+
+
+\paragraph{SlowFast-style representation}
+This is about how we spend our token budget.
+The original SlowFast idea from video recognition is: use two pathways.
+A Slow pathway runs at low frame rate and focuses on spatial semantics; a Fast pathway runs at high frame rate and focuses on motion, while being lightweight.
+For video LLMs, the same idea gets adapted into a token-budget strategy.
+
+Usually, we cannot afford: (1) many frames (2) each with many spatial tokens (3) all at once.
+
+So we compromise: (1) for a small subset of important frames, keep more spatial detail, (2) for many other frames, keep less spatial detail but more temporal coverage.
+
+LLaVA-Video uses the same general idea in a more implementation-oriented form. 
+It says it follows the classic SlowFast idea to balance the number of frames against the number of visual tokens under limited LLM context and GPU memory. 
+It divides frames into slow and fast groups, and applies different pooling rates to the two groups. 
+In other words, some frames are represented richly, others more cheaply.
+
+
+\subsection{How LLM understand audio}
 
 
 
