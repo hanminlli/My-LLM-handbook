@@ -3756,7 +3756,29 @@ In other words, some frames are represented richly, others more cheaply.
 
 
 \subsection{How LLM understand audio}
+For the previous mentioned family A: a general patter is that 
+\begin{verbatim}
+modality encoder + alignment / connector + LLM.
+\end{verbatim}
+In that sense, for audio you usually replace the vision encoder with an audio encoder, then use a projector / pooler / Q-Former-like connector to map audio features into something the LLM can condition on.
+This is exactly the basic architecture used by models such as Qwen-Audio / Qwen2-Audio and SALMONN. Qwen2-Audio is described as an audio encoder + large language model.
 
+There are two importants caveats.
+\begin{enumerate}
+  \item Audio is often more \textbf{temporally dense} than images or short videos. 
+  Audio models often need stronger temporal compression than image models.
+  In Qwen2-Audio, raw waveform is resampled to 16 kHz, converted to a 128-channel mel spectrogram, and even after pooling, each encoder output frame still corresponds to only about 40 ms of original audio. So long audio produces very long feature sequences very quickly.
+
+  \item Second, ``audio'' is not one single semantic type.
+  It may contain speech content, speaker identity, prosody/emotion, music structure, and non-speech events all at once.
+  Because of that, some systems use \textbf{multiple audio encoders} rather than a single one. 
+  SALMONN is a clean example: it combines a Whisper speech encoder with a BEATs audio encoder, then fuses them through a window-level Q-Former before passing them to the LLM.
+\end{enumerate}
+
+\paragraph{Pooling}
+Sometimes we see pooling a lot in relevant papers: this term simply means that we take many nearby features/tokens and compress them into fewer features/tokens by aggregation.
+The usual purpose is simple, to reduce sequence length while keeping most of the useful information.
+In multimodal LLMs, pooling is often a compute-saving compression step before the modality features are handed to the LLM.
 
 
 \section{Miscellaneous}
