@@ -3781,6 +3781,109 @@ The usual purpose is simple, to reduce sequence length while keeping most of the
 In multimodal LLMs, pooling is often a compute-saving compression step before the modality features are handed to the LLM.
 
 
+\subsection{Generateing Images}
+
+A modern multimodal assistant that can ``draw an image'' often works like this
+\begin{lstlisting}
+[user prompt] -> [LLM] -> [structured image prompt / tool args] -> [image model] -> [image]
+\end{lstlisting}
+The LLM may do things like: (1) infer missing details, (2) resolve ambiguity, (3) maintain conversation context, (4) apply safety rules, (5) decide aspect ratio / style / number of images, (6) send a refined prompt to the image model.
+
+So in that sense, the LLM is the controller or brain.
+But the actual image synthesis is usually done by a different model, for example a diffusion model.
+
+\paragraph{How can a model output images}
+
+There are two types of models:
+\begin{itemize}
+  \item \textbf{Autoregressive image generation:} The idea is that we first convert an image into a sequence of discrete visual tokens, and then we train a transformer to predict those tokens one by one.
+  This is very similar to LLM, because it is still next-token prediction, just over visual tokens instead of words.
+
+  \paragraph{Typical Recipe:} (1) Train an image tokenizer, often with something like VQ-VAE / VQGAN. (2) Represent each image as a grid/sequence of codebook indices. (3) Train a transformer conditioned on text to autoregressively predict these indices. (4) Decode the indices back to pixels.
+
+  Typically, we have long token sequences for images, and the sampling is slow. Historically, it results in weaker image quality than strong diffusion systems.
+
+  \item \textbf{Diffusion / flow-style generation:} This is the dominant idea for high-quality image generation\footnote{More precisely, today it is usually diffusion or a very close relative such as flow matching / rectified-flow-style models.}.
+  The idea is that instead of predicting image tokens one by one, we ask the model to learns to iteratively denoise a noisy image latent.
+\end{itemize}
+
+
+Top level facts: (1) Diffusion learns a reverse stochastic process from noise to data. (2) Flow matching / rectified flow learns a deterministic ODE flow from noise to data.
+
+Let $p_{\text{data}}$ be the target data distribution on $\R^d$, for images $d = HWC$ in pixel space, or much more commonly in practice, $d$ is the dimension of a learned latent code\footnote{Latent diffusion models explicitly move the diffusion process into latent space for efficiency, and use cross-attention to inject text conditioning.}.
+
+\paragraph{Diffusion Models}
+The core idea is 
+\begin{enumerate}
+  \item Define a forward process that gradually destroys structure by adding noise.
+  \item Learn a reverse process that gradually removes the noise.
+  \item To generate a sample, start from pure noise and run the learned reverse process.
+\end{enumerate}
+So baically, the diffusion models turn the hard problem of sample $x_0 \sim p_{\text{data}}$ into many easier local denoising problems.
+
+\paragraph{The forward diffusion process}
+The forward process is fixed, at each step, we add a small amount of Gaussian noise to the data sample (we will use $x_0$ to denote the initial clean data sample).
+\begin{align*}
+  q(x_t \mid x_{t - 1}) = \cN (x_t; \sqrt{\alpha_t} x_{t-1}, \beta_t \mI_d),
+\end{align*}
+We are taking the mean as a scaled version of the previous state, $\alpha_t = 1 - \beta_t$, this gradually destroys information over time. 
+$\beta_t$ controls the amount of noise added.
+This is equivalent to the sampling equation 
+\begin{align*}
+  x_t = \sqrt{\alpha_t} x_{t - 1} + \sqrt{\beta_t}\epsilon, \quad \epsilon \sim \cN(0, \mI_d).
+\end{align*}
+After many steps, the sample becomes almost pure Gaussion noise.
+A very important fact is that we can write $x_t$ as a noisy version of $x_0$,
+\begin{align*}
+  q(x_t \mid x_0) = \cN (x_t; \sqrt{\bar{\alpha}_t}x_0, (1 - \bar{\alpha}_t)\mI_d).
+\end{align*}
+where $\bar{\alpha}_t$ is defined as 
+\begin{align*}
+  \bar{\alpha}_t \eqdef \prod_{s=1}^{t} \alpha_s.
+\end{align*}
+This matters because during it means that during training, we do not need to simulate the whole chain step by step. We can sample a random $t$ and construct $x_t$ directly from $x_0$.
+
+
+\paragraph{The reverse process: the real generative model}
+The reverse process is what we learn.
+Let $x_{0:T}$ be the whole collection of $\cbrac{x_0, x_1, \hdots, x_T}$.
+The diffusion model defines a joint distribution over the whole reverse trajectory:
+\begin{align}
+  \label{eq:denoising}
+  p_{\theta}(x_{0:T}) = p(x_T)\cdot \prod_{t=1}^T p_{\theta}(x_{t-1} \mid x_t).
+\end{align}
+Here $\theta$ is the trainable parameter, $x_T$ is the starting point of the reverse process, which is standard Gaussian noise: 
+\begin{align*}
+  p(x_T) = \cN(x_T; 0, \mI_d).
+\end{align*}
+This means that before any denoising happens, the state $x_T$ is sampled from a standard normal distribution.
+From (\ref{eq:denoising}), we know that once $x_T$ is sampled, we repeatedly sample $x_{t-1}$ from $p_{\theta}(x_{t-1}\mid x_t)$, as we are gradually denoising.
+This formula is built upon the underlying Markov assumption.
+
+Note that the true object we care about is the $x_0$, but not the whole chain.
+So after defining the joint data distribution $p_{\theta}(x_{0:T})$, we obtain the model's distribution on clean samples by marginalizing out the intermediate states:
+\begin{align*}
+  p_{\theta}(x_0) = \int p_{\theta}(x_{0:T}) dx_1 \hdots dx_T.
+\end{align*}
+This basically means that in order to compute the probability of a clean sample $x_0$, we must account for all possible noisy trajectories that could have led to it.
+
+
+\paragraph{How do we generate a sample in practice?}
+
+\begin{enumerate}
+  \item Step 1: sample pure noise: $x_{T} \sim \cN(0, \mI)$, which gives a completely random Gaussian vector. 
+  \item Step 2: denoise one step, and repeat: $x_{T-1} \sim p_{\theta}(x_{T - 1} \mid x_T)$, and repeat.
+  \item Step 3: Output the final clean sample.
+\end{enumerate}
+
+One might ask, how do we actually parametrize $p_{\theta}(x_{t-1} \mid x_t)$?
+A conditional probability distribution can be very complicated.
+The standard choice is to assume $p_\theta(x_{t-1} \mid x_t)$ is Gaussian.
+
+
+\textbf{Unfinished.}
+
+
 \section{Miscellaneous}
 
 \subsection{Chinchilla Optimality}
@@ -4576,6 +4679,258 @@ GRPO baseline is the group mean. If the group is small or low-diversity, the mea
   \end{enumerate}
 \end{itemize}
 
+
+
+\section{Megatron}
+
+\textbullet~ Megatron-Core: the modular library of distributed-training components.
+
+\textbullet~ Megatron-LM: the reference training framework built on top of Megatron Core with ready-made scripts and recipes.
+
+Megatron exists to train Transformer models that are too large, too deep, or too sequence-heavy for a single GPU or even a naïve multi-GPU setup.
+Megatron Core provides composable building blocks for Transformer training together with multiple parallelism strategies that can be combined across many GPUs.
+The most important ones to understand first are data parallelism (DP), tensor parallelism (TP), pipeline parallelism (PP), context parallelism (CP), and expert parallelism (EP).
+
+Typical usage:
+
+\textbullet~ Forward TP:	 All-Gather
+
+\textbullet~ Backward TP:	Reduce-Scatter
+
+\textbullet~ Data Parallel Gradients:	All-Reduce
+
+\paragraph{Two styles of pipeline parallelism}
+\begin{enumerate}
+  \item \textbf{GPipe style:} Do all forward microbatches first, then all backward.
+  \item \textbf{1F1B (one-forward-one-backward):} After warmup, alternate forward and backward more tightly.
+\end{enumerate}
+
+Megatron commonly uses 1F1B-style scheduling, because it is more memory-efficient and practical at scale.
+
+\paragraph{Context Parallelism}
+With context parallelism, we split the sequence length across GPUs.
+So instead of each rank storing the full sequence, each rank stores a chunk of the context.
+
+Motivation: Long context is expensive because activations and attention memory grow strongly with sequence length.
+Even when the model itself fits, the activation memory for long sequences may not fit.
+
+CP is mainly a solution of long sequence training, activation memory pressure from sequence length and scaling to larger context windows.
+
+The hidden states are partitioned along sequence dimension.
+However, this introduces a problem for attention computation. 
+In self-attention, each token can attend to many other tokens.
+So CP requires communication to make attention work across partitioned sequence chunks.
+This is due to that even though tokens are sharded, attention dependency is global over the context window.
+So CP introduces communication around K/V or attention-related states so that each shard can attend correctly.
+
+TP splits \textbf{features}. CP splits \textbf{tokens}.
+
+
+\paragraph{Combined Parallelism}
+One of the main strengths of Megatron is these strategies are not alternatives in a menu.
+They are meant to be composed.
+
+A typical world size decomposition looks like: 
+\begin{verbatim}
+  world size = TP x PP x DP.
+\end{verbatim}
+
+
+The role of ``parallel\_state'': The official API docs describe it as the place that manages ranks and groups for tensor, data, context, pipeline, and expert model parallelism.
+
+Before training can begin, Megatron must answer questions like:
+\begin{enumerate}
+  \item Which ranks are in my tensor-parallel group?
+  \item Which ranks are in my pipeline stage group?
+  \item Which ranks are data-parallel replicas of each other?
+  \item If I am an MoE rank, what is my expert group?
+  \item If context parallelism is enabled, who shares my sequence partition?
+\end{enumerate}
+
+
+\paragraph{Activation Checkpointing:}
+During a normal forward pass, the model computes many intermediate tensors, called \boxtext{activations}, and keeps them in memory because the backward pass will need them to compute gradients.
+
+With activation checkpointing, we do not save all of those intermediate activations.
+Instead, we save only a small subset of them, called checkpoints.
+Then, during backward, when some missing activation is needed, we recompute it by rerunning part of the forward pass.
+So the tradeoff is between less GPU memory and more computation time.
+This is mainly to reduce the amount of memory needed by activations, which can be huge if the model is deep, the sequence length is long or the batch size is large.
+A simple example would be 
+\begin{align*}
+  x \mapsto f_1 \mapsto f_2 \mapsto f_3 \mapsto f_4 \mapsto y,
+\end{align*}
+Without checkpointing, we need to store $f_1(x), f_2, f_3,  f_4$, so backward can use them directly.
+With gradient checkpointing, we may only store $x, f_2, y$, then during backward, if we need the output of $f_3$, we recompute it from the nearest saved point.
+Basically we are replacing memory usage with recomputation.
+
+In practice, once models become moderately large, people very often combine data / tensor / pipeline parallelism, mixed precision and activation checkpointing.
+
+In practice, \boxtext{activation checkpointing} and \boxtext{gradient checkpointing} usually means the same thing.
+
+
+
+\paragraph{Prelinminaries:}
+
+\begin{enumerate}
+  \item \begin{lstlisting}
+    parallel_state.initialize_model_parallel():
+  \end{lstlisting}
+  After initializing PyTorch distributed, Megatron Core is initialized with model-parallel settings, including tensor-model-parallel and pipeline-model-parallel sizes.
+  It read the desired decomposition of the world, builds the process groups for TP, PP, DP, and possibly others and stores rank/group metadata so later modules know how to communicate.
+
+  \item \begin{lstlisting}
+    TransformerConfig():
+  \end{lstlisting}
+  This is the model-level object we instantiate for a GPT-style stack. In Megatron, the ``model'' is not just a plain PyTorch stack. 
+  Its layers and execution are aware of the distributed topology. 
+  So when we instantiate a Megatron model, we are not merely allocating tensors; we are instantiating a distributed computation structure.
+
+  \item Forward Step functions: Megatron Core uses schedules.py to run the model. Define a forward step function that takes the \boxed{\text{data iterator}} and \boxed{\text{the model}} as input and produces the \boxed{\text{output}} tensor and a \boxed{\text{loss function}}.
+  \begin{lstlisting}
+    def forward_step_func(data_iterator, model):
+      # pass 
+      return output_tensor, partial(loss_func, loss_mask)  
+  \end{lstlisting}
+  The partial creates something behaving like:
+  \begin{lstlisting}
+    def reduced_loss_func(output_tensor):
+      return loss_func(loss_mask, output_tensor)
+  \end{lstlisting}
+
+  \item Distributed Checkpoint: Megatron Core uses distributed checkpoints for loading and saving models.
+  This allows you to convert the model from one parallel setting to another when you load it. For example, a model trained with tensor parallel size 2, can be loaded again as a tensor model with parallel size 4.
+  \begin{lstlisting}
+    def save_distributed_checkpoint(checkpoint_path, gpt_model):
+      sharded_state_dict = gpt_model.sharded_state_dict(prefix='')
+      dist_checkpointing.save(sharded_state_dict=sharded_state_dict, 
+      checkpoint_dir=checkpoint_path)
+
+  def load_distributed_checkpoint(checkpoint_path, gpt_model):
+      sharded_state_dict=gpt_model.sharded_state_dict(prefix='')
+      checkpoint = dist_checkpointing.load(sharded_state_dict=
+      sharded_state_dict, checkpoint_dir=checkpoint_path)
+      gpt_model.load_state_dict(checkpoint)
+      return gpt_model
+  \end{lstlisting}
+\end{enumerate}
+
+
+\paragraph{Context parallel package}
+Context Parallelism (``CP'') is a parallelization scheme on the dimension of sequence length. Unlike prior SP (sequence parallelism) which only splits the sequence of Dropout and LayerNorm activations CP partitions the network inputs and all activations along sequence dimension.
+
+With CP, all modules except attention (e.g., Linear, LayerNorm, etc.) can work as usual without any changes, because they do not have inter-token operations.
+
+As for attention:
+\begin{enumerate}
+  \item The $\mQ$ of each token needs to compute with the KV (key and value) of all tokens in the same sequence.
+  Hence, CP requires additional all-gather across GPUs to collect the full sequence of $\mK, \mV$.
+  Correspondingly, reduce-scatter should be applied to the activation gradients of $\mK, \mV$ in backward propagation.
+  (Recall that in forward, every rank temporarily used the full $\mK, \mV$. In backward, gradients with respect to $\mK, \mV$ are produced from all those attention computations. However, each original $\mK, \mV$, chunk belongs to one owning rank, so the gradients must be accumulated and sent back to the correct owner.)
+
+  A small example would be when computing attention forward, imagine we have 2 GPUs, we initially have 
+  \begin{verbatim}
+    GPU0: Q0, K0, V0 
+    GPU1: Q1, K1, V1
+  \end{verbatim}
+  To compute the attention, we need to call all\_gather, after which the situation becomes 
+  \begin{verbatim}
+    GPU0: Q0, [K0, K1], [V0, V1] --> computing O0
+    GPU1: Q1, [K0, K1], [V0, V1] --> computing O1
+  \end{verbatim}
+  When the backward happens, the loss gradient arriving from above is 
+  \begin{verbatim}
+    GPU0: d L / d O0
+    GPU1: d L / d O1
+  \end{verbatim}
+  Right now, on GPU0, contributions to the gradient of $\mQ_0$, $\mK_0$, $\mV_0$, $\mK_1$, $\mV_1$ will be generated, we write the chain rule formula 
+  \begin{align*}
+    \frac{\partial L}{\partial \mQ_0} &= \frac{\partial L}{\partial \mO_0} \cdot \frac{\partial \mO_0}{\partial \mQ_0} \\
+    \frac{\partial L}{\partial \mK_0} &= \frac{\partial L}{\partial \mO_0}\frac{\partial \mO_0}{\partial \mK_0} + \frac{\partial L}{\partial \mO_1}\frac{\partial \mO_1}{\partial \mK_0}.
+  \end{align*}
+  The contribution of $\mQ_0$ in gradient can be easily computed, however, for $\mK_0$, it participates also the computation of $\mO_1$ on GPU1, which requires us to do first reduce (sum), and then scatter \footnote{These matrix products are really backprop shorthand, not strict elementary scalar chain rule notation.}.
+
+  \item An important memory optimization: during forward, each rank stores only its local $\mK, \mV$ activations rather than permanently storing the full-sequence $\mK, \mV$. In backward, the needed $\mK, \mV$ are gathered again, which preserves the memory benefits of CP.
+  
+  \item CP is enabled by simply setting context\_parallel\_size=<CP\_SIZE> in command line.
+  
+  \item All-gather and reduce-scatter are implemented under the hood as point-to-point communication in a ring topology. This implementation is optimized.
+  Logically, the model still needs the effect of all-gather and reduce-scatter. Physically, that communication can be carried out as staged ring exchanges for better efficiency.
+
+  \item The docs explicitly point out that CP benefits from MQA and GQA because those attention variants reduce the number of key/value heads, which reduces the size of communicated $\mK,\mV$ tensors.
+  
+  \item \textbf{Why CP is useful for long context?} Long-context training often becomes memory-bound because activation memory grows with sequence length.
+  Full activation recomputation can add around 30\% overhead, while simply increasing tensor parallelism can also become inefficient because communication becomes harder to hide. CP is presented as a better fit when the real bottleneck is sequence length.
+
+  The underlying idea is simple: TP helps when layers are too large, CP helps when sequences are too long.
+  With CP size $C$, each GPU owns about $1/C$ of the sequence, so activation memory per GPU drops accordingly, while the communication is focused mainly around attention rather than every part of the model.
+  
+\end{enumerate}
+
+A somewhat more complicated example is the following: 2 TP + 2 CP, this is presented in the Nvidia's Megatron docs.
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\linewidth]{Figures/CP_overview.png}
+  \caption{2 TP + 2 CP}
+  \label{fig:cp_overview}
+\end{figure}
+
+TP groups: (GPU0, GPU1) for seq chunk 0, and (GPU2, GPU3) for seq chunk 1.
+This means that GPU0 and GPU1 both work on the same local sequence chunk, but with different TP shards. GPU2 and GPU3 do the same for the other sequence chunk.
+GPU0 exchanges context information with GPU2, GPU1 exchanges context information with GPU3.
+
+Suppose the input hidden states are $\mX \in \R^{B \times S \times H}$, with CP$=2$, the sequence is split into two chunks:
+\begin{align*}
+  \mX^0 \in \R^{B \times \frac{S}{2} \times H}, \quad \mX^1 \in \R^{B \times \frac{S}{2} \times H}.
+\end{align*}
+
+\paragraph{The first yellow AG / RS: TP-side activation layout bookkeeping}
+These yellow boxes are best understood as the TP-side communication/layout transitions that appear when Megatron combines TP with sequence-parallel-style activation handling.
+To be specific, inside each TP group, Megatron is not storing the full $\mX^0$ on both TP ranks all the time.
+To save activation memory, it keeps the activations sequence-sharded across the TP ranks, so for the top group, $\mX^0$ is split again along the sequence dimension:
+\begin{align*}
+  \mX^0 = \sbrac{\mX^{00}, \mX^{01}}, \text{   where  } \mX^{00}, \mX^{01} \in \R^{B \times \frac{S}{4} \times H}.
+\end{align*}
+We do all gather here so each GPU now has an full input for the corresponding chunk.
+
+Now consider the QKV part, which we assume is a column parallel linear layer, the weight is splitted along the output dimension:
+\begin{align*}
+  \mW_A = \sbrac{\mW_A^0, \mW_A^1}, \quad A \in {Q, K, V}
+\end{align*}
+Here, we compute both $\mX^0\mW_A^0, \mX^0\mW_A^1$, which are both $\R^{B \times \frac{S}{2} \times \frac{H}{2}}$, which we will denote as $\mQ^{00}, \mQ^{01}$ respectively.
+
+Now comes the blue AG, this is because each query token need key and value from all tokens in the same sequence.
+After the blue AG, on GPU0, we have 
+\begin{align*}
+  \mQ^{00} \in \R^{B \times \frac{S}{2} \times \frac{H}{2}}, \quad [\mK^{00}, \mK^{10}] \in \R^{B \times S \times \frac{H}{2}}, \quad [\mV^{00}, \mV^{10}],
+\end{align*}
+similarly on GPU1, we have 
+\begin{align*}
+  \mQ^{01} \in \R^{B \times \frac{S}{2} \times \frac{H}{2}}, \quad [\mK^{01}, \mK^{11}] \in \R^{B \times S \times \frac{H}{2}}, \quad [\mV^{01}, \mV^{11}],
+\end{align*}
+Notice that the tensor parallelism is kept, and the attnetion is computed in the following Attn block, resulting in $\mO^{00}, \mO^{01} \in \R^{B \times \frac{S}{2} \times \frac{H}{2}}$ on GPU0, GPU1 respectively.
+
+Then in the Attn out layer, we do projection. 
+This is the part that is row-parallel.
+RowParallelLinear means the weight is split along the input dimension, and the input is assumed to already be split across TP ranks.
+The reason for doing so is obvious, if we notice that on each GPU, we keep the input matrix in the shape of $B \times \frac{S}{2} \times \frac{H}{2}$, we naturally need $\mW_O^{00}, \mW_O^{01} \in \R^{\frac{H}{2} \times H}$ 
+So on GPU0, we have 
+\begin{align*}
+  \mP^{00} = \mO^{00} \times \mW_O^{00} \in \R^{B \times \frac{S}{2} \times H},
+\end{align*}
+and similar on GPU1 
+\begin{align*}
+  \mP^{01} = \mO^{01} \times \mW_O^{01} \in \R^{B \times \frac{S}{2} \times H}
+\end{align*}
+These are all partial sums, and the result is given by 
+\begin{align*}
+  \mY^0 = \mP^{00} + \mP^{01} \in \R^{B \times \frac{S}{2} \times H}.
+\end{align*}
+This is why another reduce-scatter is called here.
+
+During the next reduce-scatter, we reduce to get $\mY^0$ and $\mY^1$ and reshard them along the sequence dimension.
+
+Notice that the rest does not involve CP anymore because there is no inter token actions.
 
 
 \end{document}
