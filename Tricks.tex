@@ -891,7 +891,7 @@ It do has downside though, Pre-LN has a weaker normalizing effect so sometimes p
 }
 
 
-\begin{figure}[H]
+\begin{figure}[h]
 
 \centering
 \begin{tikzpicture}[>=Latex, node distance=12mm, font=\small]
@@ -4679,6 +4679,588 @@ GRPO baseline is the group mean. If the group is small or low-diversity, the mea
   \end{enumerate}
 \end{itemize}
 
+
+\subsection{About Fast Inferencing}
+There are several techniques exist for fast inferencing in practice.
+
+\textbullet~ (1) We have already talked about one of them, which is the V cache optimization.
+When we perform autoregressive inferencing, the main cost of computing attention comes from reading the KV cache, with MQA / GQA, we can reduce the size of the KV cache by asking some of the heads to share Key vector and Value vector.
+
+\textbullet~ (2) Another technique is the Paged KV Cache, which is used in vLLM.
+This is a memory-management technique introduced in the vLLM inference system.
+The key idea is to manage the KV cache like an operating system manages virtual memory pages rather than storing it as one long contiguous block.
+
+Traditionally, most implementations allocate contiguous memory for each request.
+Example memory layout:
+\begin{verbatim}
+Request A
+[token1 token2 token3 token4 ... token120]
+
+Request B
+[token1 token2 ... token15]
+
+Request C
+[token1 ... token450]  
+\end{verbatim}
+Each sequence occupies one continuous block. 
+However, in real inference servers: <1> requests arrive and finish at different times <2> sequences have different lengths.
+
+Initial memory:
+\begin{verbatim}
+A: 120 tokens
+B: 15 tokens
+C: 450 tokens
+D: 8 tokens  
+\end{verbatim}
+
+Memory after B finishes:
+\begin{verbatim}
+A: 120 tokens
+[free space of 15 tokens]
+C: 450 tokens
+D: 8 tokens
+\end{verbatim}
+The system cannot use the 15-token hole, so it must allocate memory elsewhere. 
+This is memory fragmentation, which results in GPU memory wasted, less requests catered and throughput decreases.
+Instead of storing tokens contiguously, vLLM splits the KV cache into fixed-size pages.
+Each request stores a list of pages, not one continuous block.
+The physical pages can be anywhere.
+This is exactly the same idea as virtual memory paging in operating systems.
+
+This also enables continous batching (new requests can be inserted between decoding steps).
+
+In naive batching: we do 
+\begin{enumerate}
+  \item collect a batch of requests
+  \item run decoding for that batch
+  \item wait until some finish
+  \item build a new batch later
+\end{enumerate}
+So the batch is relatively static.
+
+Example
+\begin{verbatim}
+Batch at start: A, B, C
+decode step 1
+decode step 2
+decode step 3
+...
+\end{verbatim}
+If a new request D arrives while A, B, C are already being decoded, the system may not insert D immediately. It may wait for some convenient rebatching point.
+
+In continous batching, the server does this instead:
+\begin{enumerate}
+  \item after each decode step, it can
+  \item remove finished requests
+  \item add newly arrived requests
+  \item keep unfinished requests
+\end{enumerate}
+This means the GPU is kept busy with a continuously refreshed set of sequences.
+With the previous contiguous design, we need to make sure there are enough space because we do not have the concept of pages. 
+This causes problem for continuous batching. 
+
+\paragraph{About vLLM:}
+vLLM is an inference and serving engine for LLMs. 
+In plain English: it is a system we use after training, when we want to run a model efficiently for generation or expose it as an API. 
+Its official docs position it around two main workflows: \textbf{offline batched inference} and \textbf{online serving} through an OpenAI-compatible server \footnote{lets your app call a local/self-hosted model almost like it calls the OpenAI API.}. 
+It is known for high throughput and memory-efficient serving, with techniques like paged attention / paged KV cache.
+
+Example usage:
+\begin{lstlisting}
+  from vllm import LLM, SamplingParams
+
+  llm = LLM(model="facebook/opt-125m")
+  sampling_params = SamplingParams(temperature=0.8, top_p=0.95, max_tokens=64)
+
+  prompts = [
+    "Explain what a transformer is in one paragraph.",
+    "What is the difference between SGD and Adam?",
+  ]
+
+  outputs = llm.generate(prompts, sampling_params)
+
+  for output in outputs:
+    print(output.prompt)
+    print(output.outputs[0].text)
+\end{lstlisting}
+
+\textbullet~ (3) Continous Batching: itself is a fast inferencing technique.
+
+\textbullet~ (4) Flash Attention: It does not change the mathematical definition of attention, it only changes how attention is scheduled on GPU memory.
+
+Let us consider a classical setting when we compute attention for one head: we have 
+\begin{align*}
+  \mQ, \mK, \mV \in \R^{L \times d}
+\end{align*}
+and the attention (scaled dot product attention) is computed as 
+\begin{align*}
+  \mS = \frac{\mQ\mK^{\top}}{\sqrt{d}}, \quad \mP = \text{softmax}(\mS), \quad \mO = \mP\mV.
+\end{align*}
+The problem is that if we look at $\mS$ and $\mP$, their sizes are $L \times L$, which means that they are huge, especially when the context lengths are long.
+
+GPU has HBM\footnote{High Bandwidth Memory: very wide memory bus, many parallel channels} / global memory, which is large but slow, and it also has SRAM\footnote{Static Random Access Memory: This is on-chip memory, built directly on the GPU die.} / shared memory / registers which are much smaller but much faster.
+
+In the naive implementation, we typically do things like:
+\begin{enumerate}
+  \item read $\mQ$ and $\mK$
+  \item compute all scores $\mS$
+  \item write $\mS$ out to HBM
+  \item read $\mS$ back 
+  \item compute softmax
+  \item maybe write/read again
+  \item multiply by $\mV$
+\end{enumerate}
+So even if the arithmetic is fine, the algorithm moves a lot of data back and forth between slow and fast memory. FlashAttention was explicitly introduced as an IO-aware exact attention algorithm to reduce these HBM reads/writes.
+
+FlashAttention avoids materializing the attention matrix by computing the needed pieces block by block and immediately folds them into the final output.
+The core idea is tiling.
+
+\paragraph{Tiling.}
+Instead of treating $\mQ, \mK, \mV$ as one large tensor, we partition them
+along the sequence dimension
+\[
+\mQ=\begin{bmatrix}\mQ^{(1)}\\\mQ^{(2)}\\\vdots\end{bmatrix},\quad
+\mK=\begin{bmatrix}\mK^{(1)}\\\mK^{(2)}\\\vdots\end{bmatrix},\quad
+\mV=\begin{bmatrix}\mV^{(1)}\\\mV^{(2)}\\\vdots\end{bmatrix}.
+\]
+Each tile contains a contiguous chunk of tokens.
+
+For a fixed query block $\mQ^{(i)}$, we iterate over the key/value tiles
+$\mK^{(j)}$ and $\mV^{(j)}$ and compute the score tile
+\begin{align*}
+\mS^{(i,j)} = \frac{\mQ^{(i)}(\mK^{(j)})^\top}{\sqrt{d}} .
+\end{align*}
+
+Instead of forming the full attention matrix
+\[
+\mS=\frac{\mQ\mK^\top}{\sqrt{d}},
+\]
+the computation proceeds tile by tile so that the working data fits in
+on-chip memory.
+
+\paragraph{Softmax.}
+Attention probabilities are obtained by applying a row-wise softmax
+\begin{align*}
+\mP = \operatorname{softmax}(\mS).
+\end{align*}
+
+For a single query row $r$ the attention weights are
+\begin{align*}
+p_{rj}
+=
+\frac{e^{S_{rj}}}{\sum_{t=1}^{T} e^{S_{rt}}},
+\qquad j=1,\dots,T.
+\end{align*}
+
+The denominator involves all keys, so it cannot be computed independently
+within each tile.
+
+\paragraph{Online Softmax.}
+To avoid materializing the entire score row, we process the keys
+sequentially and maintain two running statistics
+\begin{align*}
+m_t &= \max_{1\le j\le t} S_{rj}, \\
+l_t &= \sum_{j=1}^{t} e^{S_{rj}-m_t},
+\qquad t=1,\dots,T .
+\end{align*}
+
+Assume that after processing keys $1,\dots,t-1$ we have
+\begin{align*}
+m_{t-1} &= \max_{1\le j<t} S_{rj}, \\
+l_{t-1} &= \sum_{j=1}^{t-1} e^{S_{rj}-m_{t-1}} .
+\end{align*}
+
+When a new score $S_{rt}$ is observed, the running maximum becomes
+\begin{align*}
+m_t = \max(m_{t-1}, S_{rt}).
+\end{align*}
+
+The normalization term satisfies
+\begin{align*}
+l_t
+&=
+\sum_{j=1}^{t} e^{S_{rj}-m_t} \\
+&=
+e^{m_{t-1}-m_t} l_{t-1}
++
+e^{S_{rt}-m_t}.
+\end{align*}
+
+\paragraph{Attention Output.}
+The attention output for query $r$ is
+\begin{align*}
+\mathbf{o}_r
+=
+\frac{\sum_{j=1}^{T} e^{S_{rj}} \mathbf{v}_j}
+{\sum_{j=1}^{T} e^{S_{rj}}}.
+\end{align*}
+Note that this is basically $\text{softmax}(\mS)\mV$.
+Define the running numerator (numerically stable)
+\begin{align*}
+\mathbf{o}_t
+=
+\sum_{j=1}^{t} e^{S_{rj}-m_t} \mathbf{v}_j .
+\end{align*}
+
+Using the same rescaling argument,
+\begin{align*}
+\mathbf{o}_t
+=
+e^{m_{t-1}-m_t}\mathbf{o}_{t-1}
++
+e^{S_{rt}-m_t}\mathbf{v}_t .
+\end{align*}
+
+After all keys have been processed, the final attention output is
+\begin{align*}
+\mathbf{o}_r = \frac{\mathbf{o}_T}{l_T}.
+\end{align*}
+
+In practice the algorithm applies this update simultaneously to every
+row of the current query tile while iterating over key/value tiles.
+The full attention matrix is never materialized; only the current tile
+and the running statistics are maintained.
+
+It is worth noting that the memory consumption changes from $\cO(T^2)$ to $\cO(T)$, this is because in FlashAttention, we store:
+\begin{enumerate}
+  \item $\mQ, \mK, \mV$: already part of the model computation
+  \item output $\mO \in \R^{T \times d}$
+  \item per-row running statistics like max and normalization
+  \item one or a few temporary tiles in SRAM
+\end{enumerate} 
+So the extra memory for the attention computation scales linearly in $T$ not quadratically.
+The papers are precise that the savings come from reducing HBM traffic and not materializing the full attention matrix.
+However, the computation is still roughly \textbf{quadratic}.
+What changes is memory footprint and IO cost, which is often the real bottleneck on GPU. So FlashAttention is better thought of as: same exact attention math, much better memory movement pattern.
+
+\paragraph{Why recomputation appears?}
+Because FlashAttention refuses to store large intermediates, in backward pass it may recompute some local quantities instead of saving everything from forward. This is a classic time-vs-memory tradeoff, but on GPUs it often wins because memory traffic is so expensive. The original paper emphasizes that reducing memory reads/writes can outperform approaches that try to save every intermediate.
+
+
+\paragraph{Three generations of FlashAttention}
+
+\begin{enumerate}
+  \item \textbf{FlashAttention:} The original 2022 work introduced the tiled, IO-aware exact attention algorithm that avoids materializing the full attention matrix and substantially reduces HBM traffic.
+  
+  \item \textbf{FlashAttention-2:} keeps the same basic philosophy but reorganize the kernel so the GPU stays busy much more of the time. 
+  What FlashAttention-2 changes is how the work is partitioned and scheduled on the GPU, so it runs much faster in practice.
+  \begin{itemize}
+    \item \textbf{Fewer non-matmul operations:} more time is spent in tensor-core-friendly matrix multiplications and less time is wasted on bookkeeping, rescaling, and other operations that GPUs execute less efficiently.
+    
+    \item \textbf{Better parallelism across the sequence dimension:} FlashAttention-1 can underutilize the GPU when batch size or number of heads is small. FlashAttention-2 parallelizes attention computation more aggressively, including for a single head, across multiple thread blocks, so GPU occupancy is higher.
+    
+    \item \textbf{Better work partitioning within a thread block:} Inside each block, FlashAttention-2 distributes work across warps\footnote{A warp is a group of 32 threads that execute the same instruction at the same time on an NVIDIA GPU. When you launch a CUDA kernel with many threads, the GPU hardware internally schedules them in blocks of 32-thread bundles, called warps. The GPU scheduler operates at the warp level, not the thread level.} more carefully, which reduces synchronization and shared-memory traffic. That means less internal overhead and better effective speed.
+  \end{itemize}
+  The FlashAttention-2 paper reports roughly 2x speedup over FlashAttention-1 in many settings, and says it reaches about 50-73\% of theoretical peak FLOPs/s on A100, which is much closer to GEMM-like efficiency.
+  
+  \item \textbf{FlashAttention-3:} FlashAttention-3 targets Hopper GPUs such as H100 and uses Hopper-specific features. 
+  (1) exploiting asynchrony and TMA\footnote{Tensor Memory Accelerator} to overlap compute and data movement, 
+  (2) interleaving blockwise matmul and softmax operations more aggressively, and 
+  (3) using low-precision support such as FP8-related techniques.
+\end{enumerate}
+
+\paragraph{Warp:}
+A warp is a group of 32 threads that execute the same instruction at the same time on an NVIDIA GPU. When you launch a CUDA kernel with many threads, the GPU hardware internally schedules them in blocks of 32-thread bundles, called warps. The GPU scheduler operates at the warp level, not the thread level.
+
+Suppose a warp runs this kernel:
+\begin{verbatim}
+  y[i] = a * x[i] + b
+\end{verbatim}
+Warp execution looks conceptually like
+\begin{verbatim}
+Thread 0   : y[0]  = a*x[0]  + b
+Thread 1   : y[1]  = a*x[1]  + b
+...
+Thread 31  : y[31] = a*x[31] + b
+\end{verbatim}
+But the GPU issues one instruction for the whole warp.
+Because warps share the same instruction stream, branches can hurt performance.
+Example:
+\begin{verbatim}
+if (x[i] > 0)
+  y[i] = x[i]
+else
+  y[i] = 0
+\end{verbatim}
+If inside a warp, some threads take the if, others take the else, then GPU executes both paths sequentially, masking threads.
+This is called warp divergence.
+When people say: FlashAttention-2 distributes work across warps more carefully, they mean the kernel assigns computation like query blocks, key blocks, reduction work to different warps, instead of having one warp doing sequential steps.
+
+The original FlashAttention had patterns like:
+\begin{verbatim}
+warp 0:
+  load K tile
+  compute partial attention
+  update running softmax
+  write results
+\end{verbatim}
+FlashAttention-2 reorganizes so that
+\begin{verbatim}
+warp 0 → compute QK^T
+warp 1 → compute softmax stats
+warp 2 → multiply V
+warp 3 → reductions
+\end{verbatim}
+This improves warp occupancy, memory throughput and SM utilization.
+
+The execution hierarchy is
+\begin{verbatim}
+GPU
+ - SM (streaming multiprocessor)
+     - thread blocks
+         - warps (32 threads)
+             - threads
+\end{verbatim}
+FlashAttention kernels are tuned around: warp-level matrix multiply, warp-level reductions and warp-level memory loads.
+FlashAttention-2 improved performance largely by designing the kernel around warp-level parallelism instead of thread-level loops.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{ll}
+\hline
+\textbf{GPU Level} & \textbf{CPU Analogy} \\
+\hline
+thread & scalar instruction \\
+warp & vector instruction \\
+block & CPU core workload \\
+SM & CPU core \\
+\hline
+\end{tabular}
+\caption{A useful mental model relating CUDA execution hierarchy to CPU concepts.}
+\end{table}
+
+
+\textbullet~ (5) Speculative Decoding:
+The core idea is 
+\begin{enumerate}
+  \item a small fast model (the draft model) proposes several next tokens at once
+  \item the large target model then checks those proposals in parallel
+  \item every proposal that passes verification is accepted
+  \item generation then continues from the first rejection point or from the end of the accepted chunk.
+\end{enumerate}
+So instead of the big model doing one token per forward pass, speculative decoding tries to let the small model ``guess ahead'' a few steps, and then uses one target-model pass to verify multiple guesses at once.
+That is why the technique can \textbf{xreduce inter-token latency}, especially in memory-bound inference settings.
+
+The speed up depends on (1) draft cost: The draft model must be much cheaper than the target model;
+(2) Acceptance rate: The draft model's guesses must often be accepted.
+
+
+\textbullet~ (6) Quantization: \textbf{Reduce memory bandwidth}.
+
+\textbullet~ (7) Kernel Fusion: Kernel fusion means combining several GPU operations that would normally run as separate kernels into one kernel. TensorRT's glossary defines fusion exactly in this spirit: combining multiple layers into a single operation to reduce\textbf{memory bandwidth} use and \textbf{kernel launch overhead}.
+
+\textbullet~ (8) Prefill / Decode Separation: 
+LLM inference is not one uniform workload. It has two very different phases:
+\begin{enumerate}
+  \item \textbf{Prefill}: consume the whole prompt and build the KV cache.
+  \item \textbf{Decode}: generate new tokens one by one using that KV cache.
+\end{enumerate}
+These two phases stress the hardware in very different ways, so good systems often treat them differently in scheduling, batching, kernels, and even cluster layout.
+vLLM explicitly supports this idea; its docs describe disaggregated prefilling as running prefill and decode in different vLLM instances, so we can optimize TTFT(Time To First Token)\footnote{Users care about at least two latency metrics: TTFT: time to first token, ITL: inter-token latency} and inter-token latency separately. vLLM also documents chunked prefill and different thresholds for prefill-heavy versus decode-only batches.
+
+\textbullet~ (9) Tensor Parallel Inference: Megatron / TensorRT-LLM. Multiple GPUs assigned for tensor parallelism.
+
+\textbullet~ (10) Activation Recomputation Removal.
+
+\textbullet~ (11) Prefix Cache: If multiple requests share the same prefix (e.g. system prompt), we can cache KV cache. Often seen in ChatGPT, vLLM.
+
+
+\textbf{LLM inference is often memory-bound: Read model weights; Read KV cache. Training is often compute bound because of large batches.}
+
+
+\subsection{About PPO}
+In RLHF, we usually have three stages:
+\begin{enumerate}
+  \item \textbf{Supervised fine-tuning (SFT):} Train the language model on high-quality demonstrations.
+  \item \textbf{Reward model (RM):} Train a model to score outputs according to human preferences.
+  \item \textbf{RL optimization with PPO:} Further update the policy model so it generates responses with higher reward, while not drifting too far from the original SFT model.
+\end{enumerate}
+
+\textbullet~ The policy is the language model itself: $\pi_\theta(\my \mid \mx)$, where $\mx$ is the prompt and $\my$ is the generated response.
+
+\textbullet~ \textbf{Vanilla policy gradient} can be unstable: one update can change the model too much and destroy language quality. 
+\textbf{PPO} is a stabilized policy-gradient method that prevents overly large policy updates.
+
+\textbullet~ RLHF objective: Denote the reward model as $r_\phi(\mx, \my)$ and reference model $\pi_{\text{ref}}$, a common scalar reward is 
+\begin{align*}
+  R(\mx,\my)=r_{\phi}(\mx,\my)-\beta\,\mathrm{KL}\!\left(\pi_{\theta}(\cdot\mid\mx)\,\|\,\pi_{\mathrm{ref}}(\cdot\mid\mx)\right).
+\end{align*}
+or in practice often a token-level KL penalty approximation such as
+\begin{align*}
+  R(\mx,\my)\approx r_{\phi}(\mx,\my)-\beta\sum_{t=1}^{T}\!\left[\log \pi_{\theta}(y_t\mid \mx,\my_{<t})-\log \pi_{\mathrm{ref}}(y_t\mid \mx,\my_{<t})\right].
+\end{align*}
+The KL penalty stops the model from deviate too far from the reference.
+We will not use the reward directly, having a reward (or return) is not enough for stable policy gradient updates, and the advantage $A$ reduces variance and tells the optimizer whether an action was better or worse than expected.
+So we use reward to estimate $A$.
+
+\textbullet~ PPO surrogate objective: Suppose data is collected using the old policy $\pi_{\text{old}}$: Define the importance ratio
+\begin{align*}
+  \rho_t(\theta)=\frac{\pi_{\theta}(y_t\mid \mx,\my_{<t})}{\pi_{\theta_{\text{old}}}(y_t\mid \mx,\my_{<t})}.
+\end{align*}
+Let $\hat{A}_t$ be the estimated advantage at token $t$. PPO maximizes
+\[
+  L_{\mathrm{PPO}}(\theta)=\mathbb{E}\left[\min\left(\rho_t(\theta)\hat{A}_t,\;\mathrm{clip}\left(\rho_t(\theta),1-\epsilon,1+\epsilon\right)\hat{A}_t\right)\right].
+\]
+This clipping is the defining trick.
+If $\rho_t(\theta)$ becomes too large or too small, PPO truncates the incentive to push it further.
+So even if the gradient wants to make a huge update, PPO resists that.
+
+\textbullet~ Where does the advantage come from? In RLHF for LLMs, after sampling a completion, one must convert the sequence-level reward into learning signals for the policy. There are three common ways to construct the advantage.
+
+\paragraph{Sequence-level handling.}
+A simple approximation treats the entire completion as a single action.  
+After sampling
+\[
+  y=(y_1,\dots,y_T), \qquad y \sim \pi_\theta(\cdot \mid x),
+\]
+the reward model produces a scalar score
+\[
+  r_\phi(x,y).
+\]
+A KL penalty against a frozen reference policy $\pi_{\mathrm{ref}}$ is added
+\[
+  \mathrm{KL}(x,y)
+  =
+  \sum_{t=1}^{T}
+  \bigl(
+  \log \pi_\theta(y_t \mid x,y_{<t})
+  -
+  \log \pi_{\mathrm{ref}}(y_t \mid x,y_{<t})
+  \bigr).
+\]
+The sequence-level reward becomes
+\[
+  R(x,y)=r_\phi(x,y)-\beta\,\mathrm{KL}(x,y).
+\]
+A baseline or value estimate $V_\psi(x)$ predicts the expected reward for prompt $x$, giving the sequence-level advantage
+\[
+  \hat A(x,y)=R(x,y)-V_\psi(x).
+\]
+In practice this scalar advantage is often broadcast to all tokens in the sampled completion when updating the policy.
+
+\paragraph{Token-level returns without GAE.}
+More commonly, the sequence reward is converted into token-level rewards.
+Define the token-level state
+\[
+  s_t=(x,y_{<t}),
+  \]
+  and compute the per-token KL
+  \[
+  \mathrm{KL}_t
+  =
+  \log \pi_\theta(y_t \mid s_t)
+  -
+  \log \pi_{\mathrm{ref}}(y_t \mid s_t).
+  \]
+  The token rewards are constructed as
+  \[
+  r_t =
+  \begin{cases}
+  -\beta\,\mathrm{KL}_t, & t<T,\\
+  r_\phi(x,y)-\beta\,\mathrm{KL}_T, & t=T.
+  \end{cases}
+\]
+From these we compute the return
+\[
+  G_t=\sum_{k=t}^{T} r_k.
+\]
+A value model $V_\psi(s_t)$ predicts the expected return from state $s_t$, and the advantage used by PPO is
+\[
+  \hat A_t = G_t - V_\psi(s_t).
+\]
+
+\paragraph{Token-level advantages with GAE.}
+To reduce variance, many implementations use generalized advantage estimation (GAE).
+First define the temporal-difference residual
+\[
+  \delta_t = r_t + \gamma V_\psi(s_{t+1}) - V_\psi(s_t),
+\]
+and then compute the advantage as
+\[
+  \hat A_t =
+  \sum_{l=0}^{T-t-1}
+  (\gamma\lambda)^l
+  \delta_{t+l}.
+\]
+The resulting token-level advantages $\hat A_t$ are then used in the PPO loss to update the policy.
+
+Intuitively, the reward model provides a sequence-level signal, which is then converted into token-level advantages indicating whether each sampled action $y_t$ led to a better or worse outcome than expected. GAE typically produces lower-variance estimates and therefore more stable training.
+
+
+So PPO in RLHF is usually actor-critic:
+\begin{enumerate}
+  \item actor: policy LM,
+  \item critic: value head/model,
+  \item reward model: separate learned preference scorer.
+\end{enumerate}
+
+\textbullet~ \textbf{Typical loop:} A typical loop is:
+\begin{enumerate}
+  \item Sample prompts $\mx$.
+
+  \item Generate responses $\my \sim \pi_{\theta_{\mathrm{old}}}(\cdot \mid \mx)$.
+
+  \item Compute:
+  \begin{itemize}
+  \item log-probs from current/old policy,
+  \item log-probs from reference model,
+  \item reward model score,
+  \item KL penalty,
+  \item total reward.
+  \end{itemize}
+
+  \item Estimate advantages $\hat{A}_t$ and returns.
+
+  \item Update:
+  \begin{itemize}
+  \item policy with PPO clipped objective,
+  \item value model with regression loss,
+  \item often also include entropy regularization.
+  \end{itemize}
+
+  \item Repeat.
+\end{enumerate}
+
+\textbullet~ \textbf{Drawbacks of PPO-based RLHF}.
+
+PPO-based RLHF works, but it has real drawbacks:
+
+\begin{enumerate} 
+  \item \textbf{Expensive.}
+
+  You must generate rollouts online and run:
+  \begin{itemize}
+  \item policy model,
+  \item reference model,
+  \item reward model,
+  \item value model.
+  \end{itemize}
+  That is a lot of compute.
+
+  \item \textbf{Sensitive / unstable.}
+
+  Training can be delicate:
+  \begin{itemize}
+  \item KL coefficient $\beta$,
+  \item clipping threshold $\epsilon$,
+  \item reward scaling,
+  \item value loss balance,
+  \item rollout length.
+  \end{itemize}
+  These all matter.
+
+  \item \textbf{Reward hacking.}
+
+  The policy may exploit imperfections in the reward model.
+
+  \item \textbf{Credit assignment is crude.}
+
+  A single sequence-level preference score is often spread across many tokens, which is not always ideal.
+
+  \item \textbf{Not always the best modern choice.}
+
+  Many newer alignment methods avoid full PPO because it is heavy and complicated.
+\end{enumerate}
 
 
 \section{Megatron}
